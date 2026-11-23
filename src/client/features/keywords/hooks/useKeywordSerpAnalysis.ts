@@ -1,31 +1,41 @@
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
-import { getStandardErrorMessage } from "@/client/lib/error-messages";
+import {
+  getErrorCode,
+  getStandardErrorMessage,
+} from "@/client/lib/error-messages";
 import { getSerpAnalysis } from "@/serverFunctions/keywords";
 
 const SERP_PAGE_SIZE = 10;
-/** Depth every SERP panel opens at — two pages of results, ~5 credits. */
-const SERP_INITIAL_DEPTH = 20;
+/** Depth every SERP panel opens at — page 1, read and merged, ~5 credits. */
+const SERP_INITIAL_DEPTH = 10;
 /**
  * Depth we buy when a user pages past what's loaded. Google has no offset, so
  * this re-crawls the top of the SERP: the deeper snapshot replaces the shallow
- * one instead of extending it, and costs ~20 more credits.
+ * one instead of extending it, and costs ~36 credits.
  */
 const SERP_DEEP_DEPTH = 100;
 
 export function useKeywordSerpAnalysis(
   projectId: string,
   locationCode: number | undefined,
+  locationName: string | undefined,
 ) {
   const [serpKeyword, setSerpKeywordState] = useState<string | null>(null);
   const [serpPage, setSerpPageState] = useState(0);
-  const [requestedDepth, setRequestedDepth] = useState<20 | 100>(
+  const [requestedDepth, setRequestedDepth] = useState<10 | 100>(
     SERP_INITIAL_DEPTH,
   );
 
   // Everything but the depth identifies the snapshot; the depth decides how
   // deep it goes.
-  const snapshotKey = ["serpAnalysis", projectId, serpKeyword, locationCode];
+  const snapshotKey = [
+    "serpAnalysis",
+    projectId,
+    serpKeyword,
+    locationCode,
+    locationName,
+  ];
 
   const serpQuery = useQuery({
     queryKey: [...snapshotKey, requestedDepth],
@@ -35,6 +45,7 @@ export function useKeywordSerpAnalysis(
           projectId,
           keyword: serpKeyword!,
           locationCode,
+          locationName,
           depth: requestedDepth,
         },
       }),
@@ -76,6 +87,8 @@ export function useKeywordSerpAnalysis(
   // expensive call. The card offers the shallow snapshot back instead.
   const deepFetchFailed =
     serpQuery.isError && requestedDepth === SERP_DEEP_DEPTH;
+  const serpOutOfCredits =
+    getErrorCode(serpQuery.error) === "INSUFFICIENT_CREDITS";
 
   // Retrying a failed deep crawl re-buys the expensive call that just timed
   // out. Drop back to the shallow snapshot instead: it's still cached, so the
@@ -91,6 +104,7 @@ export function useKeywordSerpAnalysis(
   const setSerpKeyword = useCallback((keyword: string | null) => {
     setSerpKeywordState(keyword);
     setRequestedDepth(SERP_INITIAL_DEPTH);
+    setSerpPageState(0);
   }, []);
 
   const loadedPages = Math.max(
@@ -126,7 +140,6 @@ export function useKeywordSerpAnalysis(
     serpPage: visiblePage,
     setSerpPage,
     SERP_PAGE_SIZE,
-    serpQuery,
     serpResults,
     activeSerpKeyword,
     serpLoading,
@@ -134,5 +147,8 @@ export function useKeywordSerpAnalysis(
     canLoadMoreSerp,
     deepFetchFailed,
     serpError,
+    serpOutOfCredits,
+    // `isLoading` stays false while a failed query refetches.
+    serpRetrying: serpQuery.isFetching,
   };
 }

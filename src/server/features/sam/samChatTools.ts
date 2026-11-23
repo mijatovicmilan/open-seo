@@ -1,3 +1,19 @@
+import {
+  getAiVisibilityTrackerTool,
+  generateAiVisibilityPromptsTool,
+  researchAiVisibilityPromptsTool,
+  completeAiResearchSetupTool,
+  saveAiVisibilityTrackerTool,
+  estimateAiVisibilityCostTool,
+  setAiVisibilityScheduleTool,
+  runAiVisibilityCheckTool,
+  getAiVisibilityRunTool,
+  getAiVisibilityResultsTool,
+  getAiVisibilityAnswerTool,
+  getAiVisibilitySourcesTool,
+  getAiVisibilityTrendTool,
+  exportAiVisibilityDataTool,
+} from "@/server/mcp/tools/ai-visibility-tools";
 import { tool, type Tool, type ToolSet } from "ai";
 import { z, type ZodRawShape } from "zod";
 import { withPgClient } from "@/db";
@@ -11,19 +27,23 @@ import { getDomainOverviewTool } from "@/server/mcp/tools/get-domain-overview";
 import { addRankTrackingKeywordsTool } from "@/server/mcp/tools/add-rank-tracking-keywords";
 import { createRankTrackerTool } from "@/server/mcp/tools/create-rank-tracker";
 import { estimateRankTrackerCostTool } from "@/server/mcp/tools/estimate-rank-tracker-cost";
+import { getRankHistoryTool } from "@/server/mcp/tools/get-rank-history";
 import { getRankTrackerTool } from "@/server/mcp/tools/get-rank-tracker";
 import { removeRankTrackingKeywordsTool } from "@/server/mcp/tools/remove-rank-tracking-keywords";
+import { pinRankTrackingKeywordsTool } from "@/server/mcp/tools/pin-rank-tracking-keywords";
 import { runRankTrackerTool } from "@/server/mcp/tools/run-rank-tracker";
 import { searchSerpLocationsTool } from "@/server/mcp/tools/search-serp-locations";
 import { getSerpResultsTool } from "@/server/mcp/tools/get-serp-results";
 import {
   getAuditIssuesTool,
+  getAuditLighthouseTool,
   getAuditPagesTool,
   getAuditStatusTool,
   runSiteAuditTool,
 } from "@/server/mcp/tools/site-audit-tools";
 import { listSavedKeywordsTool } from "@/server/mcp/tools/list-saved-keywords";
 import { removeSavedKeywordsTool } from "@/server/mcp/tools/remove-saved-keywords";
+import { updateAiResearchKeywordsTool } from "@/server/mcp/tools/update-ai-research-keywords";
 import { buildUpdateProjectContextTool } from "@/server/mcp/tools/project-context";
 import {
   getGoogleAnalyticsAudienceBreakdownTool,
@@ -52,6 +72,7 @@ import {
   getLocalRankGridTool,
   listBusinessCategoriesTool,
 } from "@/server/mcp/tools/local-seo-tools";
+import { getSuggestedKeywordsTool } from "@/server/mcp/tools/get-suggested-keywords";
 import { researchKeywordsTool } from "@/server/mcp/tools/research-keywords";
 import { saveKeywordsTool } from "@/server/mcp/tools/save-keywords";
 import {
@@ -59,14 +80,10 @@ import {
   inspectUrlsTool,
 } from "@/server/mcp/tools/search-console-tools";
 import { whoamiTool } from "@/server/mcp/tools/whoami";
-import { discoverSiteUrls, readPages, readSite } from "@/server/lib/scrape";
+import { explorePromptTool } from "@/server/mcp/tools/explore-prompt";
+import { scrapeTools } from "@/server/features/sam/samScrapeTools";
 import { capToolOutput } from "@/server/features/sam/samToolOutput";
 import openSeoFactSheet from "@/server/features/sam/openseo-fact-sheet.md?raw";
-
-// Enough pages for SAM to work out what a business does, sells, and positions
-// against on its own.
-const SAM_MAX_SCRAPE_PAGES = 10;
-const SAM_MAX_MAPPED_URLS = 60;
 
 // Shape of the MCP tool objects exported from src/server/mcp/tools/*. SAM reuses
 // the exact same definitions the MCP server registers, so the in-app agent and
@@ -233,71 +250,6 @@ export function waitingAuditStatusTool(
   };
 }
 
-// Free (credit-less) site-reading tools, split into discovery + reading so the
-// model can pick which pages to read instead of blindly taking the first N
-// sitemap entries.
-function scrapeTools(projectDomain: string | null): ToolSet {
-  return {
-    map_links: tool({
-      description:
-        "List a site's page URLs (homepage plus its sitemap) so you can choose which pages to read with read_pages. Defaults to the project's own site; pass `domain` to map another site (e.g. a competitor). Uses no credits.",
-      inputSchema: z.object({
-        domain: z
-          .string()
-          .optional()
-          .describe("Domain or URL to map. Omit for the project's own site."),
-      }),
-      execute: async ({ domain }) => {
-        const target = domain ?? projectDomain;
-        if (!target) {
-          return {
-            error:
-              "This project has no website set — ask the user for their site first.",
-          };
-        }
-        const result = await discoverSiteUrls(target, SAM_MAX_MAPPED_URLS);
-        return result.blocked
-          ? { blocked: true, urls: [], note: "Could not reach the site." }
-          : { blocked: false, urls: result.urls };
-      },
-    }),
-    read_pages: tool({
-      description: `Read up to ${SAM_MAX_SCRAPE_PAGES} web pages as plain text — the project's own pages or anyone else's (competitors, references). Pass specific \`urls\` (usually picked from map_links); omit to read a representative sample of the project's own site. Uses no credits.`,
-      inputSchema: z.object({
-        urls: z
-          .array(z.string().url())
-          .max(SAM_MAX_SCRAPE_PAGES)
-          .optional()
-          .describe(
-            `Specific page URLs to read (max ${SAM_MAX_SCRAPE_PAGES}). Omit to read the project's own site.`,
-          ),
-      }),
-      execute: async ({ urls }) => {
-        const site =
-          urls && urls.length > 0
-            ? await readPages(urls, SAM_MAX_SCRAPE_PAGES)
-            : projectDomain
-              ? await readSite(projectDomain, SAM_MAX_SCRAPE_PAGES)
-              : null;
-        if (!site) {
-          return {
-            error:
-              "This project has no website set — ask the user for their site, or pass explicit urls.",
-          };
-        }
-        if (site.blocked) {
-          return {
-            blocked: true,
-            pages: [],
-            note: "Could not read the requested page(s). Ask the user to describe the site instead, and say you couldn't read it.",
-          };
-        }
-        return capToolOutput({ blocked: false, pages: site.pages });
-      },
-    }),
-  };
-}
-
 /**
  * Builds SAM's tool surface as an AI SDK ToolSet: the full MCP toolset plus the
  * free site-reading tools. Every tool the OpenSEO MCP server exposes is
@@ -365,6 +317,7 @@ export function buildSamMcpTools(
     update_project_context: adaptTool(buildUpdateProjectContextTool("sam")),
     list_saved_keywords: adaptTool(listSavedKeywordsTool),
     remove_saved_keywords: adaptTool(removeSavedKeywordsTool),
+    get_suggested_keywords: adaptTool(getSuggestedKeywordsTool),
     research_keywords: adaptTool(researchKeywordsTool),
     save_keywords: adaptTool(saveKeywordsTool),
     get_domain_overview: adaptTool(getDomainOverviewTool),
@@ -373,15 +326,33 @@ export function buildSamMcpTools(
     get_backlinks_profile: adaptTool(getBacklinksProfileTool),
     get_serp_results: adaptTool(getSerpResultsTool),
     search_serp_locations: adaptTool(searchSerpLocationsTool),
+    get_ai_visibility_tracker: adaptTool(getAiVisibilityTrackerTool),
+    generate_ai_visibility_prompts: adaptTool(generateAiVisibilityPromptsTool),
+    research_ai_visibility_prompts: adaptTool(researchAiVisibilityPromptsTool),
+    complete_ai_research_setup: adaptTool(completeAiResearchSetupTool),
+    update_ai_research_keywords: adaptTool(updateAiResearchKeywordsTool),
+    explore_prompt: adaptTool(explorePromptTool),
+    save_ai_visibility_tracker: adaptTool(saveAiVisibilityTrackerTool),
+    estimate_ai_visibility_cost: adaptTool(estimateAiVisibilityCostTool),
+    set_ai_visibility_schedule: adaptTool(setAiVisibilityScheduleTool),
+    run_ai_visibility_check: adaptTool(runAiVisibilityCheckTool),
+    get_ai_visibility_run: adaptTool(getAiVisibilityRunTool),
+    get_ai_visibility_results: adaptTool(getAiVisibilityResultsTool),
+    get_ai_visibility_answer: adaptTool(getAiVisibilityAnswerTool),
+    get_ai_visibility_sources: adaptTool(getAiVisibilitySourcesTool),
+    get_ai_visibility_trend: adaptTool(getAiVisibilityTrendTool),
+    export_ai_visibility_data: adaptTool(exportAiVisibilityDataTool),
     create_rank_tracker: adaptTool(createRankTrackerTool),
     get_rank_tracker: adaptTool(getRankTrackerTool),
+    get_rank_history: adaptTool(getRankHistoryTool),
     add_rank_tracking_keywords: adaptTool(addRankTrackingKeywordsTool),
     remove_rank_tracking_keywords: adaptTool(removeRankTrackingKeywordsTool),
+    pin_rank_tracking_keywords: adaptTool(pinRankTrackingKeywordsTool),
     estimate_rank_tracker_cost: adaptTool(estimateRankTrackerCostTool),
     run_rank_tracker: adaptTool(runRankTrackerTool),
     get_ranked_keywords: adaptTool(getRankedKeywordsTool),
     find_serp_competitors: adaptTool(findSerpCompetitorsTool),
-    search_local_businesses: adaptTool(searchLocalBusinessesTool),
+    search_local_businesses: adaptObjectTool(searchLocalBusinessesTool),
     get_local_serp_results: adaptTool(getLocalSerpResultsTool),
     get_google_business_questions: adaptTool(getGoogleBusinessQuestionsTool),
     get_business_profile: adaptTool(getBusinessProfileTool),
@@ -426,5 +397,6 @@ export function buildSamMcpTools(
     get_audit_status: waitingAuditStatusTool(adaptTool),
     get_audit_issues: adaptTool(getAuditIssuesTool),
     get_audit_pages: adaptTool(getAuditPagesTool),
+    get_audit_lighthouse: adaptTool(getAuditLighthouseTool),
   };
 }

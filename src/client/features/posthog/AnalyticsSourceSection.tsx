@@ -1,6 +1,7 @@
 import * as React from "react";
 import { useQuery } from "@tanstack/react-query";
-import { IntegrationConnectionCard } from "@/client/features/integrations/IntegrationConnectionCard";
+import { CardShell } from "@/client/components/CardShell";
+import { Badge } from "@/client/components/ui/badge";
 import { getStandardErrorMessage } from "@/client/lib/error-messages";
 import { getAnalyticsSource } from "@/serverFunctions/analyticsSource";
 import { ConnectPosthog } from "./PosthogConnect";
@@ -98,14 +99,19 @@ function PosthogCard({
   const connected =
     source.provider === "posthog" && Boolean(source.posthogProjectId);
   return (
-    <IntegrationConnectionCard
+    <CardShell
       title="PostHog"
-      status={
-        connected
-          ? source.key
-            ? "connected"
-            : "setup_required"
-          : "disconnected"
+      action={
+        <Badge
+          variant={connected ? (source.key ? "success" : "warning") : "outline"}
+        >
+          <span className="size-1.5 rounded-full bg-current" />
+          {connected
+            ? source.key
+              ? "Connected"
+              : "Setup required"
+            : "Not connected"}
+        </Badge>
       }
     >
       {!source.canManage ? (
@@ -126,6 +132,6 @@ function PosthogCard({
         that count visitors without cookies, users and sessions are estimates.
         PostHog has no ecommerce data.
       </p>
-    </IntegrationConnectionCard>
+    </CardShell>
   );
 }

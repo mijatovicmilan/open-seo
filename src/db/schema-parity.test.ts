@@ -19,6 +19,8 @@ import * as sqliteTelemetry from "./telemetry.schema";
 import * as sqliteOutreach from "./outreach.schema";
 import * as sqliteGscHistory from "./gsc-history.schema";
 import * as sqliteAnalyticsSource from "./analytics-source.schema";
+import * as sqliteAiVisibility from "./ai-visibility.schema";
+import * as sqliteLocalSeo from "./local-seo.schema";
 import * as pgApp from "./pg/app.schema";
 import * as pgProjectContext from "./pg/project-context.schema";
 import * as pgReports from "./pg/reports.schema";
@@ -33,6 +35,8 @@ import * as pgTelemetry from "./pg/telemetry.schema";
 import * as pgOutreach from "./pg/outreach.schema";
 import * as pgGscHistory from "./pg/gsc-history.schema";
 import * as pgAnalyticsSource from "./pg/analytics-source.schema";
+import * as pgAiVisibility from "./pg/ai-visibility.schema";
+import * as pgLocalSeo from "./pg/local-seo.schema";
 
 // Guards the ONE structural artifact `db:generate` does not regenerate: the
 // hand-written Postgres schema. The provider-aware `db`/`@/db/schema` barrel
@@ -168,6 +172,8 @@ const sqliteAppTables = tablesFrom(
   sqliteOutreach,
   sqliteGscHistory,
   sqliteAnalyticsSource,
+  sqliteAiVisibility,
+  sqliteLocalSeo,
 );
 const pgAppTables = tablesFrom(
   pgApp,
@@ -183,6 +189,8 @@ const pgAppTables = tablesFrom(
   pgOutreach,
   pgGscHistory,
   pgAnalyticsSource,
+  pgAiVisibility,
+  pgLocalSeo,
 );
 const sqliteAuthTables = tablesFrom(sqliteAuth);
 const pgAuthTables = tablesFrom(pgAuth);

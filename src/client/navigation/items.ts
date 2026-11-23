@@ -2,6 +2,7 @@ import {
   Bookmark,
   Bot,
   Brain,
+  ChartLine,
   ClipboardCheck,
   FileText,
   Globe,
@@ -9,6 +10,7 @@ import {
   Lightbulb,
   Link2,
   Mail,
+  MapPin,
   MessageSquare,
   Search,
   Sparkles,
@@ -40,6 +42,11 @@ const projectNavItems = [
     to: "/p/$projectId/rank-tracking" as const,
     label: "Rank Tracking",
     icon: TrendingUp,
+  },
+  {
+    to: "/p/$projectId/local-seo" as const,
+    label: "Local SEO",
+    icon: MapPin,
   },
   {
     to: "/p/$projectId/search-performance" as const,
@@ -74,6 +81,18 @@ const projectNavItems = [
     icon: ClipboardCheck,
   },
   {
+    to: "/p/$projectId/ai-visibility" as const,
+    label: "Prompt Tracking",
+    icon: ChartLine,
+    activeOptions: { exact: true, includeSearch: false },
+  },
+  {
+    to: "/p/$projectId/ai-visibility/research" as const,
+    label: "Prompt Research",
+    icon: Search,
+  },
+  // Fork addition (FORK-CHANGES.md): Brand Lookup stays in the menu.
+  {
     to: "/p/$projectId/brand-lookup" as const,
     label: "Brand Lookup",
     icon: Sparkles,
@@ -95,7 +114,7 @@ const projectNavItems = [
   },
 ] as const;
 
-// Project-independent. Rendered inside the project "AI" group when a project
+// Project-independent. Rendered inside the project "AI Tools" group when a project
 // is selected, and on its own (connectNavGroup) when none is.
 const aiNavItem = linkOptions({
   to: "/ai" as const,
@@ -104,9 +123,9 @@ const aiNavItem = linkOptions({
 });
 
 // Shown only when no project is selected; with a project, Agent setup lives in
-// the "AI" group below.
+// the "AI Tools" group below.
 export const connectNavGroup = {
-  label: "AI",
+  label: "AI Tools",
   items: [aiNavItem],
 };
 
@@ -138,8 +157,15 @@ export function getProjectNavGroups(projectId: string) {
         byPath("/p/$projectId/keywords"),
         byPath("/p/$projectId/domain"),
         byPath("/p/$projectId/backlinks"),
+      ],
+    },
+    {
+      label: "AI Visibility",
+      items: [
+        byPath("/p/$projectId/ai-visibility/research"),
         byPath("/p/$projectId/brand-lookup"),
         byPath("/p/$projectId/prompt-explorer"),
+        byPath("/p/$projectId/ai-visibility"),
       ],
     },
     {
@@ -149,13 +175,14 @@ export function getProjectNavGroups(projectId: string) {
         // is hidden; Search Insights replaces it and its route redirects.
         byPath("/p/$projectId/search-insights"),
         byPath("/p/$projectId/rank-tracking"),
+        byPath("/p/$projectId/local-seo"),
         byPath("/p/$projectId/saved"),
         byPath("/p/$projectId/audit"),
         byPath("/p/$projectId/outreach"),
       ],
     },
     {
-      label: "AI",
+      label: "AI Tools",
       items: [
         byPath("/p/$projectId/reports"),
         byPath("/p/$projectId/context"),

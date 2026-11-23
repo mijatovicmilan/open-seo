@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MAX_KEYWORDS_PER_CONFIG } from "@/shared/rank-tracking";
+import { runScheduledRankChecks } from "./scheduledRankChecks";
 
 type DueConfigRow = {
   id: string;
@@ -34,6 +35,7 @@ const mocks = vi.hoisted(() => ({
     vi.fn<(nowIso: string) => Promise<DueConfigRow[]>>(),
   getKeywordCountsForConfigs:
     vi.fn<(configIds: string[]) => Promise<Map<string, number>>>(),
+  getTaskUnitsInFlight: vi.fn<(since: Date) => Promise<number>>(),
   claimDueConfig: vi.fn<(input: ClaimInput) => Promise<boolean>>(),
   beginRankCheckRun:
     vi.fn<
@@ -45,15 +47,19 @@ const mocks = vi.hoisted(() => ({
     >(),
   customerHasPaidPlan: vi.fn<(organizationId: string) => Promise<boolean>>(),
   isHostedServerAuthMode: vi.fn<() => Promise<boolean>>(),
+  getFlag: vi.fn<(flag: string) => Promise<boolean>>(),
 }));
 
-vi.mock("cloudflare:workers", () => ({ env: {} }));
+vi.mock("cloudflare:workers", () => ({
+  env: { FLAGS: { getBooleanValue: mocks.getFlag } },
+}));
 vi.mock(
   "@/server/features/rank-tracking/repositories/RankTrackingRepository",
   () => ({
     RankTrackingRepository: {
       getDueConfigsWithOrganization: mocks.getDueConfigsWithOrganization,
       getKeywordCountsForConfigs: mocks.getKeywordCountsForConfigs,
+      getTaskUnitsInFlight: mocks.getTaskUnitsInFlight,
       claimDueConfig: mocks.claimDueConfig,
     },
   }),
@@ -88,16 +94,10 @@ function dueConfig(overrides: Partial<DueConfigRow> = {}): DueConfigRow {
   };
 }
 
-async function runTick() {
-  const { runScheduledRankChecks } = await import("./scheduledRankChecks");
-  await runScheduledRankChecks(testEnv);
-}
-
 describe("runScheduledRankChecks", () => {
   beforeEach(() => {
-    vi.resetModules();
-    vi.resetAllMocks();
     mocks.isHostedServerAuthMode.mockResolvedValue(true);
+    mocks.getFlag.mockResolvedValue(false);
     mocks.customerHasPaidPlan.mockResolvedValue(true);
     mocks.claimDueConfig.mockResolvedValue(true);
     mocks.beginRankCheckRun.mockResolvedValue({ ok: true, runId: "run_1" });
@@ -105,12 +105,23 @@ describe("runScheduledRankChecks", () => {
       new Map([["config_1", 5]]),
     );
     mocks.getDueConfigsWithOrganization.mockResolvedValue([dueConfig()]);
+    mocks.getTaskUnitsInFlight.mockResolvedValue(0);
+  });
+
+  it("starts and claims nothing while the pause flag is on, so configs stay due", async () => {
+    mocks.getFlag.mockResolvedValue(true);
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    await runScheduledRankChecks(testEnv);
+
+    expect(mocks.claimDueConfig).not.toHaveBeenCalled();
+    expect(mocks.beginRankCheckRun).not.toHaveBeenCalled();
   });
 
   it("advances a free config with plan_required instead of starting a workflow", async () => {
     mocks.customerHasPaidPlan.mockResolvedValue(false);
 
-    await runTick();
+    await runScheduledRankChecks(testEnv);
 
     expect(mocks.claimDueConfig).toHaveBeenCalledTimes(1);
     expect(mocks.claimDueConfig).toHaveBeenCalledWith(
@@ -135,7 +146,7 @@ describe("runScheduledRankChecks", () => {
       new Map([["config_2", 5]]),
     );
 
-    await runTick();
+    await runScheduledRankChecks(testEnv);
 
     expect(mocks.claimDueConfig).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -153,7 +164,7 @@ describe("runScheduledRankChecks", () => {
   it("claims a paid config and starts its workflow", async () => {
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
-    await runTick();
+    await runScheduledRankChecks(testEnv);
 
     expect(mocks.claimDueConfig).toHaveBeenCalledTimes(1);
     expect(mocks.claimDueConfig).toHaveBeenCalledWith(
@@ -194,7 +205,7 @@ describe("runScheduledRankChecks", () => {
 
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
-    await runTick();
+    await runScheduledRankChecks(testEnv);
 
     expect(mocks.beginRankCheckRun).toHaveBeenCalledTimes(1);
     expect(mocks.claimDueConfig).toHaveBeenCalledTimes(1);
@@ -221,7 +232,7 @@ describe("runScheduledRankChecks", () => {
     mocks.claimDueConfig.mockResolvedValueOnce(false);
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
-    await runTick();
+    await runScheduledRankChecks(testEnv);
 
     expect(mocks.beginRankCheckRun).toHaveBeenCalledTimes(1);
     expect(mocks.beginRankCheckRun.mock.calls[0][0].config.id).toBe("config_2");
@@ -245,7 +256,7 @@ describe("runScheduledRankChecks", () => {
     // A tick with errors logs its summary at error level.
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
-    await runTick();
+    await runScheduledRankChecks(testEnv);
 
     expect(mocks.beginRankCheckRun).toHaveBeenCalledTimes(1);
     expect(mocks.beginRankCheckRun.mock.calls[0][0].config.id).toBe(
@@ -272,7 +283,7 @@ describe("runScheduledRankChecks", () => {
     );
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
-    await runTick();
+    await runScheduledRankChecks(testEnv);
 
     expect(mocks.beginRankCheckRun).toHaveBeenCalledTimes(1);
     expect(mocks.beginRankCheckRun.mock.calls[0][0].config.id).toBe(
@@ -280,6 +291,35 @@ describe("runScheduledRankChecks", () => {
     );
     expect(logSpy).toHaveBeenCalledWith(
       expect.objectContaining({ stoppedByBudget: true, unitsStarted: 10 }),
+    );
+  });
+
+  it("keeps a large tracker due while the checks in flight leave it no room, and starts the small one behind it", async () => {
+    mocks.getDueConfigsWithOrganization.mockResolvedValue([
+      dueConfig({ id: "config_big" }),
+      dueConfig({
+        id: "config_small",
+        nextCheckAt: "2026-01-02T00:00:00.000Z",
+      }),
+    ]);
+    mocks.getKeywordCountsForConfigs.mockResolvedValue(
+      new Map([
+        ["config_big", MAX_KEYWORDS_PER_CONFIG],
+        ["config_small", 5],
+      ]),
+    );
+    // Room for the small tracker only.
+    mocks.getTaskUnitsInFlight.mockResolvedValue(29_000);
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    await runScheduledRankChecks(testEnv);
+
+    expect(mocks.claimDueConfig).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ configId: "config_small" }),
+    );
+    expect(mocks.beginRankCheckRun).toHaveBeenCalledTimes(1);
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ waitingForCapacity: 1, started: 1 }),
     );
   });
 
@@ -294,7 +334,7 @@ describe("runScheduledRankChecks", () => {
       .mockReturnValue(start + 4 * 60_000); // every later check is past it
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
-    await runTick();
+    await runScheduledRankChecks(testEnv);
 
     expect(mocks.beginRankCheckRun).not.toHaveBeenCalled();
     expect(mocks.claimDueConfig).not.toHaveBeenCalled();
@@ -311,7 +351,7 @@ describe("runScheduledRankChecks", () => {
     });
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
-    await runTick();
+    await runScheduledRankChecks(testEnv);
 
     expect(mocks.claimDueConfig).toHaveBeenCalledTimes(2);
     const [advance] = mocks.claimDueConfig.mock.calls[0];
@@ -358,7 +398,7 @@ describe("runScheduledRankChecks", () => {
     });
     vi.spyOn(console, "error").mockImplementation(() => {});
 
-    await runTick();
+    await runScheduledRankChecks(testEnv);
 
     // One Autumn call per org per tick — org_a's rejection is memoized.
     expect(mocks.customerHasPaidPlan).toHaveBeenCalledTimes(2);
@@ -372,7 +412,7 @@ describe("runScheduledRankChecks", () => {
   it("makes no billing calls in self-hosted mode", async () => {
     mocks.isHostedServerAuthMode.mockResolvedValue(false);
 
-    await runTick();
+    await runScheduledRankChecks(testEnv);
 
     expect(mocks.customerHasPaidPlan).not.toHaveBeenCalled();
     expect(mocks.beginRankCheckRun).toHaveBeenCalledTimes(1);

@@ -14,6 +14,11 @@ import * as sqliteTelemetry from "./telemetry.schema";
 import * as sqliteOutreach from "./outreach.schema";
 import * as sqliteGscHistory from "./gsc-history.schema";
 import * as sqliteAnalyticsSource from "./analytics-source.schema";
+import * as sqliteAiVisibility from "./ai-visibility.schema";
+import * as sqliteLocalSeo from "./local-seo.schema";
+import * as sqliteStripeProjects from "./stripe-projects.schema";
+import * as sqliteEmbeds from "./embeds.schema";
+import * as sqliteEveryAppTransfer from "./every-app-transfer.schema";
 import * as pgApp from "./pg/app.schema";
 import * as pgProjectContext from "./pg/project-context.schema";
 import * as pgReports from "./pg/reports.schema";
@@ -28,6 +33,11 @@ import * as pgTelemetry from "./pg/telemetry.schema";
 import * as pgOutreach from "./pg/outreach.schema";
 import * as pgGscHistory from "./pg/gsc-history.schema";
 import * as pgAnalyticsSource from "./pg/analytics-source.schema";
+import * as pgAiVisibility from "./pg/ai-visibility.schema";
+import * as pgLocalSeo from "./pg/local-seo.schema";
+import * as pgStripeProjects from "./pg/stripe-projects.schema";
+import * as pgEmbeds from "./pg/embeds.schema";
+import * as pgEveryAppTransfer from "./pg/every-app-transfer.schema";
 
 // Canonical schema barrel. Repositories import their tables from here and the
 // provider-aware `db` from "@/db", so each repository is written ONCE for both
@@ -52,7 +62,12 @@ type AppSchema = typeof sqliteApp &
   typeof sqliteTelemetry &
   typeof sqliteOutreach &
   typeof sqliteGscHistory &
-  typeof sqliteAnalyticsSource;
+  typeof sqliteAnalyticsSource &
+  typeof sqliteAiVisibility &
+  typeof sqliteLocalSeo &
+  typeof sqliteStripeProjects &
+  typeof sqliteEmbeds &
+  typeof sqliteEveryAppTransfer;
 
 const runtimeSchema =
   getDatabaseProvider() === "postgres"
@@ -71,6 +86,11 @@ const runtimeSchema =
         ...pgOutreach,
         ...pgGscHistory,
         ...pgAnalyticsSource,
+        ...pgAiVisibility,
+        ...pgLocalSeo,
+        ...pgStripeProjects,
+        ...pgEmbeds,
+        ...pgEveryAppTransfer,
       }
     : {
         ...sqliteApp,
@@ -87,6 +107,11 @@ const runtimeSchema =
         ...sqliteOutreach,
         ...sqliteGscHistory,
         ...sqliteAnalyticsSource,
+        ...sqliteAiVisibility,
+        ...sqliteLocalSeo,
+        ...sqliteStripeProjects,
+        ...sqliteEmbeds,
+        ...sqliteEveryAppTransfer,
       };
 
 // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- guarded by schema-parity.test.ts
@@ -94,6 +119,9 @@ const schema = runtimeSchema as unknown as AppSchema;
 
 export const {
   userOnboardingAnswers,
+  userSignupCampaigns,
+  accountDeletionRequests,
+  guestAccounts,
   projects,
   savedKeywords,
   savedKeywordTags,
@@ -107,6 +135,8 @@ export const {
   projectActivationState,
   dashboardStepDismissals,
   backlinkSnapshots,
+  dataRefreshClaims,
+  crawlerCredentials,
   projectContextSections,
   projectCompetitors,
   projectKeyPages,
@@ -146,4 +176,22 @@ export const {
   posthogCredentials,
   analyticsSources,
   analyticsKeyEvents,
+  aiTrackers,
+  aiPrompts,
+  aiRuns,
+  aiObservations,
+  aiSources,
+  aiMatches,
+  localRankTrackers,
+  localRankChecks,
+  localRankKeywords,
+  localRankScans,
+  localRankPoints,
+  localRankBusinesses,
+  localRankResults,
+  stripeProjectsGrants,
+  stripeProjectsResources,
+  projectEmbeds,
+  everyAppTransfers,
+  everyAppTransferUsers,
 } = schema;

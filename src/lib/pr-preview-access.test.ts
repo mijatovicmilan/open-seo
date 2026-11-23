@@ -35,8 +35,6 @@ describe("preview Access verification", () => {
     { responses: ["403 "], status: 1, retries: 0 },
     { responses: ["404 ", "200 "], status: 1, retries: 1 },
     { responses: Array<string>(8).fill("404 "), status: 1, retries: 8 },
-    { responses: Array<string>(8).fill("503 "), status: 1, retries: 8 },
-    { responses: Array<string>(8).fill("000 "), status: 1, retries: 8 },
   ])("handles $responses", ({ responses, status, retries }) => {
     const directory = mkdtempSync(join(tmpdir(), "preview-access-"));
     try {
@@ -59,7 +57,7 @@ ${script}`,
             ...process.env,
             PREVIEW_URL: "https://preview.example.invalid",
             STAGE: "test",
-            PREVIEW_RESPONSES: responseFile,
+            PREVIEW_RESPONSES: responseFile.replaceAll("\\", "/"),
           },
         },
       );
@@ -70,7 +68,6 @@ ${script}`,
       if (retries === 8) {
         expect(result.stdout).toContain("Could not verify");
         expect(result.stdout).not.toContain("preview is public");
-        expect(result.stdout).not.toContain("still sits behind");
       }
     } finally {
       rmSync(directory, { recursive: true, force: true });

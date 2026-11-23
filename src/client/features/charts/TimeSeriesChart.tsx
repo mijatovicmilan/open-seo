@@ -23,7 +23,7 @@ import {
   type ShownDay,
   useChartTooltip,
 } from "@/client/features/charts/useChartTooltip";
-import { useChartWidth } from "@/client/features/rank-tracking/RankTrackingTrendChart";
+import { useChartWidth } from "@/client/features/charts/useChartWidth";
 
 // One time-series chart for the fork's Outreach and Search Insights pages,
 // working like Search Console's: one or more metrics, each in its own theme

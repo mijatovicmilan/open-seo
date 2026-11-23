@@ -1,58 +1,70 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { FileDown, Loader2, Sheet, Trash2 } from "lucide-react";
-import { Modal } from "@/client/components/Modal";
-import {
-  AppDataTable,
-  useAppTable,
-} from "@/client/components/table/AppDataTable";
+import { FileDown, Plus, Sheet, Trash2 } from "lucide-react";
+import { ConfirmDialog } from "@/client/components/ConfirmDialog";
+import { Button } from "@/client/components/ui/button";
+import { DataTable, useDataTable } from "@/client/components/table/DataTable";
+import { TablePagination } from "@/client/components/table/TablePagination";
 import {
   TableBulkActionBar,
   TableBulkActionButton,
   TableBulkExportMenu,
 } from "@/client/components/table/TableBulkActionBar";
-import { buildCsv } from "@/client/lib/csv";
-import { downloadCsv } from "@/client/lib/csv";
-import { exportTableToSheets } from "@/client/lib/exportToSheets";
-import { captureClientEvent } from "@/client/lib/posthog";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import type { SortingState } from "@tanstack/react-table";
 import { removeTrackingKeywords } from "@/serverFunctions/rank-tracking";
-import { getStandardErrorMessage } from "@/client/lib/error-messages";
 import type { RankTrackingRow } from "@/types/schemas/rank-tracking";
-import { useRankTrackingColumns } from "./RankTrackingColumns";
-import { buildRankTrackingExport } from "./RankTrackingTableParts";
+import {
+  PINNED_COLUMN_ID,
+  useRankTrackingColumns,
+} from "./RankTrackingColumns";
+import { useSetKeywordPinned } from "./useSetKeywordPinned";
+import { exportRankTracking } from "./RankTrackingTableParts";
 import {
   KeywordTrendModal,
   type KeywordTrendTarget,
 } from "./KeywordTrendModal";
 import type { SelectionAnchor } from "@/client/components/table/tableSelection";
 
+// A tracker holds thousands of keywords, and a browser can't draw them all at
+// once. Sorting, filters, selection and exports still cover every row.
+const PAGE_SIZES = [50, 100, 250] as const;
+
 export function RankTrackingTable({
   totalCount,
   rows,
-  resultsLoading,
   showDesktop,
   showMobile,
-  defaultSortId,
+  sorting,
+  pageResetKey,
+  onSortingChange,
   domain,
   configId,
   projectId,
   locationCode,
+  languageCode,
   locationName,
   serpDepth,
+  onAddKeywords,
+  onClearFilters,
 }: {
   totalCount: number;
   rows: RankTrackingRow[];
-  resultsLoading: boolean;
   showDesktop: boolean;
   showMobile: boolean;
-  defaultSortId: string;
+  sorting: SortingState;
+  /** Changes when the filters do, which returns the table to its first page. */
+  pageResetKey: string;
+  onSortingChange: (sorting: SortingState) => void;
   domain: string;
   configId: string;
   projectId: string;
   locationCode: number;
+  languageCode: string;
   locationName?: string | null;
   serpDepth: number;
+  onAddKeywords: () => void;
+  onClearFilters: () => void;
 }) {
   const queryClient = useQueryClient();
   const [showConfirm, setShowConfirm] = useState(false);
@@ -70,21 +82,60 @@ export function RankTrackingTable({
     [],
   );
 
+  const setKeywordPinned = useSetKeywordPinned(projectId, configId);
+  const actions = useMemo(
+    () => ({
+      selectAnchorRef,
+      onKeywordClick: handleKeywordClick,
+      onSetPinned: setKeywordPinned,
+    }),
+    [handleKeywordClick, setKeywordPinned],
+  );
   const columns = useRankTrackingColumns({
     showDesktop,
     showMobile,
     domain,
-    selectAnchorRef,
-    onKeywordClick: handleKeywordClick,
+    actions,
     locationName,
   });
 
-  const table = useAppTable({
+  // The pinned column sorts first and stays out of the sorting the page owns.
+  // Keep sorting stable across the table's own state updates, which otherwise
+  // recompute sorted rows and queue another pagination reset on every render.
+  const tableSorting = useMemo(
+    () => [{ id: PINNED_COLUMN_ID, desc: false }, ...sorting],
+    [sorting],
+  );
+  // The page belongs to one sort and one set of filters. Under another, the
+  // table shows its first page.
+  const pageKey = `${JSON.stringify(sorting)}:${pageResetKey}`;
+  const [paging, setPaging] = useState({
+    page: 1,
+    pageSize: 100 as (typeof PAGE_SIZES)[number],
+    key: pageKey,
+  });
+  const page = paging.key === pageKey ? paging.page : 1;
+  const { pageSize } = paging;
+  const table = useDataTable({
     data: rows,
     columns,
-    initialState: {
-      sorting: [{ id: defaultSortId, desc: false }],
+    state: {
+      sorting: tableSorting,
+      columnVisibility: { [PINNED_COLUMN_ID]: false },
+      pagination: { pageIndex: page - 1, pageSize },
     },
+    withPagination: true,
+    // A refetch during a check replaces the rows; it must not change the page.
+    autoResetPageIndex: false,
+    onSortingChange: (updater) =>
+      onSortingChange(
+        (typeof updater === "function"
+          ? updater(tableSorting)
+          : updater
+        ).filter((sort) => sort.id !== PINNED_COLUMN_ID),
+      ),
+    // The URL has no value for "unsorted", so a column stays sorted.
+    enableSortingRemoval: false,
     withSorting: true,
     getRowId: (row) => row.trackingKeywordId,
     enableRowSelection: true,
@@ -95,36 +146,16 @@ export function RankTrackingTable({
   const selectedCount = selectedRows.length;
   const selectedRankRows = selectedRows.map((row) => row.original);
 
-  const exportSelectionToSheets = () => {
-    const { headers, rows: exportRows } = buildRankTrackingExport(
-      selectedRankRows,
+  const exportSelection = (format: "csv" | "sheets") =>
+    exportRankTracking({
+      format,
+      rows: selectedRankRows,
       showDesktop,
       showMobile,
-    );
-    void exportTableToSheets({
-      headers,
-      rows: exportRows,
-      feature: "rank_tracking",
+      domain,
+      locationName,
+      scope: "selection",
     });
-  };
-
-  const exportSelectionCsv = () => {
-    const { headers, rows: exportRows } = buildRankTrackingExport(
-      selectedRankRows,
-      showDesktop,
-      showMobile,
-    );
-    const csvRows = exportRows.map((row) =>
-      row.map((cell, idx) =>
-        idx === 3 && typeof cell === "number" ? cell.toFixed(2) : cell,
-      ),
-    );
-    downloadCsv(
-      `rank-tracking-${domain}-selected.csv`,
-      buildCsv(headers, csvRows),
-    );
-    captureClientEvent("rank_tracking:export_csv", { scope: "selection" });
-  };
 
   const removeMutation = useMutation({
     mutationFn: (keywordIds: string[]) =>
@@ -142,28 +173,7 @@ export function RankTrackingTable({
         `${result.removed} keyword${result.removed !== 1 ? "s" : ""} removed`,
       );
     },
-    onError: (error) => {
-      toast.error(getStandardErrorMessage(error, "Failed to remove keywords"));
-    },
   });
-
-  if (resultsLoading) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <Loader2 className="size-5 animate-spin text-base-content/50" />
-      </div>
-    );
-  }
-
-  if (rows.length === 0) {
-    return (
-      <div className="rounded-xl border border-dashed border-base-300 p-10 text-center text-sm text-base-content/55">
-        {totalCount === 0
-          ? 'No rank data yet. Click "Check Now" to run your first check.'
-          : "No keywords match your search."}
-      </div>
-    );
-  }
 
   return (
     <>
@@ -184,12 +194,12 @@ export function RankTrackingTable({
                 {
                   label: "Export to Sheets",
                   icon: <Sheet className="size-4" />,
-                  onClick: exportSelectionToSheets,
+                  onClick: () => exportSelection("sheets"),
                 },
                 {
                   label: "Export CSV",
                   icon: <FileDown className="size-4" />,
-                  onClick: exportSelectionCsv,
+                  onClick: () => exportSelection("csv"),
                 },
               ]}
             />
@@ -197,42 +207,19 @@ export function RankTrackingTable({
         }
       />
 
-      {/* Confirm modal */}
       {showConfirm && (
-        <Modal
+        <ConfirmDialog
+          title="Remove keywords?"
+          confirmLabel={`Remove ${selectedCount} keyword${selectedCount !== 1 ? "s" : ""}`}
+          destructive
+          pending={removeMutation.isPending}
+          onConfirm={() => removeMutation.mutate(selectedRows.map((r) => r.id))}
           onClose={() => setShowConfirm(false)}
-          labelledBy="remove-keywords-title"
         >
-          <h3 id="remove-keywords-title" className="text-lg font-semibold">
-            Remove keywords?
-          </h3>
-          <p className="text-sm text-base-content/70">
-            This will stop tracking {selectedCount} keyword
-            {selectedCount !== 1 ? "s" : ""}. Historical ranking data is
-            preserved but won't appear in the table.
-          </p>
-          <div className="flex justify-end gap-2">
-            <button
-              className="btn btn-ghost btn-sm"
-              onClick={() => setShowConfirm(false)}
-            >
-              Cancel
-            </button>
-            <button
-              className="btn btn-error btn-sm gap-1"
-              onClick={() =>
-                removeMutation.mutate(selectedRows.map((r) => r.id))
-              }
-              disabled={removeMutation.isPending}
-            >
-              {removeMutation.isPending && (
-                <Loader2 className="size-3 animate-spin" />
-              )}
-              Remove {selectedCount} keyword
-              {selectedCount !== 1 ? "s" : ""}
-            </button>
-          </div>
-        </Modal>
+          This will stop tracking {selectedCount} keyword
+          {selectedCount !== 1 ? "s" : ""}. Historical ranking data is preserved
+          but won't appear in the table.
+        </ConfirmDialog>
       )}
 
       {trendTarget && (
@@ -242,16 +229,51 @@ export function RankTrackingTable({
           configId={configId}
           domain={domain}
           locationCode={locationCode}
+          languageCode={languageCode}
           locationName={locationName ?? undefined}
           serpDepth={serpDepth}
           onClose={() => setTrendTarget(null)}
         />
       )}
 
-      <AppDataTable table={table} getCellClassName={() => "align-top"} />
-      <p className="text-xs text-base-content/60 pt-2">
-        {rows.length} of {totalCount} keywords
-      </p>
+      <DataTable
+        table={table}
+        isFiltered={totalCount > 0}
+        onClearFilters={onClearFilters}
+        empty={{
+          title: "No keywords yet",
+          description: "Add the keywords you want to track for this domain.",
+          action: (
+            <Button size="sm" onClick={onAddKeywords}>
+              <Plus data-icon="inline-start" />
+              Add Keywords
+            </Button>
+          ),
+        }}
+        footer={
+          rows.length > 0 ? (
+            <>
+              <p className="border-t border-border px-4 py-2 text-xs text-muted-foreground">
+                {rows.length} of {totalCount} keywords
+              </p>
+              {rows.length > PAGE_SIZES[0] ? (
+                <TablePagination
+                  page={page}
+                  pageSize={pageSize}
+                  pageSizes={PAGE_SIZES}
+                  totalCount={rows.length}
+                  onPageChange={(next) =>
+                    setPaging({ page: next, pageSize, key: pageKey })
+                  }
+                  onPageSizeChange={(next) =>
+                    setPaging({ page: 1, pageSize: next, key: pageKey })
+                  }
+                />
+              ) : null}
+            </>
+          ) : null
+        }
+      />
     </>
   );
 }

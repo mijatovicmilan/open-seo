@@ -4,10 +4,78 @@ import { DocsBody } from "fumadocs-ui/page";
 import GoogleSearchConsoleMcpContent, {
   frontmatter,
 } from "../../../content/marketing/google-search-console-mcp.mdx";
-import { ComparisonTable } from "@/components/comparison-table";
+import { AddToAgentButtons } from "@/components/add-to-agent-links";
+import {
+  ComparisonTable,
+  type ComparisonTableProps,
+} from "@/components/comparison-table";
 import { buildPageSeo, SITE_URL, toCanonicalUrl } from "@/lib/seo";
 
 const PATH = "/google-search-console-mcp";
+
+const comparison: ComparisonTableProps = {
+  columns: [
+    { name: "OpenSEO", highlight: true },
+    { name: "DIY open-source repos" },
+    { name: "Data-pipeline tools" },
+  ],
+  rows: [
+    {
+      label: "Setup",
+      cells: [
+        { text: "Simple, guided onboarding", tone: "positive" },
+        { text: "~30 min in the Google Cloud console" },
+        { text: "Account + connector setup" },
+      ],
+    },
+    {
+      label: "Google Cloud project",
+      cells: [
+        { text: "Not needed", tone: "positive" },
+        { text: "Required", tone: "negative" },
+        { text: "Usually not needed", tone: "positive" },
+      ],
+    },
+    {
+      label: "Cost to run",
+      cells: [
+        {
+          text: "Included in the $10/mo plan, zero credits. Self-hosted: the software is free",
+          tone: "positive",
+        },
+        { text: "Free (your time + your own quota)" },
+        { text: "Paid or limited free tier", tone: "negative" },
+      ],
+    },
+    {
+      label: "Read-only and safe",
+      cells: [
+        { text: "webmasters.readonly", tone: "positive", code: true },
+        { text: "Depends on the scopes you grant" },
+        { text: "Varies" },
+      ],
+    },
+    {
+      label: "Built for SEO",
+      cells: [
+        {
+          text: "Also does keyword, rank, and backlink research",
+          tone: "positive",
+        },
+        { text: "Search Console only", tone: "negative" },
+        { text: "Reporting and analytics focus" },
+      ],
+    },
+    {
+      label: "Self-host option",
+      cells: [
+        { text: "Yes", tone: "positive" },
+        { text: "Yes", tone: "positive" },
+        { text: "No", tone: "negative" },
+      ],
+    },
+  ],
+};
 
 const softwareApplicationLd = {
   "@context": "https://schema.org",
@@ -39,7 +107,7 @@ const softwareApplicationLd = {
 export const Route = createFileRoute("/_marketing/google-search-console-mcp")({
   head: () =>
     buildPageSeo({
-      title: "Google Search Console MCP Server: No Google Cloud Setup",
+      title: frontmatter.title,
       description: frontmatter.description,
       path: PATH,
       titleSuffix: "OpenSEO",
@@ -82,7 +150,11 @@ function GoogleSearchConsoleMcpPage() {
 
       <DocsBody className="min-w-0 text-neutral-800 [&_a]:!text-neutral-950 [&_h2]:!text-neutral-950 [&_h2_a]:!no-underline [&_h3]:!text-neutral-950 [&_h3_a]:!no-underline [&_h4]:!text-neutral-950 [&_h4_a]:!no-underline [&_h5_a]:!no-underline [&_h6_a]:!no-underline [&_li]:!text-neutral-700 [&_li_a]:font-medium [&_li_a]:underline [&_li_a]:decoration-[var(--color-brand-accent)] [&_li_a]:underline-offset-4 [&_li_a:hover]:!text-neutral-700 [&_p]:!text-neutral-700 [&_p_a]:font-medium [&_p_a]:underline [&_p_a]:decoration-[var(--color-brand-accent)] [&_p_a]:underline-offset-4 [&_p_a:hover]:!text-neutral-700 [&_strong]:!text-neutral-950">
         <GoogleSearchConsoleMcpContent
-          components={{ ...defaultMdxComponents, ComparisonTable }}
+          components={{
+            ...defaultMdxComponents,
+            AddToAgentButtons,
+            ComparisonTable: () => <ComparisonTable {...comparison} />,
+          }}
         />
       </DocsBody>
 
@@ -106,8 +178,8 @@ function GoogleSearchConsoleMcpCta() {
         Point your AI at your real search data
       </p>
       <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--color-brand-muted)]">
-        No Google Cloud project. Zero credits to read your own data. Works with
-        Claude, Codex, OpenClaw, OpenCode, and Gemini.
+        Sign in with Google and pick your property. Zero credits to read your
+        own data. Works with Claude, Codex, OpenClaw, OpenCode, and Gemini.
       </p>
       <div className="mt-5 flex flex-col gap-3 sm:flex-row">
         <a

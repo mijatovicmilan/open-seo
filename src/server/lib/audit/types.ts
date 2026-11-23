@@ -12,6 +12,13 @@ export type LighthouseStrategy = "auto" | "none";
 export interface AuditConfig {
   maxPages: number;
   lighthouseStrategy: LighthouseStrategy;
+  renderJavaScript?: boolean;
+  /** Detected from the start URL's `powered-by` response header. */
+  sitePlatform?: "shopify";
+  /** Which crawler-access credential the crawl replayed, if any. */
+  crawlerCredentialId?: string;
+  /** Paths the crawl skips; see `@/shared/audit-exclude-paths`. */
+  excludePaths?: string[];
 }
 
 // Read-side only (writes stringify a typed AuditConfig). Stored rows may hold
@@ -30,6 +37,12 @@ const lighthouseStrategySchema = z
 const auditConfigSchema = z.object({
   maxPages: z.number().int().min(MIN_AUDIT_PAGES).max(PAID_MAX_AUDIT_PAGES),
   lighthouseStrategy: lighthouseStrategySchema,
+  renderJavaScript: z.boolean().optional().default(false),
+  // Absent on every audit stored before crawler access shipped, and a future
+  // platform value must not make an old report unviewable.
+  sitePlatform: z.literal("shopify").optional().catch(undefined),
+  crawlerCredentialId: z.string().optional().catch(undefined),
+  excludePaths: z.array(z.string()).optional().catch(undefined),
 });
 
 const auditConfigCodec = jsonCodec(auditConfigSchema);
@@ -71,6 +84,8 @@ export interface PageAnalysis {
   // Content
   wordCount: number;
   bodyText: string;
+  /** Conservative signal of an app shell, not proof of missing content. */
+  javascriptShell?: boolean;
 
   // Images
   images: Array<{ src: string | null; alt: string | null }>;
@@ -138,6 +153,8 @@ export interface CrawledPageResult {
    * checked; a PDF must not). Transient — not persisted.
    */
   isHtml: boolean;
+  /** App shell, rendered or not; transient signal for the per-page issue reporter. */
+  javascriptShell?: boolean;
   /**
    * HTML size read for this page (approximate; capped at MAX_HTML_BYTES).
    * Transient — feeds the crawl window's memory-pressure signal, since

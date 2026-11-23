@@ -1,24 +1,40 @@
-import { useForm } from "@tanstack/react-form";
+import { useQuery } from "@tanstack/react-query";
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useAppForm } from "@/client/components/form/useAppForm";
+import { Button } from "@/client/components/ui/button";
 import {
   AuthPageCard,
   AuthMethodChooser,
+  TermsAgreementNotice,
+  authInputClassName,
+  authSubmitClassName,
   authRedirectSearchSchema,
   useAuthPageState,
 } from "@/client/features/auth/AuthPage";
-import { getFieldError, getFormError } from "@/client/lib/forms";
+import { signUpStatusQueryOptions } from "@/client/features/auth/signUpStatus";
+import { useSocialAuth } from "@/client/features/auth/useSocialAuth";
+import { getFormError } from "@/client/lib/forms";
 import { captureClientEvent } from "@/client/lib/posthog";
 import { authClient } from "@/lib/auth-client";
-import { getSignInSearch, getVerifyEmailSearch } from "@/lib/auth-redirect";
+import {
+  getSignInSearch,
+  getVerifyEmailSearch,
+  toAuthCallbackURL,
+} from "@/lib/auth-redirect";
+import { asksForChatGptSignIn } from "@/shared/chatgpt-sign-in";
 import { z } from "zod";
+import { pageHead } from "@/client/lib/pageHead";
 
 const signInSchema = z.object({
   email: z.string().trim().email("Enter a valid email address."),
   password: z.string().min(1, "Enter your password."),
 });
 
+const CHATGPT_AUTO_STARTED_KEY = "chatgpt-sign-in-auto-started";
+
 export const Route = createFileRoute("/_auth/sign-in")({
+  head: () => pageHead("Sign in"),
   validateSearch: authRedirectSearchSchema,
   component: SignInPage,
 });
@@ -26,15 +42,55 @@ export const Route = createFileRoute("/_auth/sign-in")({
 function SignInPage() {
   const search = Route.useSearch();
   const navigate = useNavigate();
-  const { redirectTo, oauthQuery, isHostedMode } = useAuthPageState(
-    search.redirect,
-  );
-  const authCallbackURL = redirectTo;
+  const {
+    redirectTo,
+    oauthQuery,
+    isHostedMode,
+    isBetterAuthMode,
+    chatGptEnabled,
+  } = useAuthPageState(search.redirect);
   const [showEmailForm, setShowEmailForm] = useState(false);
-  const [isStartingGoogle, setIsStartingGoogle] = useState(false);
-  const [socialError, setSocialError] = useState<string | null>(null);
+  // The standalone Docker edition has accounts but no Google sign-in and no
+  // emailed password reset: go straight to the email form. Accounts come from
+  // invitations, and a fresh installation has nobody to sign in, so its first
+  // visitor is sent to create the admin account instead.
+  const emailOnly = isBetterAuthMode && !isHostedMode;
+  const emailFormVisible = showEmailForm || emailOnly;
+  const google = useSocialAuth("google", { redirectTo });
+  const chatGpt = useSocialAuth("chatgpt", { redirectTo });
+  // Someone who chose "Continue with ChatGPT" in ChatGPT's connect window has
+  // already picked how to sign in, so start it without another click. Once
+  // per connection: coming back here (the browser's back button) shows the
+  // buttons, so nobody is trapped bouncing to ChatGPT.
+  useEffect(() => {
+    if (!chatGptEnabled || !asksForChatGptSignIn(redirectTo)) return;
+    try {
+      if (sessionStorage.getItem(CHATGPT_AUTO_STARTED_KEY) === redirectTo) {
+        return;
+      }
+      sessionStorage.setItem(CHATGPT_AUTO_STARTED_KEY, redirectTo);
+    } catch {
+      // Without sessionStorage nothing stops the bounce, so leave the click.
+      return;
+    }
+    void chatGpt.start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- start is a new function each render
+  }, [chatGptEnabled, redirectTo]);
+  const signUpStatus = useQuery({
+    ...signUpStatusQueryOptions(),
+    enabled: emailOnly,
+  });
+  const firstAccount = signUpStatus.data?.firstAccount === true;
+  useEffect(() => {
+    if (!firstAccount) return;
+    void navigate({
+      to: "/sign-up",
+      search: getSignInSearch(redirectTo),
+      replace: true,
+    });
+  }, [firstAccount, navigate, redirectTo]);
 
-  const form = useForm({
+  const form = useAppForm({
     defaultValues: {
       email: "",
       password: "",
@@ -52,7 +108,7 @@ function SignInPage() {
         const result = await authClient.signIn.email({
           email,
           password: value.password,
-          callbackURL: authCallbackURL,
+          callbackURL: toAuthCallbackURL(redirectTo),
           ...(oauthQuery ? { oauth_query: oauthQuery } : {}),
         });
 
@@ -94,48 +150,28 @@ function SignInPage() {
     },
   });
 
-  async function handleContinueWithGoogle() {
-    setSocialError(null);
-    setIsStartingGoogle(true);
-
-    try {
-      captureClientEvent("auth:sign_in_google_start", {
-        redirect_to: redirectTo,
-      });
-      const result = await authClient.signIn.social({
-        provider: "google",
-        callbackURL: authCallbackURL,
-      });
-
-      if (result.error) {
-        setSocialError(
-          result.error.message || "Google sign in is not available right now.",
-        );
-        setIsStartingGoogle(false);
-      }
-    } catch {
-      setSocialError("Google sign in is not available right now.");
-      setIsStartingGoogle(false);
-    }
-  }
-
   return (
     <AuthPageCard
       title="Sign in"
       footer={
-        isHostedMode ? (
+        emailOnly ? (
+          <p className="text-sm text-foreground/50">
+            Need an account? Ask an administrator for an invitation. Forgot your
+            password? Ask your server administrator to reset it.
+          </p>
+        ) : isHostedMode ? (
           <div
             className={
               showEmailForm
-                ? "flex justify-between text-sm text-base-content/50"
-                : "text-sm text-base-content/50"
+                ? "flex w-full justify-between text-sm text-foreground/50"
+                : "w-full text-sm text-foreground/50"
             }
           >
             {showEmailForm ? (
               <Link
                 to="/forgot-password"
                 search={getSignInSearch(redirectTo)}
-                className="text-base-content underline underline-offset-2 hover:text-base-content/80 transition-colors"
+                className="text-foreground underline underline-offset-2 hover:text-foreground/80 transition-colors"
               >
                 Forgot password?
               </Link>
@@ -143,7 +179,7 @@ function SignInPage() {
             <Link
               to="/sign-up"
               search={getSignInSearch(redirectTo)}
-              className="text-base-content underline underline-offset-2 hover:text-base-content/80 transition-colors"
+              className="text-foreground underline underline-offset-2 hover:text-foreground/80 transition-colors"
             >
               Create account
             </Link>
@@ -151,104 +187,91 @@ function SignInPage() {
         ) : null
       }
     >
-      {!showEmailForm ? (
+      {!emailFormVisible ? (
         <>
           <AuthMethodChooser
             googleLabel="Continue with Google"
             disabled={!isHostedMode}
-            isBusy={isStartingGoogle}
-            onContinueWithGoogle={() => {
-              void handleContinueWithGoogle();
-            }}
+            google={google}
+            chatGpt={chatGptEnabled ? chatGpt : undefined}
             onContinueWithEmail={() => {
               setShowEmailForm(true);
-              setSocialError(null);
+              google.clearError();
+              chatGpt.clearError();
             }}
           />
-          {socialError ? (
-            <p className="text-sm text-error">{socialError}</p>
+          {isHostedMode ? (
+            <TermsAgreementNotice
+              action={
+                chatGptEnabled
+                  ? "By continuing with Google or ChatGPT"
+                  : "By continuing with Google"
+              }
+            />
+          ) : null}
+          {(google.error ?? chatGpt.error) ? (
+            <p className="text-sm text-destructive">
+              {google.error ?? chatGpt.error}
+            </p>
           ) : null}
         </>
       ) : (
-        <form
-          className="space-y-4"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void form.handleSubmit();
-          }}
-        >
-          <form.Field name="email">
-            {(field) => {
-              const error = getFieldError(field.state.meta.errors);
+        <form.AppForm>
+          <form.Form className="space-y-4">
+            <form.AppField name="email">
+              {(field) => (
+                <field.TextField
+                  label="Email address"
+                  hideLabel
+                  className={authInputClassName}
+                  type="email"
+                  placeholder="Email address..."
+                  autoComplete="email"
+                  required
+                />
+              )}
+            </form.AppField>
+            <form.AppField name="password">
+              {(field) => (
+                <field.TextField
+                  label="Password"
+                  hideLabel
+                  className={authInputClassName}
+                  type="password"
+                  placeholder="Password..."
+                  autoComplete="current-password"
+                  required
+                />
+              )}
+            </form.AppField>
 
-              return (
-                <div>
-                  <input
-                    type="email"
-                    className="input input-bordered w-full"
-                    placeholder="Email address..."
-                    value={field.state.value}
-                    onChange={(event) => field.handleChange(event.target.value)}
-                    autoComplete="email"
-                    disabled={!isHostedMode}
-                    required
-                  />
-                  {error ? (
-                    <p className="mt-1 text-sm text-error">{error}</p>
-                  ) : null}
-                </div>
-              );
-            }}
-          </form.Field>
-
-          <form.Field name="password">
-            {(field) => {
-              const error = getFieldError(field.state.meta.errors);
-
-              return (
-                <div>
-                  <input
-                    type="password"
-                    className="input input-bordered w-full"
-                    placeholder="Password..."
-                    value={field.state.value}
-                    onChange={(event) => field.handleChange(event.target.value)}
-                    autoComplete="current-password"
-                    disabled={!isHostedMode}
-                    required
-                  />
-                  {error ? (
-                    <p className="mt-1 text-sm text-error">{error}</p>
-                  ) : null}
-                </div>
-              );
-            }}
-          </form.Field>
-
-          <form.Subscribe
-            selector={(state) => ({
-              submitError: state.errorMap.onSubmit,
-              isSubmitting: state.isSubmitting,
-            })}
-          >
-            {({ submitError, isSubmitting }) => {
-              const errorMessage = getFormError(submitError);
-              return (
-                <>
-                  {errorMessage ? (
-                    <p className="text-sm text-error">{errorMessage}</p>
-                  ) : null}
-                  <button
-                    className="btn btn-soft w-full"
-                    disabled={!isHostedMode || isSubmitting}
-                  >
-                    {isSubmitting ? "Signing in..." : "Sign in"}
-                  </button>
-                </>
-              );
-            }}
-          </form.Subscribe>
-        </form>
+            <form.Subscribe
+              selector={(state) => ({
+                submitError: state.errorMap.onSubmit,
+                isSubmitting: state.isSubmitting,
+              })}
+            >
+              {({ submitError, isSubmitting }) => {
+                const errorMessage = getFormError(submitError);
+                return (
+                  <>
+                    {errorMessage ? (
+                      <p className="text-sm text-destructive">{errorMessage}</p>
+                    ) : null}
+                    <Button
+                      type="submit"
+                      variant="secondary"
+                      className={authSubmitClassName}
+                      pending={isSubmitting}
+                    >
+                      {isSubmitting ? "Signing in..." : "Sign in"}
+                    </Button>
+                  </>
+                );
+              }}
+            </form.Subscribe>
+          </form.Form>
+        </form.AppForm>
       )}
     </AuthPageCard>
   );

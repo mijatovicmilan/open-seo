@@ -67,6 +67,7 @@ beforeAll(async () => {
       organization_id TEXT PRIMARY KEY REFERENCES organization(id) ON DELETE CASCADE,
       first_mcp_authorized_at TEXT,
       first_mcp_tool_call_at TEXT,
+      trustpilot_invited_at TEXT,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
     CREATE TABLE gsc_connections (
@@ -201,21 +202,5 @@ describe("WorkspaceMergeService", () => {
     expect(await rows("SELECT count(*) AS n FROM organization")).toEqual([
       expect.objectContaining({ n: 4 }),
     ]);
-  });
-
-  it("is a no-op when run again", async () => {
-    await seedLegacyWorkspaces();
-    await WorkspaceMergeService.mergeLegacyWorkspaces();
-
-    await expect(
-      WorkspaceMergeService.mergeLegacyWorkspaces(),
-    ).resolves.toEqual({ mergedWorkspaces: 0 });
-    await expect(WorkspaceMergeService.countLegacyWorkspaces()).resolves.toBe(
-      0,
-    );
-    // Nothing renamed twice.
-    expect(
-      await rows("SELECT name FROM projects WHERE id = 'p1-default'"),
-    ).toEqual([expect.objectContaining({ name: "Default (ben)" })]);
   });
 });

@@ -13,7 +13,7 @@ import {
   telemetryState,
   user,
 } from "@/db/schema";
-import { getAuthMode } from "@/lib/auth-mode";
+import { getAuthMode, isEveryAppAuthMode } from "@/lib/auth-mode";
 import {
   getOptionalEnvValue,
   isHostedServerAuthMode,
@@ -38,13 +38,13 @@ const ONBOARDING_CHECK_INTERVAL_MS = 60 * 1000;
 const STEADY_CHECK_INTERVAL_MS = 15 * 60 * 1000;
 const TELEMETRY_STATE_ID = 1;
 
-export function getHeartbeatIntervalMs(installAgeMs: number) {
+function getHeartbeatIntervalMs(installAgeMs: number) {
   return installAgeMs < ONBOARDING_WINDOW_MS
     ? ONBOARDING_HEARTBEAT_INTERVAL_MS
     : DAILY_HEARTBEAT_INTERVAL_MS;
 }
 
-export function getCheckIntervalMs(installAgeMs: number | null) {
+function getCheckIntervalMs(installAgeMs: number | null) {
   if (installAgeMs === null) return 0;
   return installAgeMs < ONBOARDING_WINDOW_MS
     ? ONBOARDING_CHECK_INTERVAL_MS
@@ -125,6 +125,8 @@ function isNonProductionBuild() {
 
 async function telemetryIsDisabled() {
   if (await isHostedServerAuthMode()) return true;
+  // Off on Every App installs for now.
+  if (isEveryAppAuthMode(await getOptionalEnvValue("AUTH_MODE"))) return true;
   if (
     isTelemetryOptOutValue(
       await getOptionalEnvValue("OPENSEO_TELEMETRY_DISABLED"),

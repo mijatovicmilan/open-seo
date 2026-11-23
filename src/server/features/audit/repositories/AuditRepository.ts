@@ -8,13 +8,12 @@ import { and, count, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
   audits,
-  auditIssues,
   auditLighthouseResults,
   auditPages,
   projects,
 } from "@/db/schema";
 import { executeInBatches } from "@/db/runBatch";
-import { AUDIT_ISSUE_TYPES } from "@/shared/audit-issues";
+import { insertIssues } from "./auditIssueWrites";
 import { deterministicAuditRowId } from "@/server/lib/audit/ids";
 import type { DetectedIssue } from "@/server/lib/audit/issues/page-reporters";
 import type {
@@ -48,6 +47,18 @@ async function createAudit(data: {
   });
 }
 
+/** Records where the crawl really starts, once the workflow has probed the site. */
+async function updateAuditStart(
+  auditId: string,
+  startUrl: string,
+  config: AuditConfig,
+) {
+  await db
+    .update(audits)
+    .set({ startUrl, config: JSON.stringify(config) })
+    .where(eq(audits.id, auditId));
+}
+
 async function updateAuditProgress(
   auditId: string,
   workflowInstanceId: string,
@@ -79,6 +90,8 @@ async function completeAudit(
     pagesTotal: number;
   },
 ) {
+  // Like failAudit, only a running audit can finish: a reconciler that already
+  // failed it keeps its error instead of showing "completed" beside it.
   await db
     .update(audits)
     .set({
@@ -91,6 +104,7 @@ async function completeAudit(
       and(
         eq(audits.id, auditId),
         eq(audits.workflowInstanceId, workflowInstanceId),
+        eq(audits.status, "running"),
       ),
     );
 }
@@ -176,16 +190,13 @@ async function insertCrawledBatch(
       h4Count: page.h4Count,
       h5Count: page.h5Count,
       h6Count: page.h6Count,
-      headingOrderJson: JSON.stringify(page.headingOrder),
       wordCount: page.wordCount,
       contentHash: page.contentHash,
       imagesTotal: page.imagesTotal,
       imagesMissingAlt: page.imagesMissingAlt,
-      imagesJson: JSON.stringify(page.images),
       internalLinkCount: page.links.filter((l) => l.isInternal).length,
       externalLinkCount: page.links.filter((l) => !l.isInternal).length,
       hasStructuredData: page.hasStructuredData,
-      hreflangTagsJson: JSON.stringify(page.hreflangTags),
       isIndexable: page.isIndexable,
       fetchClass: page.fetchClass,
       crawlDepth: page.crawlDepth,
@@ -199,28 +210,6 @@ async function insertCrawledBatch(
   });
 
   await insertIssues(auditId, issues);
-}
-
-async function insertIssues(auditId: string, issues: DetectedIssue[]) {
-  const issueRows = await Promise.all(
-    issues.map(async (issue) => ({
-      id: await deterministicAuditRowId(
-        auditId,
-        issue.pageUrl,
-        issue.issueType,
-        issue.dedupeKey ?? "",
-      ),
-      auditId,
-      pageId: issue.pageId,
-      pageUrl: issue.pageUrl,
-      issueType: issue.issueType,
-      severity: AUDIT_ISSUE_TYPES[issue.issueType].severity,
-      detailsJson: issue.details ? JSON.stringify(issue.details) : null,
-    })),
-  );
-  await executeInBatches(issueRows, (tx, row) =>
-    tx.insert(auditIssues).values(row).onConflictDoNothing(),
-  );
 }
 
 async function insertLighthouseResults(
@@ -271,21 +260,6 @@ async function getLatestAuditForProject(projectId: string) {
   return db.query.audits.findFirst({
     where: eq(audits.projectId, projectId),
     orderBy: desc(audits.startedAt),
-  });
-}
-
-async function getIssuesForAudit(
-  auditId: string,
-  filters: { severity?: "critical" | "warning" | "info"; issueType?: string },
-) {
-  return db.query.auditIssues.findMany({
-    where: and(
-      eq(auditIssues.auditId, auditId),
-      filters.severity ? eq(auditIssues.severity, filters.severity) : undefined,
-      filters.issueType
-        ? eq(auditIssues.issueType, filters.issueType)
-        : undefined,
-    ),
   });
 }
 
@@ -368,25 +342,14 @@ async function getAuditUsageForOrganization(organizationId: string) {
   };
 }
 
-async function getAuditResultsForProject(auditId: string, projectId: string) {
-  const audit = await getAuditForProject(auditId, projectId);
-  if (!audit) {
-    return { audit: null, pages: [], lighthouse: [], issues: [] };
-  }
-
-  const [pages, lighthouse, issues] = await Promise.all([
-    db.query.auditPages.findMany({
-      where: eq(auditPages.auditId, auditId),
-    }),
-    db.query.auditLighthouseResults.findMany({
-      where: eq(auditLighthouseResults.auditId, auditId),
-    }),
-    db.query.auditIssues.findMany({
-      where: eq(auditIssues.auditId, auditId),
-    }),
-  ]);
-
-  return { audit, pages, lighthouse, issues };
+async function hasAuditInOrganization(organizationId: string) {
+  const rows = await db
+    .select({ id: audits.id })
+    .from(audits)
+    .innerJoin(projects, eq(audits.projectId, projects.id))
+    .where(eq(projects.organizationId, organizationId))
+    .limit(1);
+  return rows.length > 0;
 }
 
 async function getLighthouseResultById(input: {
@@ -432,6 +395,7 @@ async function deleteAuditForProject(auditId: string, projectId: string) {
 
 export const AuditRepository = {
   createAudit,
+  updateAuditStart,
   updateAuditProgress,
   completeAudit,
   failAudit,
@@ -441,13 +405,12 @@ export const AuditRepository = {
   insertLighthouseResults,
   getAuditForProject,
   getLatestAuditForProject,
-  getIssuesForAudit,
   getPagesForAudit,
   countPagesByFetchClass,
   hasPagesForAudit,
   getAuditsByProject,
   getAuditUsageForOrganization,
-  getAuditResultsForProject,
+  hasAuditInOrganization,
   getLighthouseResultById,
   deleteAuditForProject,
 } as const;

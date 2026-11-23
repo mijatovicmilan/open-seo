@@ -1,6 +1,6 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Info, Loader2 } from "lucide-react";
-import { SearchConsoleConnectionCard } from "@/client/features/gsc/SearchConsoleConnectionCard";
+import { GoogleConnectionCard } from "@/client/features/integrations/GoogleConnectionCard";
 import {
   ChartPanel,
   periodText,
@@ -133,7 +133,7 @@ export function SearchInsightsPage({
               />
             ) : (
               <div className="max-w-2xl">
-                <SearchConsoleConnectionCard projectId={projectId} />
+                <GoogleConnectionCard provider="gsc" projectId={projectId} />
               </div>
             )}
             {insights ? (

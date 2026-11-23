@@ -126,8 +126,8 @@ beforeEach(async () => {
     INSERT INTO projects VALUES ('p1', 'example.com');
   `);
   for (const file of [
-    "drizzle/0048_fork_outreach_gsc.sql",
-    "drizzle/0050_fork_outreach_schedule.sql",
+    "drizzle/sqlite/0048_fork_outreach_gsc.sql",
+    "drizzle/sqlite/0050_fork_outreach_schedule.sql",
   ]) {
     state.database.exec(
       readFileSync(file, "utf8").replaceAll("--> statement-breakpoint", ""),

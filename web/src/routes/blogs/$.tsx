@@ -1,13 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { createClientLoader } from "fumadocs-mdx/runtime/vite";
 import { DocsBody } from "fumadocs-ui/page";
 import defaultMdxComponents from "fumadocs-ui/mdx";
 import { SiteFooter } from "@/components/site-footer";
-import { BlogLayout } from "@/components/blog-layout";
+import { PostDate } from "@/components/post-date";
 import type { ComponentPropsWithoutRef } from "react";
 import { Suspense } from "react";
 import { getBlogPost } from "@/lib/content.functions";
-import { blog } from "../../../.source/index";
+import browserCollections from "fumadocs-mdx:collections/browser";
 import { buildPageSeo } from "@/lib/seo";
 
 export const Route = createFileRoute("/blogs/$")({
@@ -34,7 +33,7 @@ export const Route = createFileRoute("/blogs/$")({
   component: BlogPost,
 });
 
-const clientMdxLoader = createClientLoader(blog, {
+const clientMdxLoader = browserCollections.blog.createClientLoader({
   id: "blog",
   component({ default: MDX }) {
     return (
@@ -86,16 +85,20 @@ function BlogPost() {
     path: string;
     title: string;
     description?: string;
+    author: string;
+    date: string;
   };
-  const Content = clientMdxLoader.getComponent(data.path);
 
   return (
-    <BlogLayout>
+    <>
       <article className="fd-light mx-auto max-w-3xl px-6 py-12 text-neutral-950 md:py-24">
-        <BlogHeader title={data.title} description={data.description} />
-        <Suspense>
-          <Content />
-        </Suspense>
+        <BlogHeader
+          title={data.title}
+          description={data.description}
+          author={data.author}
+          date={data.date}
+        />
+        <Suspense>{clientMdxLoader.useContent(data.path)}</Suspense>
       </article>
 
       <div className="mx-auto max-w-5xl px-6 pb-12">
@@ -103,17 +106,31 @@ function BlogPost() {
           <SiteFooter className="text-xs text-neutral-600 [&_a]:transition-colors [&_a]:hover:text-neutral-900" />
         </div>
       </div>
-    </BlogLayout>
+    </>
   );
 }
+
+// Keyed by the `author` name in blog frontmatter.
+const authorXUrls = new Map([
+  ["Ben Senescu", "https://x.com/bensenescu"],
+  ["Carter Smith", "https://x.com/carterwsmith"],
+  ["Jeremy Rivera", "https://x.com/JeremyRiveraSEO"],
+  ["Sohan Bhat", "https://x.com/sohanbhat2324"],
+]);
 
 function BlogHeader({
   title,
   description,
+  author,
+  date,
 }: {
   title: string;
   description?: string;
+  author: string;
+  date: string;
 }) {
+  const authorUrl = authorXUrls.get(author);
+
   return (
     <header className="mb-10 border-b border-[var(--color-border-subtle)] pb-8">
       <div className="mb-4">
@@ -133,6 +150,23 @@ function BlogHeader({
           {description}
         </p>
       )}
+      <p className="mt-6 text-sm text-[var(--color-brand-muted)]">
+        By{" "}
+        {authorUrl ? (
+          <a
+            href={authorUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium text-neutral-950 underline decoration-[var(--color-brand-accent)] underline-offset-4"
+          >
+            {author}
+          </a>
+        ) : (
+          <span className="font-medium text-neutral-950">{author}</span>
+        )}
+        <span aria-hidden="true"> · </span>
+        <PostDate date={date} />
+      </p>
     </header>
   );
 }

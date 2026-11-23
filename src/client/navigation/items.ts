@@ -6,7 +6,9 @@ import {
   FileText,
   Globe,
   LayoutDashboard,
+  Lightbulb,
   Link2,
+  Mail,
   MessageSquare,
   Search,
   Sparkles,
@@ -44,6 +46,12 @@ const projectNavItems = [
     label: "GSC Insights",
     icon: GoogleGlyphMuted,
   },
+  // Fork addition (FORK-CHANGES.md): stored Search Console history.
+  {
+    to: "/p/$projectId/search-insights" as const,
+    label: "Search Insights",
+    icon: Lightbulb,
+  },
   {
     to: "/p/$projectId/domain" as const,
     label: "Domain Overview",
@@ -53,6 +61,12 @@ const projectNavItems = [
     to: "/p/$projectId/backlinks" as const,
     label: "Backlinks",
     icon: Link2,
+  },
+  // Fork addition (FORK-CHANGES.md): link outreach.
+  {
+    to: "/p/$projectId/outreach" as const,
+    label: "Outreach",
+    icon: Mail,
   },
   {
     to: "/p/$projectId/audit" as const,
@@ -132,9 +146,11 @@ export function getProjectNavGroups(projectId: string) {
       label: "My Site",
       items: [
         byPath("/p/$projectId/search-performance"),
+        byPath("/p/$projectId/search-insights"),
         byPath("/p/$projectId/rank-tracking"),
         byPath("/p/$projectId/saved"),
         byPath("/p/$projectId/audit"),
+        byPath("/p/$projectId/outreach"),
       ],
     },
     {

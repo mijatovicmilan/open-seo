@@ -75,6 +75,14 @@ import {
   getSearchConsolePerformanceTool,
   inspectUrlsTool,
 } from "@/server/mcp/tools/search-console-tools";
+// Fork addition (FORK-CHANGES.md): stored Search Console history.
+import {
+  addSearchAnnotationTool,
+  deleteSearchAnnotationTool,
+  getSearchInsightsTool,
+  listSearchAnnotationsTool,
+  syncSearchConsoleHistoryTool,
+} from "@/server/mcp/tools/search-history-tools";
 import {
   getAuditIssuesTool,
   getAuditPagesTool,
@@ -86,6 +94,25 @@ import {
   listSiteAuditsTool,
 } from "@/server/mcp/tools/site-audit-cleanup-tools";
 import { whoamiTool } from "@/server/mcp/tools/whoami";
+// Fork addition (FORK-CHANGES.md): link outreach tools.
+import {
+  getOutreachOverviewTool,
+  getOutreachProspectTool,
+  getApprovedOutreachBatchTool,
+  addOutreachProspectTool,
+  updateOutreachProspectTool,
+  scoreOutreachProspectTool,
+  setOutreachAngleTool,
+  addOutreachAngleTool,
+  enrichOutreachProspectTool,
+  draftOutreachEmailTool,
+  recordOutreachSendTool,
+  recordOutreachReplyTool,
+  recordOutreachBounceTool,
+  checkOutreachLinkTool,
+  setOutreachStatusTool,
+  updateOutreachSettingsTool,
+} from "@/server/mcp/tools/outreach-tools";
 
 type ToolSchema = z.ZodType | z.ZodRawShape;
 
@@ -211,6 +238,12 @@ export function createOpenSeoMcpServer(authProps: McpProps) {
   register(getKeywordMetricsTool);
   register(getSearchConsolePerformanceTool);
   register(inspectUrlsTool);
+  // Fork addition (FORK-CHANGES.md): stored Search Console history.
+  register(syncSearchConsoleHistoryTool);
+  register(getSearchInsightsTool);
+  register(addSearchAnnotationTool);
+  register(listSearchAnnotationsTool);
+  register(deleteSearchAnnotationTool);
   register(getGoogleAnalyticsOrganicLandingPagesTool);
   register(getGoogleAnalyticsPagePerformanceTool);
   register(getGoogleAnalyticsKeyEventsTool);
@@ -234,6 +267,23 @@ export function createOpenSeoMcpServer(authProps: McpProps) {
   register(listReportTemplatesTool);
   register(saveReportTemplateTool);
   register(deleteReportTemplateTool);
+  // Fork addition (FORK-CHANGES.md): link outreach tools.
+  register(getOutreachOverviewTool);
+  register(getOutreachProspectTool);
+  register(getApprovedOutreachBatchTool);
+  register(addOutreachProspectTool);
+  register(updateOutreachProspectTool);
+  register(scoreOutreachProspectTool);
+  register(setOutreachAngleTool);
+  register(addOutreachAngleTool);
+  register(enrichOutreachProspectTool);
+  register(draftOutreachEmailTool);
+  register(recordOutreachSendTool);
+  register(recordOutreachReplyTool);
+  register(recordOutreachBounceTool);
+  register(checkOutreachLinkTool);
+  register(setOutreachStatusTool);
+  register(updateOutreachSettingsTool);
 
   return server;
 }

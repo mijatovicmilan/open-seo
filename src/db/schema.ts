@@ -10,6 +10,9 @@ import * as sqliteBilling from "./billing.schema";
 import * as sqliteGa4 from "./ga4.schema";
 import * as sqliteGsc from "./gsc.schema";
 import * as sqliteTelemetry from "./telemetry.schema";
+// Fork additions (FORK-CHANGES.md).
+import * as sqliteOutreach from "./outreach.schema";
+import * as sqliteGscHistory from "./gsc-history.schema";
 import * as pgApp from "./pg/app.schema";
 import * as pgProjectContext from "./pg/project-context.schema";
 import * as pgReports from "./pg/reports.schema";
@@ -21,6 +24,8 @@ import * as pgBilling from "./pg/billing.schema";
 import * as pgGa4 from "./pg/ga4.schema";
 import * as pgGsc from "./pg/gsc.schema";
 import * as pgTelemetry from "./pg/telemetry.schema";
+import * as pgOutreach from "./pg/outreach.schema";
+import * as pgGscHistory from "./pg/gsc-history.schema";
 
 // Canonical schema barrel. Repositories import their tables from here and the
 // provider-aware `db` from "@/db", so each repository is written ONCE for both
@@ -42,7 +47,9 @@ type AppSchema = typeof sqliteApp &
   typeof sqliteBilling &
   typeof sqliteGa4 &
   typeof sqliteGsc &
-  typeof sqliteTelemetry;
+  typeof sqliteTelemetry &
+  typeof sqliteOutreach &
+  typeof sqliteGscHistory;
 
 const runtimeSchema =
   getDatabaseProvider() === "postgres"
@@ -58,6 +65,8 @@ const runtimeSchema =
         ...pgGa4,
         ...pgGsc,
         ...pgTelemetry,
+        ...pgOutreach,
+        ...pgGscHistory,
       }
     : {
         ...sqliteApp,
@@ -71,6 +80,8 @@ const runtimeSchema =
         ...sqliteGa4,
         ...sqliteGsc,
         ...sqliteTelemetry,
+        ...sqliteOutreach,
+        ...sqliteGscHistory,
       };
 
 // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- guarded by schema-parity.test.ts
@@ -114,4 +125,15 @@ export const {
   ga4Connections,
   gscConnections,
   telemetryState,
+  outreachSettings,
+  outreachAngles,
+  outreachProspects,
+  outreachMessages,
+  outreachEvents,
+  outreachLinkChecks,
+  gscDailyTotals,
+  gscDailyPages,
+  gscDailyQueryPages,
+  gscSyncState,
+  gscAnnotations,
 } = schema;

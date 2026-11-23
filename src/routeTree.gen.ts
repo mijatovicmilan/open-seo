@@ -48,10 +48,12 @@ import { Route as ApiGscOauthCallbackRouteImport } from './routes/api/gsc/oauth/
 import { Route as ApiGa4OauthCallbackRouteImport } from './routes/api/ga4/oauth/callback'
 import { Route as ProjectPProjectIdSettingsRouteImport } from './routes/_project/p/$projectId/settings'
 import { Route as ProjectPProjectIdSearchPerformanceRouteImport } from './routes/_project/p/$projectId/search-performance'
+import { Route as ProjectPProjectIdSearchInsightsRouteImport } from './routes/_project/p/$projectId/search-insights'
 import { Route as ProjectPProjectIdSavedRouteImport } from './routes/_project/p/$projectId/saved'
 import { Route as ProjectPProjectIdSamRouteImport } from './routes/_project/p/$projectId/sam'
 import { Route as ProjectPProjectIdRankTrackingRouteImport } from './routes/_project/p/$projectId/rank-tracking'
 import { Route as ProjectPProjectIdPromptExplorerRouteImport } from './routes/_project/p/$projectId/prompt-explorer'
+import { Route as ProjectPProjectIdOutreachRouteImport } from './routes/_project/p/$projectId/outreach'
 import { Route as ProjectPProjectIdKeywordsRouteImport } from './routes/_project/p/$projectId/keywords'
 import { Route as ProjectPProjectIdDomainRouteImport } from './routes/_project/p/$projectId/domain'
 import { Route as ProjectPProjectIdContextRouteImport } from './routes/_project/p/$projectId/context'
@@ -265,6 +267,12 @@ const ProjectPProjectIdSearchPerformanceRoute =
     path: '/search-performance',
     getParentRoute: () => ProjectPProjectIdRouteRoute,
   } as any)
+const ProjectPProjectIdSearchInsightsRoute =
+  ProjectPProjectIdSearchInsightsRouteImport.update({
+    id: '/search-insights',
+    path: '/search-insights',
+    getParentRoute: () => ProjectPProjectIdRouteRoute,
+  } as any)
 const ProjectPProjectIdSavedRoute = ProjectPProjectIdSavedRouteImport.update({
   id: '/saved',
   path: '/saved',
@@ -285,6 +293,12 @@ const ProjectPProjectIdPromptExplorerRoute =
   ProjectPProjectIdPromptExplorerRouteImport.update({
     id: '/prompt-explorer',
     path: '/prompt-explorer',
+    getParentRoute: () => ProjectPProjectIdRouteRoute,
+  } as any)
+const ProjectPProjectIdOutreachRoute =
+  ProjectPProjectIdOutreachRouteImport.update({
+    id: '/outreach',
+    path: '/outreach',
     getParentRoute: () => ProjectPProjectIdRouteRoute,
   } as any)
 const ProjectPProjectIdKeywordsRoute =
@@ -419,10 +433,12 @@ export interface FileRoutesByFullPath {
   '/p/$projectId/context': typeof ProjectPProjectIdContextRoute
   '/p/$projectId/domain': typeof ProjectPProjectIdDomainRoute
   '/p/$projectId/keywords': typeof ProjectPProjectIdKeywordsRoute
+  '/p/$projectId/outreach': typeof ProjectPProjectIdOutreachRoute
   '/p/$projectId/prompt-explorer': typeof ProjectPProjectIdPromptExplorerRoute
   '/p/$projectId/rank-tracking': typeof ProjectPProjectIdRankTrackingRouteWithChildren
   '/p/$projectId/sam': typeof ProjectPProjectIdSamRoute
   '/p/$projectId/saved': typeof ProjectPProjectIdSavedRoute
+  '/p/$projectId/search-insights': typeof ProjectPProjectIdSearchInsightsRoute
   '/p/$projectId/search-performance': typeof ProjectPProjectIdSearchPerformanceRoute
   '/p/$projectId/settings': typeof ProjectPProjectIdSettingsRouteWithChildren
   '/api/ga4/oauth/callback': typeof ApiGa4OauthCallbackRoute
@@ -473,9 +489,11 @@ export interface FileRoutesByTo {
   '/p/$projectId/context': typeof ProjectPProjectIdContextRoute
   '/p/$projectId/domain': typeof ProjectPProjectIdDomainRoute
   '/p/$projectId/keywords': typeof ProjectPProjectIdKeywordsRoute
+  '/p/$projectId/outreach': typeof ProjectPProjectIdOutreachRoute
   '/p/$projectId/prompt-explorer': typeof ProjectPProjectIdPromptExplorerRoute
   '/p/$projectId/sam': typeof ProjectPProjectIdSamRoute
   '/p/$projectId/saved': typeof ProjectPProjectIdSavedRoute
+  '/p/$projectId/search-insights': typeof ProjectPProjectIdSearchInsightsRoute
   '/p/$projectId/search-performance': typeof ProjectPProjectIdSearchPerformanceRoute
   '/api/ga4/oauth/callback': typeof ApiGa4OauthCallbackRoute
   '/api/gsc/oauth/callback': typeof ApiGscOauthCallbackRoute
@@ -533,10 +551,12 @@ export interface FileRoutesById {
   '/_project/p/$projectId/context': typeof ProjectPProjectIdContextRoute
   '/_project/p/$projectId/domain': typeof ProjectPProjectIdDomainRoute
   '/_project/p/$projectId/keywords': typeof ProjectPProjectIdKeywordsRoute
+  '/_project/p/$projectId/outreach': typeof ProjectPProjectIdOutreachRoute
   '/_project/p/$projectId/prompt-explorer': typeof ProjectPProjectIdPromptExplorerRoute
   '/_project/p/$projectId/rank-tracking': typeof ProjectPProjectIdRankTrackingRouteWithChildren
   '/_project/p/$projectId/sam': typeof ProjectPProjectIdSamRoute
   '/_project/p/$projectId/saved': typeof ProjectPProjectIdSavedRoute
+  '/_project/p/$projectId/search-insights': typeof ProjectPProjectIdSearchInsightsRoute
   '/_project/p/$projectId/search-performance': typeof ProjectPProjectIdSearchPerformanceRoute
   '/_project/p/$projectId/settings': typeof ProjectPProjectIdSettingsRouteWithChildren
   '/api/ga4/oauth/callback': typeof ApiGa4OauthCallbackRoute
@@ -592,10 +612,12 @@ export interface FileRouteTypes {
     | '/p/$projectId/context'
     | '/p/$projectId/domain'
     | '/p/$projectId/keywords'
+    | '/p/$projectId/outreach'
     | '/p/$projectId/prompt-explorer'
     | '/p/$projectId/rank-tracking'
     | '/p/$projectId/sam'
     | '/p/$projectId/saved'
+    | '/p/$projectId/search-insights'
     | '/p/$projectId/search-performance'
     | '/p/$projectId/settings'
     | '/api/ga4/oauth/callback'
@@ -646,9 +668,11 @@ export interface FileRouteTypes {
     | '/p/$projectId/context'
     | '/p/$projectId/domain'
     | '/p/$projectId/keywords'
+    | '/p/$projectId/outreach'
     | '/p/$projectId/prompt-explorer'
     | '/p/$projectId/sam'
     | '/p/$projectId/saved'
+    | '/p/$projectId/search-insights'
     | '/p/$projectId/search-performance'
     | '/api/ga4/oauth/callback'
     | '/api/gsc/oauth/callback'
@@ -705,10 +729,12 @@ export interface FileRouteTypes {
     | '/_project/p/$projectId/context'
     | '/_project/p/$projectId/domain'
     | '/_project/p/$projectId/keywords'
+    | '/_project/p/$projectId/outreach'
     | '/_project/p/$projectId/prompt-explorer'
     | '/_project/p/$projectId/rank-tracking'
     | '/_project/p/$projectId/sam'
     | '/_project/p/$projectId/saved'
+    | '/_project/p/$projectId/search-insights'
     | '/_project/p/$projectId/search-performance'
     | '/_project/p/$projectId/settings'
     | '/api/ga4/oauth/callback'
@@ -1023,6 +1049,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjectPProjectIdSearchPerformanceRouteImport
       parentRoute: typeof ProjectPProjectIdRouteRoute
     }
+    '/_project/p/$projectId/search-insights': {
+      id: '/_project/p/$projectId/search-insights'
+      path: '/search-insights'
+      fullPath: '/p/$projectId/search-insights'
+      preLoaderRoute: typeof ProjectPProjectIdSearchInsightsRouteImport
+      parentRoute: typeof ProjectPProjectIdRouteRoute
+    }
     '/_project/p/$projectId/saved': {
       id: '/_project/p/$projectId/saved'
       path: '/saved'
@@ -1049,6 +1082,13 @@ declare module '@tanstack/react-router' {
       path: '/prompt-explorer'
       fullPath: '/p/$projectId/prompt-explorer'
       preLoaderRoute: typeof ProjectPProjectIdPromptExplorerRouteImport
+      parentRoute: typeof ProjectPProjectIdRouteRoute
+    }
+    '/_project/p/$projectId/outreach': {
+      id: '/_project/p/$projectId/outreach'
+      path: '/outreach'
+      fullPath: '/p/$projectId/outreach'
+      preLoaderRoute: typeof ProjectPProjectIdOutreachRouteImport
       parentRoute: typeof ProjectPProjectIdRouteRoute
     }
     '/_project/p/$projectId/keywords': {
@@ -1270,10 +1310,12 @@ interface ProjectPProjectIdRouteRouteChildren {
   ProjectPProjectIdContextRoute: typeof ProjectPProjectIdContextRoute
   ProjectPProjectIdDomainRoute: typeof ProjectPProjectIdDomainRoute
   ProjectPProjectIdKeywordsRoute: typeof ProjectPProjectIdKeywordsRoute
+  ProjectPProjectIdOutreachRoute: typeof ProjectPProjectIdOutreachRoute
   ProjectPProjectIdPromptExplorerRoute: typeof ProjectPProjectIdPromptExplorerRoute
   ProjectPProjectIdRankTrackingRoute: typeof ProjectPProjectIdRankTrackingRouteWithChildren
   ProjectPProjectIdSamRoute: typeof ProjectPProjectIdSamRoute
   ProjectPProjectIdSavedRoute: typeof ProjectPProjectIdSavedRoute
+  ProjectPProjectIdSearchInsightsRoute: typeof ProjectPProjectIdSearchInsightsRoute
   ProjectPProjectIdSearchPerformanceRoute: typeof ProjectPProjectIdSearchPerformanceRoute
   ProjectPProjectIdSettingsRoute: typeof ProjectPProjectIdSettingsRouteWithChildren
   ProjectPProjectIdIndexRoute: typeof ProjectPProjectIdIndexRoute
@@ -1290,11 +1332,13 @@ const ProjectPProjectIdRouteRouteChildren: ProjectPProjectIdRouteRouteChildren =
     ProjectPProjectIdContextRoute: ProjectPProjectIdContextRoute,
     ProjectPProjectIdDomainRoute: ProjectPProjectIdDomainRoute,
     ProjectPProjectIdKeywordsRoute: ProjectPProjectIdKeywordsRoute,
+    ProjectPProjectIdOutreachRoute: ProjectPProjectIdOutreachRoute,
     ProjectPProjectIdPromptExplorerRoute: ProjectPProjectIdPromptExplorerRoute,
     ProjectPProjectIdRankTrackingRoute:
       ProjectPProjectIdRankTrackingRouteWithChildren,
     ProjectPProjectIdSamRoute: ProjectPProjectIdSamRoute,
     ProjectPProjectIdSavedRoute: ProjectPProjectIdSavedRoute,
+    ProjectPProjectIdSearchInsightsRoute: ProjectPProjectIdSearchInsightsRoute,
     ProjectPProjectIdSearchPerformanceRoute:
       ProjectPProjectIdSearchPerformanceRoute,
     ProjectPProjectIdSettingsRoute: ProjectPProjectIdSettingsRouteWithChildren,

@@ -9,3 +9,6 @@ export * from "./billing.schema";
 export * from "./ga4.schema";
 export * from "./gsc.schema";
 export * from "./telemetry.schema";
+// Fork additions (FORK-CHANGES.md).
+export * from "./outreach.schema";
+export * from "./gsc-history.schema";

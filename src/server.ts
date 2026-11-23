@@ -8,6 +8,7 @@ import { ProjectRepository } from "@/server/features/projects/repositories/Proje
 import { SamSessionRepository } from "@/server/features/sam/SamSessionRepository";
 import { runScheduledRankChecks } from "@/server/features/rank-tracking/services/scheduledRankChecks";
 import { reconcileStaleAudits } from "@/server/features/audit/services/auditReconciler";
+import { GscHistorySyncService } from "@/server/features/gsc-history/services/GscHistorySyncService";
 import { getOrCreateOrganizationCustomer } from "@/server/billing/subscription";
 import { isHostedServerAuthMode } from "@/server/lib/runtime-env";
 import { getAuthMode, isHostedAuthMode } from "@/lib/auth-mode";
@@ -212,6 +213,14 @@ export default {
         } catch (err) {
           console.error("[cron] Dub referral sale sweep failed:", err);
         }
+      }
+      // Fork addition (FORK-CHANGES.md): daily Search Console history sync.
+      try {
+        await withPgClient(() =>
+          GscHistorySyncService.syncAllConnectedProjects(),
+        );
+      } catch (err) {
+        console.error("[cron] Search Console history sync failed:", err);
       }
       return;
     }

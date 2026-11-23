@@ -1,13 +1,5 @@
-import { z } from "zod";
-import {
-  PosthogApiError,
-  PosthogNotConfiguredError,
-  runHogql,
-} from "@/server/lib/posthogClient";
-import {
-  Ga4MalformedResponseError,
-  Ga4ReportError,
-} from "@/server/lib/ga4Errors";
+import { runHogql } from "@/server/lib/posthogClient";
+import { Ga4ReportError } from "@/server/lib/ga4Errors";
 import { getGa4ReportConfiguration } from "@/server/features/ga4/services/Ga4ReportDefinitions";
 import {
   buildReportComparison,
@@ -33,7 +25,8 @@ import {
   unsupportedPosthogReason,
   type PosthogQuery,
 } from "./posthogQueries";
-import { normalizePosthogResult } from "./posthogNormalization";
+import { hogqlText, normalizePosthogResult } from "./posthogNormalization";
+import { mapPosthogError } from "./posthogErrorMap";
 
 // Fork addition (FORK-CHANGES.md): the GA4 reports, organic overview and
 // measurement health answered from PostHog, in the GA4 services' output
@@ -45,7 +38,7 @@ const MAX_FETCH_ROWS = 10_000;
 
 /** Metrics that count visitors or visits: estimates without cookies. */
 const ESTIMATED_METRICS = new Set(["activeUsers", "totalUsers", "sessions"]);
-export const POSTHOG_ESTIMATE_WARNING = "posthog_users_and_sessions_estimated";
+const POSTHOG_ESTIMATE_WARNING = "posthog_users_and_sessions_estimated";
 
 function posthogSourceInfo(source: PosthogSource) {
   return {
@@ -62,60 +55,6 @@ function sourceWarnings(source: PosthogSource, metrics: string[]): string[] {
       : []),
     ...(source.keyEvents.length === 0 ? ["posthog_no_key_events"] : []),
   ];
-}
-
-export function mapPosthogError(error: unknown, projectId?: string): never {
-  if (error instanceof Ga4ReportError) throw error;
-  if (error instanceof PosthogNotConfiguredError) {
-    throw new Ga4ReportError(
-      "ga4_not_connected",
-      "PostHog is this project's analytics source, but no PostHog API key is connected. Connect one in Settings → Integrations.",
-    );
-  }
-  if (error instanceof PosthogApiError) {
-    const project = projectId ? ` project ${projectId}` : " project";
-    if (error.status === 401 || error.code === "authentication_failed") {
-      throw new Ga4ReportError(
-        "ga4_reconnect_required",
-        "PostHog rejected the API key (expired or revoked).",
-      );
-    }
-    if (error.status === 403 || error.status === 404) {
-      throw new Ga4ReportError(
-        "ga4_property_inaccessible",
-        `The PostHog API key cannot read PostHog${project} (it needs query:read on it).`,
-      );
-    }
-    if (error.status === 429) {
-      throw new Ga4ReportError(
-        "ga4_quota_exhausted",
-        "PostHog's query rate limit is reached. Try again later.",
-        error.retryAfterSeconds,
-      );
-    }
-    if (error.status === 400) {
-      // Our query's fault, not the person's: PostHog's reason helps fix it.
-      console.error("posthog.query_rejected", { detail: error.message });
-      throw new Ga4ReportError(
-        "ga4_report_incompatible",
-        "PostHog rejected this report's query.",
-      );
-    }
-    throw new Ga4ReportError(
-      "ga4_upstream_unavailable",
-      "PostHog is temporarily unavailable.",
-    );
-  }
-  if (
-    error instanceof Ga4MalformedResponseError ||
-    error instanceof z.ZodError
-  ) {
-    throw new Ga4ReportError(
-      "ga4_malformed_response",
-      "PostHog returned an invalid report.",
-    );
-  }
-  throw error;
 }
 
 async function query(source: PosthogSource, spec: PosthogQuery) {
@@ -242,6 +181,14 @@ async function runReport(
   }
 }
 
+function numberOf(
+  row: Record<string, string | number | null> | null,
+  metric: string,
+): number | null {
+  const value = row?.[metric];
+  return typeof value === "number" ? value : null;
+}
+
 async function getOrganicOverview(
   input: {
     startDate?: string;
@@ -277,10 +224,6 @@ async function getOrganicOverview(
     ]);
     const currentSummary = current.rows[0] ?? null;
     const previousSummary = previous.rows[0] ?? null;
-    const number = (
-      row: Record<string, string | number | null> | null,
-      metric: string,
-    ) => (typeof row?.[metric] === "number" ? row[metric] : null);
     return {
       status: "ok" as const,
       source: posthogSourceInfo(source),
@@ -299,8 +242,8 @@ async function getOrganicOverview(
         currentSpec.metrics.map((metric) => [
           metric,
           comparisonValue(
-            number(currentSummary, metric),
-            number(previousSummary, metric),
+            numberOf(currentSummary, metric),
+            numberOf(previousSummary, metric),
           ),
         ]),
       ),
@@ -341,15 +284,15 @@ async function getMeasurementHealth(source: PosthogSource) {
       run(POSTHOG_HEALTH_QUERIES.siteSearch),
     ]);
     const eventRows = events.rows.map(([name, count, lastSeenAt]) => ({
-      eventName: String(name),
+      eventName: hogqlText(name),
       countLast30Days: Number(count) || 0,
-      lastSeenAt: lastSeenAt == null ? null : String(lastSeenAt),
+      lastSeenAt: hogqlText(lastSeenAt) || null,
     }));
     const eventCount = (name: string) =>
       eventRows.find((row) => row.eventName === name)?.countLast30Days ?? 0;
     const webStreams = hosts.rows.map(
       ([host, pageviews, lastSeenAt, cookieless]) => {
-        const name = host == null || host === "" ? "(not set)" : String(host);
+        const name = hogqlText(host) || "(not set)";
         const views = Number(pageviews) || 0;
         return {
           streamId: name,
@@ -357,7 +300,7 @@ async function getMeasurementHealth(source: PosthogSource) {
           measurementId: null,
           defaultUri: name === "(not set)" ? null : `https://${name}`,
           createTime: null,
-          updateTime: lastSeenAt == null ? null : String(lastSeenAt),
+          updateTime: hogqlText(lastSeenAt) || null,
           pageviewsLast30Days: views,
           cookielessShare: views > 0 ? (Number(cookieless) || 0) / views : 0,
         };

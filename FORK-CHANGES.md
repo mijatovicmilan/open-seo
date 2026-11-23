@@ -26,6 +26,23 @@ upstream's version and re-apply the marked lines (each carries a
   CTR below expected, cannibalization, new pages, chart annotations). MCP
   tools: `src/server/mcp/tools/search-history-tools.ts`.
 
+- **PostHog as an analytics source** (Settings → Integrations): per project,
+  Google Analytics or PostHog. An organization's PostHog personal API key is
+  stored once, encrypted with `BETTER_AUTH_SECRET` (Better Auth's symmetric
+  encryption, as OAuth tokens are), shown only as `phx_…abcd`, and can serve
+  several projects; check, connect, replace and disconnect in the UI;
+  `POSTHOG_PERSONAL_API_KEY` / `POSTHOG_HOST` in `.env` are a fallback and the
+  seed for "Use the key from the server's .env". Key events (signups) are
+  picked from the PostHog project's events. Every GA4 report, the organic
+  overview, measurement health, search opportunities, the dashboard card and
+  the GA4 MCP tools answer from PostHog over HogQL in the GA4 shape (no
+  ecommerce or new-vs-returning; users and sessions marked as estimates on
+  cookieless sites). Our joins: Search Insights gets Google visits and
+  signups (cards, chart lines with the same notes, a sortable "From search to
+  signups" table); Outreach gets visits and signups per earned link (Links
+  tab and prospect panel). MCP tools: `get_search_signups`,
+  `get_outreach_link_traffic` (`src/server/mcp/tools/posthog-join-tools.ts`).
+
 Our own files:
 
 - `src/db/outreach.schema.ts`, `src/db/gsc-history.schema.ts` and their
@@ -42,25 +59,41 @@ Our own files:
 - `scripts/outreach-import-d1.ts`
 - `src/server/features/internal-cron/` (the cron endpoint for local Docker)
 - `src/server/mcp/tools/outreach-schedule-tools.ts`
+- PostHog: `src/db/analytics-source.schema.ts` (+ `src/db/pg/` mirror),
+  `src/server/features/posthog/`, `src/server/lib/posthogClient.ts`,
+  `src/server/lib/posthogErrors.ts`, `src/server/lib/secretBox.ts`,
+  `src/serverFunctions/analyticsSource.ts`,
+  `src/types/schemas/analytics-source.ts`, `src/client/features/posthog/`,
+  `src/server/mcp/tools/posthog-join-tools.ts`
 - Migrations `drizzle/0048_fork_outreach_gsc.sql`, `drizzle/0049_fork_gsc_segments.sql`,
   `drizzle/0050_fork_outreach_schedule.sql` and `drizzle-pg/0026_fork_outreach_gsc.sql`,
-  `drizzle-pg/0027_fork_gsc_segments.sql`, `drizzle-pg/0028_fork_outreach_schedule.sql`
+  `drizzle-pg/0027_fork_gsc_segments.sql`, `drizzle-pg/0028_fork_outreach_schedule.sql`,
+  `drizzle/0051_fork_analytics_source.sql`, `drizzle-pg/0029_fork_analytics_source.sql`
   (with their snapshots)
 
 ## Intentional edits to upstream files
 
-| File                                                          | Change                                                                                                                                                          | Why                                                        |
-| ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| `src/db/schema.ts`                                            | Import, type and spread our two schema modules; export our tables                                                                                               | The provider-aware barrel is how repositories get tables   |
-| `src/db/d1/schema.ts`, `src/db/pg/schema.ts`                  | `export *` of our schema modules                                                                                                                                | drizzle-kit and the D1/PG clients read these barrels       |
-| `src/db/schema-parity.test.ts`                                | Include our modules                                                                                                                                             | Keeps the SQLite/Postgres parity guard covering our tables |
-| `src/server/mcp/server.ts`                                    | Import and `register(...)` our tools                                                                                                                            | MCP tool registration                                      |
-| `src/server.ts`                                               | One try/catch call to `GscHistorySyncService.syncAllConnectedProjects()` in the daily `17 3 * * *` cron branch                                                  | Daily Search Console history                               |
-| `src/server.ts`                                               | `scheduled` body moved into `runScheduled(cron, env)`; `OutreachScheduler.tick()` in the 5-minute branch; the `INTERNAL_CRON_PATH` route calling `runScheduled` | Scheduled outreach sending; crons for local Docker         |
-| `compose.yaml`                                                | The `scheduler` sidecar service                                                                                                                                 | Calls the internal cron endpoint every 5 minutes           |
-| `src/client/navigation/items.ts`                              | "Search Insights" and "Outreach" items in My Site                                                                                                               | Navigation                                                 |
-| `src/routeTree.gen.ts`                                        | Regenerated with our two routes                                                                                                                                 | Generated by the router plugin                             |
-| `drizzle/meta/_journal.json`, `drizzle-pg/meta/_journal.json` | Our migration entries                                                                                                                                           | Generated by drizzle-kit                                   |
+| File                                                                                                                        | Change                                                                                                                                                                                             | Why                                                                  |
+| --------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `src/db/schema.ts`                                                                                                          | Import, type and spread our two schema modules; export our tables                                                                                                                                  | The provider-aware barrel is how repositories get tables             |
+| `src/db/d1/schema.ts`, `src/db/pg/schema.ts`                                                                                | `export *` of our schema modules                                                                                                                                                                   | drizzle-kit and the D1/PG clients read these barrels                 |
+| `src/db/schema-parity.test.ts`                                                                                              | Include our modules                                                                                                                                                                                | Keeps the SQLite/Postgres parity guard covering our tables           |
+| `src/server/mcp/server.ts`                                                                                                  | Import and `register(...)` our tools                                                                                                                                                               | MCP tool registration                                                |
+| `src/server.ts`                                                                                                             | One try/catch call to `GscHistorySyncService.syncAllConnectedProjects()` in the daily `17 3 * * *` cron branch                                                                                     | Daily Search Console history                                         |
+| `src/server.ts`                                                                                                             | `scheduled` body moved into `runScheduled(cron, env)`; `OutreachScheduler.tick()` in the 5-minute branch; the `INTERNAL_CRON_PATH` route calling `runScheduled`                                    | Scheduled outreach sending; crons for local Docker                   |
+| `compose.yaml`                                                                                                              | The `scheduler` sidecar service                                                                                                                                                                    | Calls the internal cron endpoint every 5 minutes                     |
+| `src/client/navigation/items.ts`                                                                                            | "Search Insights" and "Outreach" items in My Site                                                                                                                                                  | Navigation                                                           |
+| `src/routeTree.gen.ts`                                                                                                      | Regenerated with our two routes                                                                                                                                                                    | Generated by the router plugin                                       |
+| `drizzle/meta/_journal.json`, `drizzle-pg/meta/_journal.json`                                                               | Our migration entries                                                                                                                                                                              | Generated by drizzle-kit                                             |
+| `src/server/features/ga4/services/Ga4ReportingService.ts`, `Ga4OrganicOverviewService.ts`, `Ga4MeasurementHealthService.ts` | First lines of `runReport` / `getOrganicOverview` / `getMeasurementHealth` hand PostHog projects to `PosthogReportingService`; `normalizeLimit`, `normalizeOffset`, `keyEventDiagnostics` exported | PostHog answers in the GA4 shape                                     |
+| `src/server/features/ga4/services/SearchOpportunityService.ts`                                                              | Time zone from the PostHog source when there is no GA4 link; `source.analyticsProvider`                                                                                                            | Search opportunities for PostHog projects                            |
+| `src/server/features/ga4/services/*.test.ts` (5 files)                                                                      | `vi.mock` of `posthogSource` returning null                                                                                                                                                        | Their projects have no PostHog source; keeps the DB out of the tests |
+| `src/server/features/dashboard/services/DashboardService.ts`                                                                | A PostHog source counts as connected analytics                                                                                                                                                     | Dashboard card and setup step                                        |
+| `src/serverFunctions/ga4.ts`                                                                                                | Dashboard report carries `provider`; a PostHog project's error is thrown, not turned into the GA4 connect card                                                                                     | Dashboard card                                                       |
+| `src/client/features/dashboard/Ga4Card.tsx`                                                                                 | "PostHog · last 28 days", "(est.)" labels, neutral error text                                                                                                                                      | Dashboard card                                                       |
+| `src/server/mcp/tools/google-analytics-tools.ts`                                                                            | A sentence on PostHog in each description; "Source: PostHog" note in the text; overview lists only metrics the source has                                                                          | MCP tools explain the source                                         |
+| `src/routes/_project/p/$projectId/settings/integrations.tsx`                                                                | `AnalyticsSourceSection` wraps the GA4 card                                                                                                                                                        | Source picker                                                        |
+| `compose.yaml`, `.env.example`                                                                                              | `POSTHOG_PERSONAL_API_KEY`, `POSTHOG_HOST`                                                                                                                                                         | Env key fallback                                                     |
 
 ## Hidden upstream features
 
@@ -75,7 +108,7 @@ Brand Lookup and Prompt Explorer stay.
 ## Migrations and upstream merges
 
 Our migrations are numbered after upstream's last one at fork time (D1 0048
-to 0050, Postgres 0026 to 0028). D1 (`wrangler d1 migrations apply`) tracks applied files by
+to 0051, Postgres 0026 to 0029). D1 (`wrangler d1 migrations apply`) tracks applied files by
 name, so a later upstream file with the same number but a different name
 still applies. If upstream adds 0048/0026:
 

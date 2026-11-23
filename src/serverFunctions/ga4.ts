@@ -5,6 +5,8 @@ import { z } from "zod";
 import { shiftGa4Date } from "@/server/features/ga4/services/Ga4Dates";
 import { Ga4OrganicOverviewService } from "@/server/features/ga4/services/Ga4OrganicOverviewService";
 import { Ga4Service } from "@/server/features/ga4/services/Ga4Service";
+// Fork addition (FORK-CHANGES.md): PostHog as an analytics source.
+import { getActivePosthogSource } from "@/server/features/posthog/services/posthogSource";
 import { AppError } from "@/server/lib/errors";
 import { Ga4ReportError } from "@/server/lib/ga4Errors";
 import { hasSelfHostedGoogleOAuthConfig } from "@/server/features/google/oauth-config";
@@ -96,6 +98,9 @@ export const getGa4DashboardReport = createServerFn({ method: "POST" })
   .middleware(requireProjectContext)
   .validator(projectScopedSchema)
   .handler(async ({ context }) => {
+    // Fork addition (FORK-CHANGES.md): a PostHog project's card shows its
+    // errors instead of turning into the Google Analytics connect card.
+    const posthog = await getActivePosthogSource(context.projectId);
     try {
       const overview = await Ga4OrganicOverviewService.getOrganicOverview({
         projectId: context.projectId,
@@ -108,6 +113,7 @@ export const getGa4DashboardReport = createServerFn({ method: "POST" })
       });
       return {
         connected: true as const,
+        provider: overview.source.provider,
         totals: totals(overview.current),
         prevTotals: totals(overview.previous),
         trend: fillDailySessions(
@@ -116,6 +122,7 @@ export const getGa4DashboardReport = createServerFn({ method: "POST" })
         ),
       };
     } catch (error) {
+      if (posthog) throw error;
       // Not connected, a dead grant, or a lost/deleted property: the dashboard
       // card falls back to the connect card instead of retrying a report that
       // can never succeed. Other report errors are real faults.

@@ -2,6 +2,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { makeGa4Connection } from "./ga4-test-fixtures";
 import { Ga4OrganicOverviewService } from "./Ga4OrganicOverviewService";
 
+// Fork addition (FORK-CHANGES.md): these projects have no PostHog source.
+vi.mock("@/server/features/posthog/services/posthogSource", () => ({
+  getActivePosthogSource: async () => null,
+}));
+
 const mocks = vi.hoisted(() => ({
   getByProjectId: vi.fn(),
   runReport: vi.fn(),

@@ -28,8 +28,8 @@ import { buildDashboardUrl } from "@/server/mcp/urls";
 const POSTHOG_SOURCE_NOTE =
   " When the project's analytics source is PostHog, the same report comes from PostHog (source.provider is posthog): no ecommerce or new-versus-returning, and users and sessions are estimates on cookieless sites.";
 
-function posthogNote(result: { source: { provider: string } }) {
-  return result.source.provider === "posthog"
+function posthogNote(result: { source?: { provider: string } }) {
+  return result.source?.provider === "posthog"
     ? " Source: PostHog; users and sessions are estimates (cookieless)."
     : "";
 }
@@ -308,7 +308,8 @@ function overviewText(result: Ga4OverviewResult) {
   }
   // Fork addition (FORK-CHANGES.md): PostHog has no revenue metrics.
   const rows = OVERVIEW_METRICS.filter(
-    (metric) => metric in result.comparison,
+    (metric) =>
+      result.source?.provider !== "posthog" || metric in result.comparison,
   ).map((metric) => ({
     metric,
     current: result.current[metric] ?? null,

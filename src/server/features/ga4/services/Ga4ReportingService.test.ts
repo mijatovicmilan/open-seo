@@ -7,6 +7,11 @@ import { Ga4DataApiError, Ga4ReportError } from "@/server/lib/ga4Errors";
 import { makeGa4Connection } from "./ga4-test-fixtures";
 import { Ga4ReportingService } from "./Ga4ReportingService";
 
+// Fork addition (FORK-CHANGES.md): these projects have no PostHog source.
+vi.mock("@/server/features/posthog/services/posthogSource", () => ({
+  getActivePosthogSource: async () => null,
+}));
+
 const mocks = vi.hoisted(() => ({
   getByProjectId: vi.fn(),
   runReport:

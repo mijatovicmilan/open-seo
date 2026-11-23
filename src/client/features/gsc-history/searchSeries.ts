@@ -10,7 +10,15 @@ import { GSC_ANNOTATION_KINDS } from "@/types/schemas/gsc-history";
 // Turns the server's daily series into chart points with every metric at a
 // chosen granularity, with the notes that fall in each bucket.
 
-export type MetricKey = "clicks" | "impressions" | "ctr" | "position";
+// Fork addition (FORK-CHANGES.md): visits and signups come from PostHog
+// (only for PostHog projects); see client/features/posthog/SearchSignups.
+export type MetricKey =
+  | "clicks"
+  | "impressions"
+  | "ctr"
+  | "position"
+  | "visits"
+  | "signups";
 export type Granularity = "auto" | "day" | "week" | "month";
 
 const count = (value: number) => Math.round(value).toLocaleString("en-US");
@@ -56,6 +64,22 @@ export const METRICS: Record<
     minTop: 10,
     // Orange-red, apart from the blue clicks line (as in Search Console).
     color: "var(--color-error)",
+  },
+  visits: {
+    key: "visits",
+    name: "Google visits",
+    integer: true,
+    format: count,
+    minTop: 4,
+    color: "var(--color-accent)",
+  },
+  signups: {
+    key: "signups",
+    name: "Signups",
+    integer: true,
+    format: count,
+    minTop: 2,
+    color: "var(--color-secondary)",
   },
 };
 
@@ -115,7 +139,21 @@ function noteFor(annotation: Insights["annotations"][number]): ChartNote {
   };
 }
 
-type Sums = { clicks: number; impressions: number; weighted: number };
+type Sums = {
+  clicks: number;
+  impressions: number;
+  weighted: number;
+  /** Null when the day has no PostHog data joined. */
+  visits: number | null;
+  signups: number | null;
+};
+type Joined = { visits?: number | null; signups?: number | null };
+type SeriesDay = Insights["series"][number] &
+  Joined & {
+    compare:
+      | (NonNullable<Insights["series"][number]["compare"]> & Joined)
+      | null;
+  };
 
 function valueOf(sums: Sums, metric: MetricKey): number | null {
   switch (metric) {
@@ -127,6 +165,10 @@ function valueOf(sums: Sums, metric: MetricKey): number | null {
       return sums.impressions > 0 ? sums.clicks / sums.impressions : null;
     case "position":
       return sums.impressions > 0 ? sums.weighted / sums.impressions : null;
+    case "visits":
+      return sums.visits;
+    case "signups":
+      return sums.signups;
   }
 }
 
@@ -135,6 +177,8 @@ export const METRIC_KEYS: MetricKey[] = [
   "impressions",
   "ctr",
   "position",
+  "visits",
+  "signups",
 ];
 
 /** The metrics in the URL ("clicks,ctr"); clicks and impressions by default. */
@@ -149,6 +193,8 @@ const EMPTY_VALUES: Record<MetricKey, null> = {
   impressions: null,
   ctr: null,
   position: null,
+  visits: null,
+  signups: null,
 };
 
 function valuesOf(sums: Sums): Record<MetricKey, number | null> {
@@ -157,17 +203,33 @@ function valuesOf(sums: Sums): Record<MetricKey, number | null> {
     impressions: valueOf(sums, "impressions"),
     ctr: valueOf(sums, "ctr"),
     position: valueOf(sums, "position"),
+    visits: valueOf(sums, "visits"),
+    signups: valueOf(sums, "signups"),
   };
 }
 
 function add(
   sums: Sums,
-  day: { clicks: number; impressions: number; position: number | null },
+  day: {
+    clicks: number;
+    impressions: number;
+    position: number | null;
+  } & Joined,
 ) {
   sums.clicks += day.clicks;
   sums.impressions += day.impressions;
   sums.weighted += (day.position ?? 0) * day.impressions;
+  if (day.visits != null) sums.visits = (sums.visits ?? 0) + day.visits;
+  if (day.signups != null) sums.signups = (sums.signups ?? 0) + day.signups;
 }
+
+const emptySums = (): Sums => ({
+  clicks: 0,
+  impressions: 0,
+  weighted: 0,
+  visits: null,
+  signups: null,
+});
 
 /** The first day the chart shows: a young site starts a few days before its
  *  first impressions instead of a long flat line at zero. */
@@ -185,7 +247,7 @@ export function chartStart(
 }
 
 export function buildChartPoints(input: {
-  series: Insights["series"];
+  series: SeriesDay[];
   annotations: Insights["annotations"];
   granularity: "day" | "week" | "month";
   from: string | null;
@@ -212,8 +274,8 @@ export function buildChartPoints(input: {
   for (const day of days) {
     const key = bucketKey(day.date, granularity);
     const bucket = buckets.get(key) ?? {
-      current: { clicks: 0, impressions: 0, weighted: 0 },
-      compare: { clicks: 0, impressions: 0, weighted: 0 },
+      current: emptySums(),
+      compare: emptySums(),
       compareStart: null,
       partial: false,
       hasCompare: false,

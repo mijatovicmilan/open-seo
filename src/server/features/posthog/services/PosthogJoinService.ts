@@ -1,17 +1,19 @@
 import { and, eq, min, or } from "drizzle-orm";
+import { sort } from "remeda";
 import { db } from "@/db";
 import { outreachEvents, outreachProspects } from "@/db/schema";
 import { runHogql } from "@/server/lib/posthogClient";
 import { GscHistoryRepository } from "@/server/features/gsc-history/repositories/GscHistoryRepository";
 import { shiftGa4Date } from "@/server/features/ga4/services/Ga4Dates";
 import { getActivePosthogSource, type PosthogSource } from "./posthogSource";
-import { mapPosthogError } from "./PosthogReportingService";
+import { mapPosthogError } from "./posthogErrorMap";
+import { hogqlText } from "./posthogNormalization";
 import {
   buildGoogleDailyQuery,
   buildGooglePagesQuery,
   buildReferralQuery,
-  ratio,
-} from "./posthogQueries";
+} from "./posthogJoinQueries";
+import { ratio } from "./posthogQueries";
 
 // Fork addition (FORK-CHANGES.md): our joins across sources.
 // 1. Search Console page → visits from Google (PostHog) → signups.
@@ -21,11 +23,13 @@ import {
 // project's zone, so a day can shift by a few hours between the two.
 
 type Range = { start: string; end: string };
-export type JoinMetrics = {
+type JoinMetrics = {
   visits: number;
   signups: number;
   keyEvents: number;
 };
+
+const byText = (a: string, b: string) => a.localeCompare(b);
 
 const GSC_PAGE_LIMIT = 1_000;
 /** How far back outreach link traffic is read. */
@@ -49,7 +53,7 @@ function addMetrics(sum: JoinMetrics, row: JoinMetrics) {
 }
 
 /** "www.Example.com" → "example.com". */
-export function bareHost(host: string): string {
+function bareHost(host: string): string {
   return host
     .trim()
     .toLowerCase()
@@ -57,13 +61,13 @@ export function bareHost(host: string): string {
 }
 
 /** "/guides/x/" → "/guides/x"; "/" stays. */
-export function barePath(path: string): string {
+function barePath(path: string): string {
   const clean = path.split(/[?#]/u)[0] || "/";
   return clean.length > 1 ? clean.replace(/\/+$/u, "") || "/" : clean;
 }
 
 /** A page URL's host and path in the form both sources are matched on. */
-export function pageParts(url: string): { host: string; path: string } | null {
+function pageParts(url: string): { host: string; path: string } | null {
   try {
     const parsed = new URL(url.includes("://") ? url : `https://${url}`);
     return { host: bareHost(parsed.hostname), path: barePath(parsed.pathname) };
@@ -106,7 +110,7 @@ const sourceInfo = (source: PosthogSource) => ({
   keyEvents: source.keyEvents,
 });
 
-export type SearchSignupsInput = {
+type SearchSignupsInput = {
   projectId: string;
   current: Range;
   previous?: Range | null;
@@ -134,11 +138,14 @@ async function getSearchSignups(input: SearchSignupsInput) {
   const ranges = [input.current, input.previous, input.chart].filter(
     (range): range is Range => Boolean(range),
   );
-  const loadStart = ranges.map((range) => range.start).sort()[0];
-  const loadEnd = ranges
-    .map((range) => range.end)
-    .sort()
-    .at(-1);
+  const loadStart = sort(
+    ranges.map((range) => range.start),
+    byText,
+  )[0];
+  const loadEnd = sort(
+    ranges.map((range) => range.end),
+    byText,
+  ).at(-1);
   const keyEvents = source.keyEvents;
 
   const [daily, pages, gscPages] = await Promise.all([
@@ -175,7 +182,7 @@ async function getSearchSignups(input: SearchSignupsInput) {
   ]);
 
   const days = (daily?.rows ?? []).map((row) => ({
-    date: String(row[0]),
+    date: hogqlText(row[0]),
     ...metricsOf(row, 1),
   }));
   const sumRange = (range: Range | null | undefined) => {
@@ -207,7 +214,7 @@ async function getSearchSignups(input: SearchSignupsInput) {
     });
   }
   for (const row of pages?.rows ?? []) {
-    const parts = { host: String(row[0]), path: String(row[1]) };
+    const parts = { host: hogqlText(row[0]), path: hogqlText(row[1]) };
     const key = pageKey(parts);
     const existing = byKey.get(key);
     const metrics = metricsOf(row, 2);
@@ -223,22 +230,22 @@ async function getSearchSignups(input: SearchSignupsInput) {
       });
     }
   }
-  const pageRows = [...byKey.entries()]
-    .filter(([key]) => !page || key === pageKey(page))
-    .map(([, row]) => ({
-      ...row,
-      // Google visits per Search Console click: well under 1 means the
-      // page loses visitors before analytics loads (or blocks it).
-      visitsPerClick: row.clicks > 0 ? row.visits / row.clicks : null,
-      signupRate: row.visits > 0 ? ratio(row.signups, row.visits) : null,
-    }))
-    .filter((row) => row.clicks > 0 || row.visits > 0)
-    .sort(
-      (a, b) =>
-        b.clicks - a.clicks ||
-        b.visits - a.visits ||
-        a.page.localeCompare(b.page),
-    );
+  const pageRows = sort(
+    [...byKey.entries()]
+      .filter(([key]) => !page || key === pageKey(page))
+      .map(([, row]) => ({
+        ...row,
+        // Google visits per Search Console click: well under 1 means the
+        // page loses visitors before analytics loads (or blocks it).
+        visitsPerClick: row.clicks > 0 ? row.visits / row.clicks : null,
+        signupRate: row.visits > 0 ? ratio(row.signups, row.visits) : null,
+      }))
+      .filter((row) => row.clicks > 0 || row.visits > 0),
+    (a, b) =>
+      b.clicks - a.clicks ||
+      b.visits - a.visits ||
+      a.page.localeCompare(b.page),
+  );
 
   return {
     available: true as const,
@@ -250,8 +257,6 @@ async function getSearchSignups(input: SearchSignupsInput) {
     pages: pageRows,
   };
 }
-
-export type SearchSignups = Awaited<ReturnType<typeof getSearchSignups>>;
 
 /** Prospects with a link to us: linked now, or a link was found once. */
 async function listOutreachLinks(projectId: string) {
@@ -339,7 +344,10 @@ async function getOutreachLinkTraffic(projectId: string, now = new Date()) {
         .filter((host): host is string => Boolean(host)),
     ),
   ];
-  const since = links.map((link) => link.since).sort()[0];
+  const since = sort(
+    links.map((link) => link.since),
+    byText,
+  )[0];
   const result =
     domains.length > 0 && since
       ? await hogql(
@@ -353,16 +361,16 @@ async function getOutreachLinkTraffic(projectId: string, now = new Date()) {
         )
       : null;
   const rows: ReferralRow[] = (result?.rows ?? []).map((row) => ({
-    domain: String(row[0]),
-    date: String(row[1]),
-    referrer: String(row[2] ?? ""),
+    domain: hogqlText(row[0]),
+    date: hogqlText(row[1]),
+    referrer: hogqlText(row[2]),
     ...metricsOf(row, 3),
   }));
   return {
     available: true as const,
     source: sourceInfo(source),
-    links: links
-      .map((link) => ({
+    links: sort(
+      links.map((link) => ({
         number: link.number,
         site: link.site,
         theirPage: link.theirPage,
@@ -370,14 +378,11 @@ async function getOutreachLinkTraffic(projectId: string, now = new Date()) {
         linkFoundAt: link.linkFoundAt?.slice(0, 10) ?? null,
         since: link.since,
         ...linkTraffic(link, rows),
-      }))
-      .sort((a, b) => b.since.localeCompare(a.since) || a.number - b.number),
+      })),
+      (a, b) => b.since.localeCompare(a.since) || a.number - b.number,
+    ),
   };
 }
-
-export type OutreachLinkTraffic = Awaited<
-  ReturnType<typeof getOutreachLinkTraffic>
->;
 
 export const PosthogJoinService = {
   getSearchSignups,

@@ -25,7 +25,7 @@ function pathOf(url: string) {
 }
 
 /** A URL shown as its path; click filters to the page, full URL on hover. */
-function PageCell({ url }: { url: string | null }) {
+export function PageCell({ url }: { url: string | null }) {
   const onFilter = useContext(InsightsFilterContext);
   if (!url) return <span className="text-base-content/40">—</span>;
   const label = pathOf(url);

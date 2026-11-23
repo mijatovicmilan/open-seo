@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+  PosthogApiError,
+  PosthogNotConfiguredError,
+} from "@/server/lib/posthogErrors";
 
 // Fork addition (FORK-CHANGES.md): reads a PostHog project over the HogQL
 // Query API with a read-only personal API key. Keys are passed in by the
@@ -8,27 +12,6 @@ import { z } from "zod";
 const REQUEST_TIMEOUT_MS = 30_000;
 
 export type PosthogCredential = { host: string; apiKey: string };
-
-export class PosthogNotConfiguredError extends Error {
-  constructor() {
-    super("No PostHog API key is connected for this project.");
-    this.name = "PosthogNotConfiguredError";
-  }
-}
-
-export class PosthogApiError extends Error {
-  constructor(
-    public readonly status: number,
-    message: string,
-    public readonly retryAfterSeconds: number | null = null,
-    /** PostHog's error code, e.g. "authentication_failed" (bad key or
-     *  wrong region) or "permission_denied" (scope or project). */
-    public readonly code: string | null = null,
-  ) {
-    super(message);
-    this.name = "PosthogApiError";
-  }
-}
 
 const hogqlResponseSchema = z.object({
   columns: z.array(z.string()),
@@ -59,7 +42,7 @@ export type HogqlResult = {
   timeZone: string | null;
 };
 
-export const POSTHOG_PROJECT_ID_PATTERN = /^\d{1,12}$/;
+const POSTHOG_PROJECT_ID_PATTERN = /^\d{1,12}$/;
 
 /** An https API origin ("https://eu.posthog.com"), or null. */
 export function normalizePosthogHost(value: string): string | null {

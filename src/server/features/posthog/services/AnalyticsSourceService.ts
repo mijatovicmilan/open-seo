@@ -1,8 +1,11 @@
+import { hogqlText } from "./posthogNormalization";
+import {
+  PosthogApiError,
+  PosthogNotConfiguredError,
+} from "@/server/lib/posthogErrors";
 import {
   listPosthogProjects,
   normalizePosthogHost,
-  PosthogApiError,
-  PosthogNotConfiguredError,
   posthogKeyHint,
   runHogql,
   type PosthogCredential,
@@ -27,7 +30,7 @@ export class AnalyticsSourceError extends Error {
 }
 
 /** Where the key for a request comes from. */
-export type CredentialRef =
+type CredentialRef =
   | { kind: "new"; host: string; apiKey: string }
   | { kind: "existing"; id: string }
   | { kind: "env" }
@@ -214,7 +217,7 @@ ORDER BY events DESC, event ASC
 LIMIT 100`,
     });
     return result.rows.map(([event, total]) => ({
-      eventName: String(event),
+      eventName: hogqlText(event),
       countLast90Days: Number(total) || 0,
     }));
   } catch (error) {

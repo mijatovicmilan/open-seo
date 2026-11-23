@@ -86,11 +86,14 @@ export function Ga4Card({
   }
 
   const report = reportQuery.data;
+  // Fork addition (FORK-CHANGES.md): PostHog projects; counts of visitors
+  // and visits are estimates on cookieless sites.
+  const posthog = report?.connected && report.provider === "posthog";
 
   return (
     <CardShell
       title="Organic traffic"
-      stamp="Google Analytics · last 28 days"
+      stamp={`${posthog ? "PostHog" : "Google Analytics"} · last 28 days`}
       action={
         <Link
           to="/p/$projectId/settings"
@@ -113,7 +116,8 @@ export function Ga4Card({
         </div>
       ) : reportQuery.isError ? (
         <p className="text-sm text-base-content/60">
-          Couldn&rsquo;t load Google Analytics data. Try again shortly.
+          Couldn&rsquo;t load analytics data. Try again shortly, or check
+          Settings → Integrations.
         </p>
       ) : report?.connected ? (
         // Covers null (no report row) and 0: a zero-session period would
@@ -126,7 +130,7 @@ export function Ga4Card({
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <Stat
-                label="Sessions"
+                label={posthog ? "Sessions (est.)" : "Sessions"}
                 value={statValue(report.totals.sessions, formatCount)}
                 sub={statDelta(
                   report.totals.sessions,
@@ -134,7 +138,7 @@ export function Ga4Card({
                 )}
               />
               <Stat
-                label="Active users"
+                label={posthog ? "Visitors (est.)" : "Active users"}
                 value={statValue(report.totals.activeUsers, formatCount)}
                 sub={statDelta(
                   report.totals.activeUsers,

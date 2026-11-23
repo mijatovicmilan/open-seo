@@ -6,6 +6,15 @@ import type { PosthogMetricRow, PosthogQuery } from "./posthogQueries";
 // Fork addition (FORK-CHANGES.md): HogQL rows → the normalized GA4 report
 // (dimension values as strings, metrics as finite numbers, GA4 names).
 
+/** A HogQL cell as text: strings and numbers as they are, others empty. */
+export function hogqlText(value: unknown): string {
+  return typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+    ? String(value)
+    : "";
+}
+
 const EMPTY_METADATA: NormalizedGa4Report["reportMetadata"] = {
   dataLossFromOtherRow: false,
   subjectToThresholding: false,
@@ -48,10 +57,7 @@ export function normalizePosthogResult(
     const row: Record<string, string | number | null> = {};
     spec.dimensions.forEach((name, index) => {
       const value = values[index];
-      row[name] =
-        value === null || value === undefined || value === ""
-          ? "(not set)"
-          : String(value);
+      row[name] = hogqlText(value) === "" ? "(not set)" : hogqlText(value);
     });
     for (const metric of spec.metrics) {
       const derive = spec.derived[metric];

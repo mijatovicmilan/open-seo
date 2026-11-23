@@ -30,6 +30,12 @@ import type { Insights } from "@/client/features/gsc-history/types";
 import { useSearchHistorySync } from "@/client/features/gsc-history/useSearchHistorySync";
 import { getStandardErrorMessage } from "@/client/lib/error-messages";
 import { getSearchInsights } from "@/serverFunctions/gscHistory";
+// Fork addition (FORK-CHANGES.md): PostHog visits and signups.
+import {
+  SearchSignupsSection,
+  useSearchSignups,
+  withSignupSeries,
+} from "@/client/features/posthog/SearchSignups";
 import type {
   SearchInsightsCompare,
   SearchInsightsRange,
@@ -85,6 +91,7 @@ export function SearchInsightsPage({
   const status = insightsQuery.data?.status;
   const insights = insightsQuery.data?.data ?? null;
   const sync = useSearchHistorySync(projectId, status);
+  const signups = useSearchSignups(projectId, insights, state);
   const resolvedGranularity = resolveGranularity(
     state.gran,
     insights?.series.length ?? 28,
@@ -164,6 +171,7 @@ export function SearchInsightsPage({
                   <InsightsBody
                     projectId={projectId}
                     insights={insights}
+                    signups={signups}
                     metrics={state.metrics}
                     granularity={resolvedGranularity}
                     onMetrics={(metrics) => onChange({ metrics })}
@@ -187,6 +195,7 @@ export function SearchInsightsPage({
 function InsightsBody({
   projectId,
   insights,
+  signups,
   metrics,
   granularity,
   onMetrics,
@@ -194,12 +203,15 @@ function InsightsBody({
 }: {
   projectId: string;
   insights: Insights;
+  signups: ReturnType<typeof useSearchSignups>;
   metrics: MetricKey[];
   granularity: "day" | "week" | "month";
   onMetrics: (metrics: MetricKey[]) => void;
   onShowDays: () => void;
 }) {
   const { period, changes } = insights;
+  const joined =
+    signups.data && !signups.data.unsupportedFilter ? signups.data : null;
   const curveNote =
     insights.ctrCurve.source === "site"
       ? "your site's own median CTR per position"
@@ -210,8 +222,12 @@ function InsightsBody({
   return (
     <>
       <MetricCards
-        totals={insights.totals}
-        prevTotals={insights.prevTotals}
+        totals={{ ...insights.totals, ...joined?.totals }}
+        prevTotals={
+          insights.prevTotals
+            ? { ...insights.prevTotals, ...joined?.prevTotals }
+            : null
+        }
         selected={metrics}
         onChange={onMetrics}
         compareLabel={period.previous ? periodText(period.previous) : null}
@@ -219,7 +235,7 @@ function InsightsBody({
 
       <ChartPanel
         projectId={projectId}
-        insights={insights}
+        insights={withSignupSeries(insights, signups.data)}
         metrics={metrics}
         granularity={granularity}
         onShowDays={onShowDays}
@@ -232,6 +248,8 @@ function InsightsBody({
           : ""}
         . Table rows need {insights.minImpressions}+ impressions.
       </p>
+
+      <SearchSignupsSection data={signups.data} error={signups.error} />
 
       <div className="grid gap-4 xl:grid-cols-2">
         <InsightSection

@@ -1,6 +1,7 @@
 /* eslint-disable max-lines -- the outreach screen and its tabs (fork feature) */
 import { useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { LinkTrafficInline } from "@/client/features/posthog/LinkTraffic";
 import { ArrowDown, ArrowUp, Loader2, Search, Settings2 } from "lucide-react";
 import {
   type ChartPoint,
@@ -267,6 +268,8 @@ export function OutreachPage({
                   <span className="text-xs text-base-content/50">
                     checked {p.linkCheckedAt || "never"}
                   </span>
+                  {/* Fork addition: PostHog visits and signups. */}
+                  <LinkTrafficInline projectId={projectId} number={p.number} />
                 </span>
               )}
               onProspect={onProspect}

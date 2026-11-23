@@ -3,6 +3,11 @@ import { GscNotConnectedError } from "@/server/lib/gscErrors";
 import { makeGa4ReportResult } from "./ga4-test-fixtures";
 import { SearchOpportunityService } from "./SearchOpportunityService";
 
+// Fork addition (FORK-CHANGES.md): these projects have no PostHog source.
+vi.mock("@/server/features/posthog/services/posthogSource", () => ({
+  getActivePosthogSource: async () => null,
+}));
+
 const mocks = vi.hoisted(() => ({
   getGa4Connection: vi.fn(),
   getGscConnection: vi.fn(),

@@ -11,7 +11,7 @@ import {
 // Fork addition (FORK-CHANGES.md). Sources are scoped by project_id and
 // credentials by organization_id; callers authorize both.
 
-export type AnalyticsSource = {
+type AnalyticsSource = {
   provider: "ga4" | "posthog";
   posthogCredentialId: string | null;
   posthogProjectId: string | null;
@@ -20,7 +20,7 @@ export type AnalyticsSource = {
   updatedAt: string;
 };
 
-export type PosthogCredentialRow = typeof posthogCredentials.$inferSelect;
+type PosthogCredentialRow = typeof posthogCredentials.$inferSelect;
 
 async function get(projectId: string): Promise<AnalyticsSource | null> {
   const [rows, events] = await Promise.all([

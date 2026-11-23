@@ -4,7 +4,8 @@ import {
 } from "@/client/features/gsc-history/searchSeries";
 import type { Insights } from "@/client/features/gsc-history/types";
 
-type Totals = Insights["totals"];
+// Fork addition (FORK-CHANGES.md): visits and signups from PostHog.
+type Totals = Insights["totals"] & { visits?: number; signups?: number };
 
 // On tiny numbers a percentage misleads (3 to 39 impressions is "+1200%"),
 // so under 20 the change is shown as a plain difference.
@@ -40,6 +41,7 @@ function change(
 }
 
 const KEYS: MetricKey[] = ["clicks", "impressions", "ctr", "position"];
+const JOINED_KEYS: MetricKey[] = ["visits", "signups"];
 
 /** Period totals that double as the chart's metric toggles, as in Search
  *  Console: each selected card is a line on the chart, in the card's colour.
@@ -57,16 +59,19 @@ export function MetricCards({
   onChange: (metrics: MetricKey[]) => void;
   compareLabel: string | null;
 }) {
+  const keys = totals.visits === undefined ? KEYS : [...KEYS, ...JOINED_KEYS];
   return (
     <div
-      className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4"
+      className={`grid grid-cols-2 gap-2 sm:gap-3 ${keys.length > 4 ? "sm:grid-cols-3 xl:grid-cols-6" : "lg:grid-cols-4"}`}
       role="group"
       aria-label="Chart metrics"
     >
-      {KEYS.map((key) => {
+      {keys.map((key) => {
         const metric = METRICS[key];
-        const value = totals[key];
-        const delta = prevTotals ? change(key, value, prevTotals[key]) : null;
+        const value = totals[key] ?? 0;
+        const previous = prevTotals?.[key];
+        const delta =
+          previous !== undefined ? change(key, value, previous) : null;
         const active = selected.includes(key);
         const last = active && selected.length === 1;
         const empty =

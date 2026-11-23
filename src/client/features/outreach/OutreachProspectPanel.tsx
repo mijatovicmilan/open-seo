@@ -1,4 +1,5 @@
 /* eslint-disable max-lines -- the prospect slide-over and its sections (fork feature) */
+import { LinkTrafficSection } from "@/client/features/posthog/LinkTraffic";
 import { useEffect, useState } from "react";
 import {
   CheckCircle2,
@@ -607,6 +608,8 @@ function LinkSection({
           Check now
         </button>
       </div>
+      {/* PostHog visits and signups from this link. */}
+      <LinkTrafficSection projectId={projectId} number={prospect.number} />
     </section>
   );
 }

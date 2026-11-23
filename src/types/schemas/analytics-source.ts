@@ -9,13 +9,13 @@ const range = z
   .object({ start: isoDay, end: isoDay })
   .refine((value) => value.start <= value.end, "Start must not be after end");
 
-export const posthogProjectIdSchema = z
+const posthogProjectIdSchema = z
   .string()
   .trim()
   .regex(/^\d{1,12}$/, "A PostHog project ID is a number, e.g. 352215");
 
 // PostHog event names as they are captured: anything printable, short.
-export const posthogEventNameSchema = z
+const posthogEventNameSchema = z
   .string()
   .trim()
   .min(1)
@@ -35,7 +35,7 @@ const apiKeySchema = z
 
 /** Where a key comes from: pasted now, one the organization already
  *  stored, the server's env, or the one this project already uses. */
-export const credentialRefSchema = z.discriminatedUnion("kind", [
+const credentialRefSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("new"),
     host: z.string().trim().url().max(200),

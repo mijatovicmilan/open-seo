@@ -22,10 +22,11 @@ import { useChartWidth } from "@/client/features/rank-tracking/RankTrackingTrend
 // to); further metrics are drawn to their own hidden scale. Counts get
 // whole-number round ticks and position runs top to bottom. Segments are
 // straight between real values; days still being reported (or a bucket the
-// range cuts short) are dashed; the comparison period is a faint solid line
-// in the same colour. Notes are small neutral markers under the baseline,
+// range cuts short) stand apart, faint; the comparison period is a faint
+// solid line in the same colour. Notes are small neutral markers under the baseline,
 // merged with a count when close, with a guide line on hover. The tooltip
-// always shows every selected metric's real value.
+// always shows every selected metric's real value. Days still being
+// reported are a faint dotted line that never joins the last complete day.
 
 export type ChartNote = {
   kind: string;
@@ -63,6 +64,9 @@ export type ChartMetric = {
   inverted?: boolean;
   /** Percentages: ticks are formatted with `format`. */
   percent?: boolean;
+  /** The axis reaches at least this far (counts: 5 clicks, 50 impressions;
+   *  position: 10), so a handful of events never fills the chart's height. */
+  minTop?: number;
 };
 
 export type ChartSeries = {
@@ -102,7 +106,10 @@ function axisFor(points: ChartPoint[], series: ChartSeries) {
     p.values[series.key] ?? null,
     p.compare?.[series.key] ?? null,
   ]);
-  const max = Math.max(0, ...values.filter((v): v is number => v !== null));
+  const max = Math.max(
+    series.metric.minTop ?? 0,
+    ...values.filter((v): v is number => v !== null),
+  );
   if (series.metric.inverted) {
     const ticks = niceTicks(Math.max(max, 2), true).filter((t) => t > 0);
     const top = ticks.at(-1) ?? 2;
@@ -233,20 +240,18 @@ export function TimeSeriesChart({
     [points, series],
   );
 
-  // Per series: the complete points (solid), the points next to a partial
-  // one (dashed, drawn underneath so the two join) and the comparison.
+  // Per series: the complete points (solid line), the incomplete ones (a
+  // separate faint line) and the comparison.
   const rows: Row[] = useMemo(
     () =>
-      points.map((p, index) => {
-        const near =
-          p.partial ||
-          Boolean(points[index - 1]?.partial) ||
-          Boolean(points[index + 1]?.partial);
+      points.map((p) => {
         const row: Row = { ...p };
         for (const s of series) {
           const value = p.values[s.key] ?? null;
           row[`${s.key}__solid`] = p.partial ? null : value;
-          row[`${s.key}__partial`] = near ? value : null;
+          // Incomplete days stand apart: faint, never joined to the last
+          // complete day, so a half-reported day does not read as a drop.
+          row[`${s.key}__partial`] = p.partial ? value : null;
           row[`${s.key}__compare`] = p.compare?.[s.key] ?? null;
         }
         return row;
@@ -470,11 +475,11 @@ export function TimeSeriesChart({
                 yAxisId={s.key}
                 type="linear"
                 dataKey={`${s.key}__partial`}
-                stroke={s.color}
+                stroke={faint(s.color)}
                 strokeWidth={2}
-                strokeDasharray="3 4"
-                dot={false}
-                activeDot={false}
+                strokeDasharray="2 4"
+                dot={{ r: 2.5, strokeWidth: 0, fill: faint(s.color) }}
+                activeDot={{ r: 4, strokeWidth: 0, fill: faint(s.color) }}
                 connectNulls={false}
                 isAnimationActive={false}
               />

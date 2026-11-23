@@ -202,6 +202,9 @@ function ChartPanel({
   granularity: "day" | "week" | "month";
 }) {
   const { period } = insights;
+  // A comparison period without a single impression draws nothing useful.
+  const comparable =
+    Boolean(period.previous) && (insights.prevTotals?.impressions ?? 0) > 0;
   const from = chartStart(insights.series, insights.firstDataDay, granularity);
   const points = useMemo(
     () =>
@@ -216,9 +219,10 @@ function ChartPanel({
         ),
         granularity,
         from,
-        hasCompare: Boolean(period.previous),
+        hasCompare: comparable,
+        firstDataDay: insights.firstDataDay,
       }),
-    [insights, granularity, from, period.previous],
+    [insights, granularity, from, comparable],
   );
   const series = useMemo(
     () =>
@@ -239,7 +243,7 @@ function ChartPanel({
           <span className="h-0.5 w-4 rounded bg-base-content/70" />
           {periodText(period.current)}
         </span>
-        {period.previous ? (
+        {comparable && period.previous ? (
           <span className="inline-flex items-center gap-1.5">
             <span className="h-0.5 w-4 rounded bg-base-content/25" />
             {periodText(period.previous)}
@@ -247,12 +251,12 @@ function ChartPanel({
         ) : null}
         {hasPartial ? (
           <span className="inline-flex items-center gap-1.5">
-            <span className="w-4 border-t-2 border-dotted border-base-content/70" />
-            Incomplete days
+            <span className="w-4 border-t-2 border-dotted border-base-content/30" />
+            Still reporting
           </span>
         ) : null}
-        {period.compareMissing ? (
-          <span>No stored data for the comparison period</span>
+        {period.compareMissing || (period.previous && !comparable) ? (
+          <span>No data in the comparison period</span>
         ) : null}
         {trimmed && insights.firstDataDay ? (
           <span>No data before {formatDay(insights.firstDataDay)}</span>
@@ -308,7 +312,7 @@ function InsightsBody({
 
       <p className="text-xs text-base-content/50">
         Totals and the tables below cover {periodText(period.current)}
-        {period.previous
+        {period.previous && (insights.prevTotals?.impressions ?? 0) > 0
           ? `, compared with ${periodText(period.previous)}`
           : ""}
         . Table rows need {insights.minImpressions}+ impressions.

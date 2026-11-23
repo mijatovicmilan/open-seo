@@ -453,7 +453,12 @@ const SENT_SERIES: ChartSeries[] = [
   {
     key: "sent",
     color: "var(--color-primary)",
-    metric: { name: "Sent", integer: true, format: (value) => `${value}` },
+    metric: {
+      name: "Sent",
+      integer: true,
+      minTop: 4,
+      format: (value) => `${value}`,
+    },
   },
 ];
 

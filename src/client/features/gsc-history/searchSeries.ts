@@ -24,6 +24,7 @@ export const METRICS: Record<
     name: "Clicks",
     integer: true,
     format: count,
+    minTop: 5,
     color: "var(--color-primary)",
   },
   impressions: {
@@ -31,6 +32,7 @@ export const METRICS: Record<
     name: "Impressions",
     integer: true,
     format: count,
+    minTop: 50,
     color: "var(--color-warning)",
   },
   ctr: {
@@ -39,6 +41,7 @@ export const METRICS: Record<
     integer: false,
     percent: true,
     format: (value) => `${(value * 100).toFixed(value >= 0.1 ? 0 : 1)}%`,
+    minTop: 0.05,
     color: "var(--color-success)",
   },
   position: {
@@ -47,6 +50,7 @@ export const METRICS: Record<
     integer: false,
     inverted: true,
     format: (value) => value.toFixed(1),
+    minTop: 10,
     // Orange-red, apart from the blue clicks line (as in Search Console).
     color: "var(--color-error)",
   },
@@ -175,6 +179,8 @@ export function buildChartPoints(input: {
   granularity: "day" | "week" | "month";
   from: string | null;
   hasCompare: boolean;
+  /** Nothing is drawn for buckets that end before this day. */
+  firstDataDay?: string | null;
 }): ChartPoint[] {
   const { granularity } = input;
   const days = input.from
@@ -189,6 +195,7 @@ export function buildChartPoints(input: {
       partial: boolean;
       hasCompare: boolean;
       days: number;
+      lastDate: string;
     }
   >();
   for (const day of days) {
@@ -200,8 +207,10 @@ export function buildChartPoints(input: {
       partial: false,
       hasCompare: false,
       days: 0,
+      lastDate: day.date,
     };
     bucket.days += 1;
+    bucket.lastDate = day.date;
     add(bucket.current, day);
     if (day.compare) {
       add(bucket.compare, day.compare);
@@ -256,7 +265,11 @@ export function buildChartPoints(input: {
       key,
       label,
       tick,
-      values: valuesOf(bucket.current),
+      // Before the first day with impressions there is no data, not zero.
+      values:
+        input.firstDataDay && bucket.lastDate < input.firstDataDay
+          ? EMPTY_VALUES
+          : valuesOf(bucket.current),
       ...(input.hasCompare
         ? {
             compare: bucket.hasCompare

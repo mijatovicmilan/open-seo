@@ -27,7 +27,9 @@ export const METRICS: Record<
   MetricKey,
   ChartMetric & { key: MetricKey; color: string }
 > = {
-  // One fixed theme colour per metric: card, line and tooltip dot.
+  // One fixed theme colour per metric: card, line and tooltip dot. The
+  // chart tokens are upstream's colour-blind safe set, in the order upstream's
+  // Search Performance chart uses them (clicks blue, impressions orange).
   clicks: {
     key: "clicks",
     name: "Clicks",
@@ -36,7 +38,7 @@ export const METRICS: Record<
     // Small floors (Plausible-style whole ticks above them): one click is
     // a quarter of the height, five impressions half of it.
     minTop: 4,
-    color: "var(--color-primary)",
+    color: "var(--chart-1)",
   },
   impressions: {
     key: "impressions",
@@ -44,7 +46,7 @@ export const METRICS: Record<
     integer: true,
     format: count,
     minTop: 10,
-    color: "var(--color-warning)",
+    color: "var(--chart-2)",
   },
   ctr: {
     key: "ctr",
@@ -53,7 +55,7 @@ export const METRICS: Record<
     percent: true,
     format: (value) => `${(value * 100).toFixed(value >= 0.1 ? 0 : 1)}%`,
     minTop: 0.02,
-    color: "var(--color-success)",
+    color: "var(--chart-3)",
   },
   position: {
     key: "position",
@@ -62,8 +64,7 @@ export const METRICS: Record<
     inverted: true,
     format: (value) => value.toFixed(1),
     minTop: 10,
-    // Orange-red, apart from the blue clicks line (as in Search Console).
-    color: "var(--color-error)",
+    color: "var(--chart-4)",
   },
   visits: {
     key: "visits",
@@ -71,8 +72,7 @@ export const METRICS: Record<
     integer: true,
     format: count,
     minTop: 4,
-    // Violet and pink: apart from the theme's blue, orange, green and red.
-    color: "oklch(62% 0.17 300)",
+    color: "var(--chart-5)",
   },
   signups: {
     key: "signups",
@@ -80,7 +80,9 @@ export const METRICS: Record<
     integer: true,
     format: count,
     minTop: 2,
-    color: "oklch(64% 0.19 350)",
+    // The chart set has five colours: a violet mixed from two of them keeps
+    // signups apart from visits (pink) and clicks (blue).
+    color: "color-mix(in oklab, var(--chart-1) 50%, var(--chart-5))",
   },
 };
 

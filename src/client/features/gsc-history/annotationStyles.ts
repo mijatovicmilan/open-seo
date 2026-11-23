@@ -7,15 +7,15 @@ export const ANNOTATION_STYLES: Record<
   { color: string; label: string }
 > = {
   // Theme tokens, so notes follow the app's light and dark palettes.
-  deploy: { color: "var(--color-warning)", label: "Deploy" },
-  page: { color: "var(--color-success)", label: "Page" },
-  link: { color: "var(--color-secondary)", label: "Link" },
+  deploy: { color: "var(--warning)", label: "Deploy" },
+  page: { color: "var(--success)", label: "Page" },
+  link: { color: "var(--chart-5)", label: "Link" },
   note: {
-    color: "color-mix(in oklab, var(--color-base-content) 45%, transparent)",
+    color: "color-mix(in oklab, var(--foreground) 45%, transparent)",
     label: "Note",
   },
-  outreach: { color: "var(--color-secondary)", label: "Outreach link" },
-  first_seen: { color: "var(--color-info)", label: "New page" },
+  outreach: { color: "var(--chart-5)", label: "Outreach link" },
+  first_seen: { color: "var(--info)", label: "New page" },
 };
 
 export function formatDay(day: string): string {

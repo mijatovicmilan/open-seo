@@ -1,7 +1,9 @@
 import * as React from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { Checkbox } from "@/client/components/ui/checkbox";
+import { RadioGroupItem } from "@/client/components/ui/radio-group";
+import { Spinner } from "@/client/components/ui/spinner";
 import { getStandardErrorMessage } from "@/client/lib/error-messages";
 import type { getAnalyticsSource } from "@/serverFunctions/analyticsSource";
 import { listPosthogEvents } from "@/serverFunctions/analyticsSource";
@@ -56,7 +58,7 @@ export function MutationError({
         ? getStandardErrorMessage(mutation.error)
         : null;
   return message ? (
-    <p role="alert" className="text-sm text-error">
+    <p role="alert" className="text-sm text-destructive">
       {message}
     </p>
   ) : null;
@@ -106,23 +108,22 @@ export function KeyEventPicker({
         : [...selected, name].slice(0, MAX_KEY_EVENTS),
     );
   return (
-    <fieldset className="space-y-2" disabled={disabled}>
+    <fieldset className="min-w-0 space-y-2" disabled={disabled}>
       <legend className="text-sm font-medium">Key events (signups)</legend>
-      <p className="text-xs text-base-content/60">
+      <p className="text-xs text-muted-foreground">
         Events PostHog saw in the last 90 days. A visit with any checked event
         counts as a signup in Search Insights, Outreach and the reports.
       </p>
       {eventsQuery.isPending || settledId !== posthogProjectId ? (
-        <p className="flex items-center gap-2 text-sm text-base-content/60">
-          <Loader2 className="size-4 animate-spin" /> Reading events from
-          PostHog…
+        <p className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Spinner /> Reading events from PostHog…
         </p>
       ) : eventsQuery.data && !eventsQuery.data.ok ? (
-        <p role="alert" className="text-sm text-error">
+        <p role="alert" className="text-sm text-destructive">
           {eventsQuery.data.message}
         </p>
       ) : options.length === 0 ? (
-        <p className="text-sm text-base-content/60">
+        <p className="text-sm text-muted-foreground">
           No custom events in the last 90 days. Signups stay at zero until the
           site sends one.
         </p>
@@ -130,17 +131,16 @@ export function KeyEventPicker({
         <ul className="grid gap-1 sm:grid-cols-2">
           {options.map((event) => (
             <li key={event.eventName}>
-              <label className="flex min-w-0 cursor-pointer items-center gap-2 rounded-md px-2 py-1 hover:bg-base-200">
-                <input
-                  type="checkbox"
-                  className="checkbox checkbox-sm"
+              <label className="flex min-w-0 cursor-pointer items-center gap-2 rounded-md px-2 py-1 hover:bg-foreground/5">
+                <Checkbox
                   checked={selected.includes(event.eventName)}
-                  onChange={() => toggle(event.eventName)}
+                  disabled={disabled}
+                  onCheckedChange={() => toggle(event.eventName)}
                 />
                 <span className="min-w-0 truncate font-mono text-sm">
                   {event.eventName}
                 </span>
-                <span className="ml-auto shrink-0 text-xs tabular-nums text-base-content/50">
+                <span className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">
                   {event.countLast90Days > 0
                     ? event.countLast90Days.toLocaleString("en-US")
                     : "not seen"}
@@ -154,26 +154,17 @@ export function KeyEventPicker({
   );
 }
 
+/** One choice in the key RadioGroup of ConnectPosthog. */
 export function KeyOption({
   value,
-  choice,
-  onChoose,
   children,
 }: {
   value: string;
-  choice: string;
-  onChoose: (value: string) => void;
   children: React.ReactNode;
 }) {
   return (
     <label className="flex min-w-0 cursor-pointer items-start gap-2 text-sm">
-      <input
-        type="radio"
-        className="radio radio-sm mt-0.5"
-        name="posthog-key"
-        checked={choice === value}
-        onChange={() => onChoose(value)}
-      />
+      <RadioGroupItem value={value} className="mt-0.5" />
       <span className="min-w-0 break-words">{children}</span>
     </label>
   );

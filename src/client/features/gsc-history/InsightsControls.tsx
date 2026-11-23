@@ -2,6 +2,9 @@ import { useState } from "react";
 import { ChoiceMenu, SegmentGroup } from "@/client/features/charts/ChoiceMenu";
 import { countryName } from "@/client/features/gsc-history/countryNames";
 import { CalendarRange, X } from "lucide-react";
+import { Badge } from "@/client/components/ui/badge";
+import { Button } from "@/client/components/ui/button";
+import { Input } from "@/client/components/ui/input";
 import type { Granularity } from "@/client/features/gsc-history/searchSeries";
 import type {
   SearchInsightsCompare,
@@ -132,7 +135,7 @@ export function InsightsControls({
               granularity === "auto" ? (
                 <>
                   {resolvedLabel}{" "}
-                  <span className="text-base-content/50">· auto</span>
+                  <span className="text-muted-foreground">· auto</span>
                 </>
               ) : undefined
             }
@@ -172,7 +175,7 @@ export function InsightsControls({
           />
         </div>
         {segmentsPending ? (
-          <span className="text-xs text-base-content/50">
+          <span className="text-xs text-muted-foreground">
             Country and device data is still being added for older days.
           </span>
         ) : null}
@@ -187,37 +190,38 @@ export function InsightsControls({
             onChange({ range: "custom", start: draftStart, end: draftEnd });
           }}
         >
-          <CalendarRange className="size-4 text-base-content/50" />
-          <input
+          <CalendarRange className="size-4 text-muted-foreground" />
+          <Input
             type="date"
-            className="input input-bordered h-9 w-40 text-sm"
+            className="h-9 w-40 text-sm"
             value={draftStart}
             min={bounds.oldest ?? undefined}
             max={bounds.newest ?? undefined}
             onChange={(event) => setDraftStart(event.target.value)}
             aria-label="From"
           />
-          <span className="text-xs text-base-content/50">to</span>
-          <input
+          <span className="text-xs text-muted-foreground">to</span>
+          <Input
             type="date"
-            className="input input-bordered h-9 w-40 text-sm"
+            className="h-9 w-40 text-sm"
             value={draftEnd}
             min={bounds.oldest ?? undefined}
             max={bounds.newest ?? undefined}
             onChange={(event) => setDraftEnd(event.target.value)}
             aria-label="To"
           />
-          <button type="submit" className="btn btn-primary btn-sm h-9">
+          <Button type="submit" className="h-9">
             Apply
-          </button>
+          </Button>
           {range !== "custom" ? (
-            <button
+            <Button
               type="button"
-              className="btn btn-ghost btn-sm h-9"
+              variant="ghost"
+              className="h-9"
               onClick={() => setEditing(false)}
             >
               Cancel
-            </button>
+            </Button>
           ) : null}
         </form>
       ) : null}
@@ -242,20 +246,24 @@ export function FilterChips({
 }) {
   if (!page && !query && !country && !device) return null;
   const chip = (key: FilterKey, label: string, value: string) => (
-    <span className="badge badge-sm gap-1 border-base-300 bg-base-200 py-2.5 pl-2 pr-1 text-base-content/80">
-      <span className="text-base-content/50">{label}</span>
-      <span className="max-w-[14rem] truncate" title={value}>
+    <Badge
+      variant="outline"
+      className="h-6 max-w-full gap-1 bg-muted pr-0.5 pl-2 font-normal text-foreground/80"
+    >
+      <span className="text-muted-foreground">{label}</span>
+      <span className="max-w-[14rem] min-w-0 truncate" title={value}>
         {value}
       </span>
-      <button
-        type="button"
-        className="btn btn-ghost btn-xs btn-circle size-4 min-h-0"
+      <Button
+        variant="ghost"
+        size="icon-xs"
+        className="size-5 rounded-full text-muted-foreground"
         aria-label={`Clear ${label.toLowerCase()} filter`}
         onClick={() => onClear(key)}
       >
         <X className="size-3" />
-      </button>
-    </span>
+      </Button>
+    </Badge>
   );
   let path = page ?? "";
   try {
@@ -265,7 +273,7 @@ export function FilterChips({
   }
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <span className="text-xs text-base-content/50">Filtered to</span>
+      <span className="text-xs text-muted-foreground">Filtered to</span>
       {page ? chip("page", "Page", path) : null}
       {query ? chip("query", "Query", query) : null}
       {country ? chip("country", "Country", countryName(country)) : null}

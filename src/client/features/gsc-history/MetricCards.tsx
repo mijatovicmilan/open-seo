@@ -1,3 +1,4 @@
+import { cn } from "cn";
 import {
   METRICS,
   type MetricKey,
@@ -94,17 +95,21 @@ export function MetricCards({
               active
                 ? {
                     borderColor: metric.color,
-                    backgroundColor: `color-mix(in oklab, ${metric.color} 8%, var(--color-base-100))`,
+                    backgroundColor: `color-mix(in oklab, ${metric.color} 8%, var(--card))`,
                   }
                 : undefined
             }
-            className={`min-w-0 rounded-lg border bg-base-100 p-3 text-left transition-colors sm:p-4 ${
-              active ? "" : "border-base-300 hover:border-base-content/30"
-            }`}
+            className={cn(
+              "min-w-0 rounded-xl border bg-card p-3 text-left transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 sm:p-4",
+              active ? "" : "border-border hover:bg-foreground/[0.03]",
+            )}
           >
-            <div className="flex items-center gap-1.5 text-xs uppercase tracking-wide text-base-content/60">
+            <div className="flex items-center gap-1.5 text-xs uppercase tracking-wide text-muted-foreground">
               <span
-                className={`flex size-3 items-center justify-center rounded-sm border ${active ? "" : "border-base-content/30"}`}
+                className={cn(
+                  "flex size-3 items-center justify-center rounded-sm border",
+                  active ? "" : "border-foreground/30",
+                )}
                 style={
                   active
                     ? {
@@ -116,7 +121,7 @@ export function MetricCards({
                 aria-hidden
               >
                 {active ? (
-                  <svg viewBox="0 0 12 12" className="size-2.5 text-base-100">
+                  <svg viewBox="0 0 12 12" className="size-2.5 text-card">
                     <path
                       d="M2.5 6.2 5 8.5l4.5-5"
                       fill="none"
@@ -131,12 +136,15 @@ export function MetricCards({
               {metric.name}
             </div>
             <div className="mt-1 flex flex-wrap items-baseline gap-x-2">
-              <span className="text-xl font-semibold tabular-nums sm:text-2xl">
+              <span className="text-xl font-semibold tabular-nums text-foreground sm:text-2xl">
                 {empty ? "—" : metric.format(value)}
               </span>
               {delta ? (
                 <span
-                  className={`text-xs tabular-nums ${delta.improved ? "text-success" : "text-error"}`}
+                  className={cn(
+                    "text-xs tabular-nums",
+                    delta.improved ? "text-success" : "text-destructive",
+                  )}
                   title={compareLabel ? `vs ${compareLabel}` : undefined}
                 >
                   {delta.text}

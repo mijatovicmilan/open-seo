@@ -15,6 +15,8 @@ export const Route = createFileRoute("/_app/settings")({
 function SettingsLayout() {
   const tabs = [
     { to: "/settings" as const, label: "Personal", exact: true },
+    // Fork addition (FORK-CHANGES.md): agent setup moved here from the sidebar.
+    { to: "/settings/agent" as const, label: "Agent setup" },
     // Access / no-auth self-host has no memberships — the organization tab
     // would 404.
     ...(usesBetterAuthClient()

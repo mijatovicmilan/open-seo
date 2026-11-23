@@ -1,5 +1,13 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { Info, Loader2 } from "lucide-react";
+import { AlertCircle, Info } from "lucide-react";
+import { PageHeader } from "@/client/components/PageHeader";
+import { Alert, AlertDescription } from "@/client/components/ui/alert";
+import { Spinner } from "@/client/components/ui/spinner";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/client/components/ui/tooltip";
 import { GoogleConnectionCard } from "@/client/features/integrations/GoogleConnectionCard";
 import {
   ChartPanel,
@@ -22,9 +30,9 @@ import {
   InsightSection,
   InsightsFilterContext,
   NearPageOneTable,
-  NewPagesTable,
   NewQueriesTable,
 } from "@/client/features/gsc-history/SearchInsightsSections";
+import { NewPagesTable } from "@/client/features/gsc-history/NewPagesTable";
 import { SyncStatusLine } from "@/client/features/gsc-history/SyncStatusLine";
 import type { Insights } from "@/client/features/gsc-history/types";
 import { useSearchHistorySync } from "@/client/features/gsc-history/useSearchHistorySync";
@@ -98,31 +106,31 @@ export function SearchInsightsPage({
   );
 
   return (
-    <div className="px-4 py-4 pb-24 overflow-auto md:px-6 md:py-6 md:pb-8">
+    <div className="overflow-auto px-4 py-4 pb-24 md:px-6 md:py-6 md:pb-8">
       <div className="mx-auto max-w-7xl space-y-4">
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-semibold">Search Insights</h1>
-            {insightsQuery.isFetching && !insightsQuery.isPending ? (
-              <Loader2 className="size-4 animate-spin text-base-content/40" />
-            ) : null}
-          </div>
-          <p className="text-sm text-base-content/70">
-            What changed in Google Search and what to do about it, from your
-            stored Search Console history.
-          </p>
-        </div>
+        <PageHeader
+          title={
+            <span className="inline-flex items-center gap-2">
+              Search Insights
+              {insightsQuery.isFetching && !insightsQuery.isPending ? (
+                <Spinner className="text-muted-foreground" />
+              ) : null}
+            </span>
+          }
+          description="What changed in Google Search and what to do about it, from your stored Search Console history."
+        />
 
         {insightsQuery.isPending ? (
-          <div className="flex items-center gap-2 p-8 text-sm text-base-content/60">
-            <Loader2 className="size-4 animate-spin" /> Loading…
+          <div className="flex items-center gap-2 p-8 text-sm text-muted-foreground">
+            <Spinner /> Loading…
           </div>
         ) : insightsQuery.isError ? (
-          <div className="alert alert-error">
-            <span className="text-sm">
+          <Alert variant="destructive">
+            <AlertCircle />
+            <AlertDescription>
               {getStandardErrorMessage(insightsQuery.error)}
-            </span>
-          </div>
+            </AlertDescription>
+          </Alert>
         ) : !status ? null : (
           <>
             {status.connected ? (
@@ -180,7 +188,7 @@ export function SearchInsightsPage({
                 </InsightsFilterContext.Provider>
               </>
             ) : status.connected ? (
-              <div className="rounded-xl border border-base-300 bg-base-100 p-6 text-sm text-base-content/70">
+              <div className="rounded-xl border border-border bg-card p-6 text-sm text-muted-foreground">
                 No history stored yet. The first sync fills the newest days
                 first; insights appear as soon as it writes them.
               </div>
@@ -241,7 +249,7 @@ function InsightsBody({
         onShowDays={onShowDays}
       />
 
-      <p className="text-xs text-base-content/50">
+      <p className="text-xs text-muted-foreground">
         Totals and the tables below cover {periodText(period.current)}
         {period.previous && (insights.prevTotals?.impressions ?? 0) > 0
           ? `, compared with ${periodText(period.previous)}`
@@ -319,15 +327,27 @@ function InsightsBody({
         <NewPagesTable rows={insights.newPages} />
       </InsightSection>
 
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-base-content/50">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
         <span className="inline-flex items-center gap-1">
           Stored daily from Search Console (web search).
-          <span
-            className="tooltip tooltip-top inline-flex"
-            data-tip="Up to 5,000 query and page pairs a day are kept, also per country and device (Google's top rows by clicks). Clicks on anonymized queries count in page totals only."
-          >
-            <Info className="size-3.5" aria-label="About this data" />
-          </span>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <button
+                  type="button"
+                  aria-label="About this data"
+                  className="inline-flex rounded-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                />
+              }
+            >
+              <Info className="size-3.5" />
+            </TooltipTrigger>
+            <TooltipContent>
+              Up to 5,000 query and page pairs a day are kept, also per country
+              and device (Google&apos;s top rows by clicks). Clicks on
+              anonymized queries count in page totals only.
+            </TooltipContent>
+          </Tooltip>
         </span>
       </div>
     </>

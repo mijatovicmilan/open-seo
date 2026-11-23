@@ -116,8 +116,10 @@ const projectNavItems = [
 
 // Project-independent. Rendered inside the project "AI Tools" group when a project
 // is selected, and on its own (connectNavGroup) when none is.
+// Fork addition (FORK-CHANGES.md): Agent setup lives in Settings; this item
+// shows only before any project exists.
 const aiNavItem = linkOptions({
-  to: "/ai" as const,
+  to: "/settings/agent" as const,
   label: "Agent setup",
   icon: Bot,
 });
@@ -183,11 +185,7 @@ export function getProjectNavGroups(projectId: string) {
     },
     {
       label: "AI Tools",
-      items: [
-        byPath("/p/$projectId/reports"),
-        byPath("/p/$projectId/context"),
-        aiNavItem,
-      ],
+      items: [byPath("/p/$projectId/reports"), byPath("/p/$projectId/context")],
     },
   ];
 }

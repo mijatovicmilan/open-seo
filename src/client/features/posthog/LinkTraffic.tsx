@@ -36,7 +36,7 @@ export function LinkTrafficInline({
   if (!link) return null;
   return (
     <span
-      className="text-xs tabular-nums text-base-content/70"
+      className="text-xs tabular-nums text-muted-foreground"
       title={`PostHog visits from ${link.site} since ${link.since}`}
     >
       {plural(link.visits, "visit")} · {plural(link.signups, "signup")}
@@ -55,7 +55,7 @@ export function LinkTrafficSection({
   const { link, error, keyEvents } = useLinkTraffic(projectId, number);
   if (error) {
     return (
-      <p role="alert" className="text-sm text-error">
+      <p role="alert" className="text-sm text-destructive">
         Traffic from PostHog: {error}
       </p>
     );
@@ -63,7 +63,7 @@ export function LinkTrafficSection({
   if (!link) return null;
   return (
     <section className="space-y-2">
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-base-content/60">
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         Traffic from this link
       </h3>
       <dl className="grid grid-cols-3 gap-2 text-sm">
@@ -74,15 +74,18 @@ export function LinkTrafficSection({
             ["Signups", link.signups],
           ] as const
         ).map(([label, value]) => (
-          <div key={label} className="rounded-lg border border-base-300 p-2">
-            <dt className="text-xs text-base-content/60">{label}</dt>
+          <div
+            key={label}
+            className="min-w-0 rounded-lg border border-border bg-card p-2"
+          >
+            <dt className="text-xs text-muted-foreground">{label}</dt>
             <dd className="text-lg font-semibold tabular-nums">
               {value.toLocaleString("en-US")}
             </dd>
           </div>
         ))}
       </dl>
-      <p className="text-xs text-base-content/60">
+      <p className="text-xs text-muted-foreground">
         PostHog visits referred by {new URL(link.theirPage).hostname} since{" "}
         {link.since}
         {link.lastVisitAt ? `, last on ${link.lastVisitAt}` : ""}. A signup is a

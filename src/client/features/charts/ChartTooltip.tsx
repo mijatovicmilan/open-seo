@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ExternalLink, Pencil, Plus, X } from "lucide-react";
+import { Button } from "@/client/components/ui/button";
 import type {
   ChartMetric,
   ChartNote,
@@ -43,7 +44,7 @@ function ChangeCell({
     prior === null ||
     prior === undefined
   ) {
-    return <td className="py-0.5 pl-2 text-right text-base-content/30">—</td>;
+    return <td className="py-0.5 pl-2 text-right text-muted-foreground">—</td>;
   }
   const diff = value - prior;
   let text: string;
@@ -60,10 +61,10 @@ function ChangeCell({
   const better = metric.inverted ? diff < 0 : diff > 0;
   const tone =
     Math.abs(diff) < 1e-9
-      ? "text-base-content/40"
+      ? "text-muted-foreground"
       : better
         ? "text-success"
-        : "text-error";
+        : "text-destructive";
   return (
     <td className={`py-0.5 pl-2 text-right tabular-nums ${tone}`}>
       {Math.abs(diff) < 1e-9 ? "0" : text}
@@ -83,7 +84,7 @@ function MetricsTable({
     <table className="w-full">
       {hasCompare ? (
         <thead>
-          <tr className="text-[10px] uppercase tracking-wide text-base-content/40">
+          <tr className="text-[10px] uppercase tracking-wide text-muted-foreground">
             <th />
             <th className="pb-1 text-right font-normal">This</th>
             <th
@@ -103,7 +104,7 @@ function MetricsTable({
           return (
             <tr key={s.key}>
               <td className="py-0.5">
-                <span className="flex items-center gap-2 text-base-content/70">
+                <span className="flex items-center gap-2 text-muted-foreground">
                   <span
                     className="size-2 shrink-0 rounded-full"
                     style={{ backgroundColor: s.color }}
@@ -111,13 +112,13 @@ function MetricsTable({
                   {s.metric.name}
                 </span>
               </td>
-              <td className="py-0.5 text-right font-medium tabular-nums text-base-content">
+              <td className="py-0.5 text-right font-medium tabular-nums text-foreground">
                 {value === null || value === undefined
                   ? "—"
                   : s.metric.format(value)}
               </td>
               {hasCompare ? (
-                <td className="py-0.5 pl-2 text-right tabular-nums text-base-content/50">
+                <td className="py-0.5 pl-2 text-right tabular-nums text-muted-foreground">
                   {prior === null || prior === undefined
                     ? "—"
                     : s.metric.format(prior)}
@@ -134,8 +135,7 @@ function MetricsTable({
   );
 }
 
-const ICON_BUTTON =
-  "inline-flex size-6 shrink-0 items-center justify-center rounded text-base-content/50 hover:bg-base-200 hover:text-base-content focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/60";
+const ICON_BUTTON = "text-muted-foreground";
 
 function NoteRow({
   note,
@@ -155,39 +155,40 @@ function NoteRow({
         aria-hidden
       />
       {showDate && note.date ? (
-        <span className="shrink-0 tabular-nums text-base-content/45">
+        <span className="shrink-0 tabular-nums text-muted-foreground">
           {shortDay(note.date)}
         </span>
       ) : null}
-      <span className="shrink-0 text-base-content/50">{note.label}</span>
-      <span
-        className="min-w-0 flex-1 truncate text-base-content/85"
-        title={full}
-      >
+      <span className="shrink-0 text-muted-foreground">{note.label}</span>
+      <span className="min-w-0 flex-1 truncate text-foreground/80" title={full}>
         {note.text}
       </span>
       {note.url ? (
-        <a
-          href={note.url}
-          target="_blank"
-          rel="noopener noreferrer"
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          nativeButton={false}
+          render={
+            <a href={note.url} target="_blank" rel="noopener noreferrer" />
+          }
           className={ICON_BUTTON}
           aria-label={`Open ${note.url} in a new tab`}
           title="Open in a new tab"
         >
           <ExternalLink className="size-3.5" />
-        </a>
+        </Button>
       ) : null}
       {note.editable && onEdit ? (
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="icon-xs"
           className={ICON_BUTTON}
           aria-label={`Edit note: ${note.text}`}
           title="Edit note"
           onClick={() => onEdit(note)}
         >
           <Pencil className="size-3.5" />
-        </button>
+        </Button>
       ) : null}
     </li>
   );
@@ -219,30 +220,31 @@ function TooltipCard({
   const visible = expanded ? notes : notes.slice(0, VISIBLE_NOTES);
   const hidden = notes.length - visible.length;
   return (
-    <div className="rounded-lg border border-base-300 bg-base-100 p-3 text-xs shadow-lg">
+    <div className="rounded-lg bg-popover p-3 text-xs text-popover-foreground shadow-md ring-1 ring-foreground/10">
       <div className="mb-2 flex items-center justify-between gap-2">
-        <span className="font-medium text-base-content">{point.label}</span>
+        <span className="font-medium text-foreground">{point.label}</span>
         <span className="flex items-center gap-1">
           {point.partial ? (
-            <span className="text-base-content/50">
+            <span className="text-muted-foreground">
               {point.partialNote ?? "partial data"}
             </span>
           ) : null}
           {pinned ? (
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="icon-xs"
               className={ICON_BUTTON}
               aria-label="Close"
               onClick={onClose}
             >
               <X className="size-3.5" />
-            </button>
+            </Button>
           ) : null}
         </span>
       </div>
       <MetricsTable point={point} series={series} />
       {notes.length ? (
-        <div className="mt-2 border-t border-base-300 pt-1.5">
+        <div className="mt-2 border-t border-border pt-1.5">
           <ul
             className={
               expanded ? "max-h-48 overflow-y-auto overscroll-contain" : ""
@@ -258,28 +260,30 @@ function TooltipCard({
             ))}
           </ul>
           {hidden > 0 ? (
-            <button
-              type="button"
-              className="mt-1 rounded text-primary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/60"
+            <Button
+              variant="link"
+              size="xs"
+              className="mt-1 h-auto px-0 py-0.5"
               onClick={() => setExpanded(true)}
             >
               Show {hidden} more
-            </button>
+            </Button>
           ) : null}
         </div>
       ) : null}
       {pinned && onAddNote ? (
-        <div className="mt-2 flex justify-end border-t border-base-300 pt-1.5">
-          <button
-            type="button"
-            className="inline-flex h-6 items-center gap-1 rounded px-1.5 text-base-content/60 hover:bg-base-200 hover:text-base-content focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/60"
+        <div className="mt-2 flex justify-end border-t border-border pt-1.5">
+          <Button
+            variant="ghost"
+            size="xs"
+            className="text-muted-foreground"
             onClick={onAddNote}
           >
-            <Plus className="size-3.5" /> Note on this day
-          </button>
+            <Plus data-icon="inline-start" /> Note on this day
+          </Button>
         </div>
       ) : !pinned && (notes.length || onAddNote) ? (
-        <p className="mt-2 text-[11px] text-base-content/40">
+        <p className="mt-2 text-[11px] text-muted-foreground">
           Click to pin{onAddNote ? " or add a note" : ""}
         </p>
       ) : null}

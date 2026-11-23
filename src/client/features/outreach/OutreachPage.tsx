@@ -3,6 +3,24 @@ import { useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { LinkTrafficInline } from "@/client/features/posthog/LinkTraffic";
 import { ArrowDown, ArrowUp, Loader2, Search, Settings2 } from "lucide-react";
+import { PageHeader } from "@/client/components/PageHeader";
+import { Alert } from "@/client/components/ui/alert";
+import { Badge } from "@/client/components/ui/badge";
+import { Button } from "@/client/components/ui/button";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@/client/components/ui/input-group";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/client/components/ui/table";
+import { Tabs, TabsList, TabsTrigger } from "@/client/components/ui/tabs";
 import {
   type ChartPoint,
   type ChartSeries,
@@ -63,13 +81,13 @@ function Panel({
   children: ReactNode;
 }) {
   return (
-    <section className="min-w-0 overflow-hidden rounded-xl border border-base-300 bg-base-100">
+    <section className="min-w-0 overflow-hidden rounded-xl border border-border bg-card">
       {title || actions ? (
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-base-300 px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
           <div className="min-w-0">
             {title ? <h2 className="font-semibold">{title}</h2> : null}
             {meta ? (
-              <p className="text-xs text-base-content/60">{meta}</p>
+              <p className="text-xs text-muted-foreground">{meta}</p>
             ) : null}
           </div>
           {actions}
@@ -82,7 +100,7 @@ function Panel({
 
 function EmptyState({ children }: { children: ReactNode }) {
   return (
-    <p className="px-4 py-8 text-center text-sm text-base-content/60">
+    <p className="px-4 py-8 text-center text-sm text-muted-foreground">
       {children}
     </p>
   );
@@ -116,7 +134,7 @@ export function OutreachPage({
 
   if (snapshotQuery.isPending) {
     return (
-      <div className="flex items-center justify-center gap-2 py-16 text-sm text-base-content/60">
+      <div className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
         <Loader2 className="size-4 animate-spin" /> Loading outreach…
       </div>
     );
@@ -124,14 +142,12 @@ export function OutreachPage({
   if (snapshotQuery.isError) {
     return (
       <div className="px-4 py-6 md:px-6">
-        <div className="alert alert-error">
-          <span className="text-sm">
-            {getStandardErrorMessage(
-              snapshotQuery.error,
-              "Failed to load outreach",
-            )}
-          </span>
-        </div>
+        <Alert variant="destructive">
+          {getStandardErrorMessage(
+            snapshotQuery.error,
+            "Failed to load outreach",
+          )}
+        </Alert>
       </div>
     );
   }
@@ -144,52 +160,50 @@ export function OutreachPage({
   return (
     <div className="overflow-auto px-4 py-4 pb-24 md:px-6 md:py-6 md:pb-8">
       <div className="mx-auto max-w-7xl space-y-4">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-          <div className="min-w-0">
-            <h1 className="text-2xl font-semibold">Outreach</h1>
-            <p className="text-sm text-base-content/70">
+        <PageHeader
+          title="Outreach"
+          description={
+            <>
               Earned links for {settings.siteUrl || "this project"}: prospects,
               emails you approve, replies and verified links.
+            </>
+          }
+          actions={
+            <p
+              className="text-sm text-muted-foreground sm:mt-1 sm:text-right"
+              title={`Days and weeks in ${limits.timeZoneLabel}`}
+            >
+              Sent today{" "}
+              <span className="font-medium text-foreground tabular-nums">
+                {limits.sentToday}/{limits.dailyMax}
+              </span>{" "}
+              · this week{" "}
+              <span className="font-medium text-foreground tabular-nums">
+                {limits.sentWeek}/{limits.weeklyMax}
+              </span>
             </p>
-          </div>
-          <p
-            className="shrink-0 text-sm text-base-content/60 sm:mt-1 sm:text-right"
-            title={`Days and weeks in ${limits.timeZoneLabel}`}
-          >
-            Sent today{" "}
-            <span className="font-medium tabular-nums text-base-content">
-              {limits.sentToday}/{limits.dailyMax}
-            </span>{" "}
-            · this week{" "}
-            <span className="font-medium tabular-nums text-base-content">
-              {limits.sentWeek}/{limits.weeklyMax}
-            </span>
-          </p>
-        </div>
+          }
+        />
 
-        <div className="overflow-x-auto">
-          <div
-            role="tablist"
-            className="tabs tabs-border tabs-sm w-max sm:tabs-md"
+        <div className="overflow-x-auto pb-1.5">
+          <Tabs
+            value={tab}
+            onValueChange={(value) => {
+              const next = OUTREACH_TABS.find((item) => item.value === value);
+              if (next) onTab(next.value);
+            }}
           >
-            {OUTREACH_TABS.map((item) => (
-              <button
-                key={item.value}
-                type="button"
-                role="tab"
-                aria-selected={tab === item.value}
-                className={`tab gap-1.5 ${tab === item.value ? "tab-active" : ""}`}
-                onClick={() => onTab(item.value)}
-              >
-                {item.label}
-                {item.value === "replies" && replies.length ? (
-                  <span className="badge badge-xs badge-primary border-0 text-primary-content">
-                    {replies.length}
-                  </span>
-                ) : null}
-              </button>
-            ))}
-          </div>
+            <TabsList variant="line" className="w-max *:flex-none">
+              {OUTREACH_TABS.map((item) => (
+                <TabsTrigger key={item.value} value={item.value}>
+                  {item.label}
+                  {item.value === "replies" && replies.length ? (
+                    <Badge size="sm">{replies.length}</Badge>
+                  ) : null}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
         </div>
 
         {tab === "overview" ? (
@@ -225,7 +239,7 @@ export function OutreachPage({
               empty="No replies waiting for an answer."
               detail={(p) => (
                 <>
-                  <span className="text-base-content/50">{p.replyAt} · </span>
+                  <span className="text-muted-foreground">{p.replyAt} · </span>
                   {p.replySummary}
                 </>
               )}
@@ -249,7 +263,7 @@ export function OutreachPage({
               detail={(p) => (
                 <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                   <a
-                    className="link link-hover min-w-0 truncate"
+                    className="min-w-0 truncate text-primary underline-offset-4 hover:underline"
                     href={p.linkUrl || p.theirPage}
                     target="_blank"
                     rel="noreferrer noopener"
@@ -258,14 +272,14 @@ export function OutreachPage({
                     {p.linkUrl || p.theirPage}
                   </a>
                   {p.rel ? (
-                    <span className="badge badge-xs border-0 bg-base-300 text-base-content/70">
+                    <Badge variant="secondary" size="sm">
                       {p.rel}
-                    </span>
+                    </Badge>
                   ) : null}
                   {p.linkLost ? (
-                    <span className="text-xs text-error">Lost</span>
+                    <span className="text-xs text-destructive">Lost</span>
                   ) : null}
-                  <span className="text-xs text-base-content/50">
+                  <span className="text-xs text-muted-foreground">
                     checked {p.linkCheckedAt || "never"}
                   </span>
                   {/* Fork addition: PostHog visits and signups. */}
@@ -333,19 +347,21 @@ function Overview({
   return (
     <div className="space-y-4">
       {setupMissing || !settings.mailReady ? (
-        <div className="flex flex-col gap-2 rounded-lg border border-base-300 bg-base-200/50 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
-          <span className="text-base-content/80">
+        <div className="flex flex-col gap-2 rounded-lg border border-border bg-muted px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+          <span className="text-foreground/80">
             {setupMissing
               ? "Set the site and link domains so link checks know what to look for."
               : `Sending from the app is off. ${settings.mailProblem ?? ""} Drafts and approvals still work.`}
           </span>
-          <button
+          <Button
             type="button"
-            className="btn btn-ghost btn-sm gap-1.5 self-start sm:self-auto"
+            variant="ghost"
+            size="sm"
+            className="self-start sm:self-auto"
             onClick={() => onTab("settings")}
           >
-            <Settings2 className="size-4" /> Settings
-          </button>
+            <Settings2 data-icon="inline-start" /> Settings
+          </Button>
         </div>
       ) : null}
 
@@ -387,22 +403,22 @@ function Overview({
         {attention.length === 0 ? (
           <EmptyState>Nothing waits on you or the agent right now.</EmptyState>
         ) : (
-          <ul className="divide-y divide-base-300">
+          <ul className="divide-y divide-border">
             {attention.map((p) => {
               const button = p.attention ? OWNER_BUTTON[p.attention] : null;
               return (
                 <li
                   key={p.number}
-                  className="flex cursor-pointer items-center gap-3 px-4 py-2.5 hover:bg-base-200/60"
+                  className="flex cursor-pointer items-center gap-3 px-4 py-2.5 transition-colors hover:bg-foreground/[0.03]"
                   onClick={() => onProspect(p.number)}
                 >
                   <Favicon src={favicons[p.number]} domain={p.domain} />
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm">
-                      <span className="text-base-content/50">#{p.number}</span>{" "}
+                      <span className="text-muted-foreground">#{p.number}</span>{" "}
                       {p.prospect}
                     </div>
-                    <div className="truncate text-xs text-base-content/60">
+                    <div className="truncate text-xs text-muted-foreground">
                       {p.attention
                         ? OUTREACH_ATTENTION_LABELS[p.attention]
                         : ""}
@@ -410,16 +426,18 @@ function Overview({
                     </div>
                   </div>
                   {button && p.action.who === "owner" ? (
-                    <button
+                    <Button
                       type="button"
-                      className="btn btn-ghost btn-xs shrink-0 text-primary"
+                      variant="ghost"
+                      size="xs"
+                      className="shrink-0 text-primary hover:text-primary"
                       onClick={(event) => {
                         event.stopPropagation();
                         onProspect(p.number);
                       }}
                     >
                       {button}
-                    </button>
+                    </Button>
                   ) : (
                     <span className="shrink-0">
                       <ActionPill prospect={p} />
@@ -454,15 +472,15 @@ function Stat({
   hint?: string;
 }) {
   return (
-    <div className="min-w-0 rounded-lg border border-base-300 bg-base-100 p-3 sm:p-4">
-      <div className="truncate text-xs uppercase tracking-wide text-base-content/60">
+    <div className="min-w-0 rounded-lg border border-border bg-card p-3 sm:p-4">
+      <div className="truncate text-xs tracking-wide text-muted-foreground uppercase">
         {label}
       </div>
       <div className="mt-1 text-xl font-semibold tabular-nums sm:text-2xl">
         {value}
       </div>
       {hint ? (
-        <div className="truncate text-xs text-base-content/60">{hint}</div>
+        <div className="truncate text-xs text-muted-foreground">{hint}</div>
       ) : null}
     </div>
   );
@@ -471,7 +489,7 @@ function Stat({
 const SENT_SERIES: ChartSeries[] = [
   {
     key: "sent",
-    color: "var(--color-primary)",
+    color: "var(--chart-1)",
     metric: {
       name: "Sent",
       integer: true,
@@ -562,59 +580,65 @@ function Results({ analytics }: { analytics: OutreachSnapshot["analytics"] }) {
     <Panel
       title="Results"
       actions={
-        <div role="tablist" className="tabs tabs-border tabs-sm w-fit">
-          {RESULT_VIEWS.map((item) => (
-            <button
-              key={item.value}
-              type="button"
-              role="tab"
-              aria-selected={view === item.value}
-              className={`tab ${view === item.value ? "tab-active" : ""}`}
-              onClick={() => setView(item.value)}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
+        <Tabs
+          value={view}
+          onValueChange={(value) => {
+            const next = RESULT_VIEWS.find((item) => item.value === value);
+            if (next) setView(next.value);
+          }}
+        >
+          <TabsList variant="line" className="*:flex-none">
+            {RESULT_VIEWS.map((item) => (
+              <TabsTrigger key={item.value} value={item.value}>
+                {item.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
       }
     >
       {rows.length === 0 ? (
         <EmptyState>No prospects yet.</EmptyState>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="table table-sm">
-            <thead>
-              <tr>
-                <th className="w-full">
-                  {RESULT_VIEWS.find((item) => item.value === view)?.label}
-                </th>
-                <th className="px-2 text-right" title="Prospects">
-                  Total
-                </th>
-                <th className="px-2 text-right">Sent</th>
-                <th className="px-2 text-right">Replied</th>
-                <th className="px-2 text-right">Linked</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.label}>
-                  <td className="min-w-28 max-w-0 truncate" title={row.label}>
-                    {row.label}
-                  </td>
-                  <td className="px-2 text-right tabular-nums">
-                    {row.prospects}
-                  </td>
-                  <td className="px-2 text-right tabular-nums">{row.sent}</td>
-                  <td className="px-2 text-right tabular-nums">
-                    {row.replied}
-                  </td>
-                  <td className="px-2 text-right tabular-nums">{row.linked}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-full">
+                {RESULT_VIEWS.find((item) => item.value === view)?.label}
+              </TableHead>
+              <TableHead className="px-2 text-right" title="Prospects">
+                Total
+              </TableHead>
+              <TableHead className="px-2 text-right">Sent</TableHead>
+              <TableHead className="px-2 text-right">Replied</TableHead>
+              <TableHead className="px-2 text-right">Linked</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map((row) => (
+              <TableRow key={row.label}>
+                <TableCell
+                  className="max-w-0 min-w-28 truncate"
+                  title={row.label}
+                >
+                  {row.label}
+                </TableCell>
+                <TableCell className="px-2 text-right tabular-nums">
+                  {row.prospects}
+                </TableCell>
+                <TableCell className="px-2 text-right tabular-nums">
+                  {row.sent}
+                </TableCell>
+                <TableCell className="px-2 text-right tabular-nums">
+                  {row.replied}
+                </TableCell>
+                <TableCell className="px-2 text-right tabular-nums">
+                  {row.linked}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       )}
     </Panel>
   );
@@ -683,37 +707,40 @@ function ProspectsTable({
   return (
     <Panel
       title={
-        <div
-          role="tablist"
-          className="tabs tabs-border tabs-sm w-fit sm:tabs-md"
+        <Tabs
+          value={filter}
+          onValueChange={(value) => {
+            const next = OUTREACH_FILTERS.find((item) => item.value === value);
+            if (next) setFilter(next.value);
+          }}
         >
-          {OUTREACH_FILTERS.map((item) => (
-            <button
-              key={item.value}
-              type="button"
-              role="tab"
-              aria-selected={filter === item.value}
-              className={`tab gap-1.5 ${filter === item.value ? "tab-active" : ""}`}
-              onClick={() => setFilter(item.value)}
-            >
-              {item.label}
-              <span className="text-xs tabular-nums text-base-content/50">
-                {counts[item.value]}
-              </span>
-            </button>
-          ))}
-        </div>
+          <TabsList
+            variant="line"
+            className="h-auto! flex-wrap justify-start *:flex-none"
+          >
+            {OUTREACH_FILTERS.map((item) => (
+              <TabsTrigger key={item.value} value={item.value}>
+                {item.label}
+                <span className="text-xs font-normal text-muted-foreground tabular-nums">
+                  {counts[item.value]}
+                </span>
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
       }
       actions={
-        <label className="input input-sm input-bordered flex w-full items-center gap-2 sm:w-64">
-          <Search className="size-4 text-base-content/50" />
-          <input
-            className="min-w-0 grow"
+        <InputGroup className="h-9 w-full sm:w-64">
+          <InputGroupAddon>
+            <Search />
+          </InputGroupAddon>
+          <InputGroupInput
             placeholder="Search site, page, contact"
+            aria-label="Search prospects"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
-        </label>
+        </InputGroup>
       }
     >
       {rows.length === 0 ? (
@@ -723,98 +750,96 @@ function ProspectsTable({
             : "No prospects match."}
         </EmptyState>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="table table-zebra table-sm">
-            <thead>
-              <tr>
-                {SORTABLE.map((column) => (
-                  <th key={column.key} className={column.className}>
-                    <button
-                      type="button"
-                      className="inline-flex items-center gap-1 whitespace-nowrap"
-                      onClick={() =>
-                        setSort((current) => ({
-                          key: column.key,
-                          direction:
-                            current.key === column.key &&
-                            current.direction === "desc"
-                              ? "asc"
-                              : "desc",
-                        }))
-                      }
-                    >
-                      {column.label}
-                      {sort.key === column.key ? (
-                        sort.direction === "asc" ? (
-                          <ArrowUp className="size-3" />
-                        ) : (
-                          <ArrowDown className="size-3" />
-                        )
-                      ) : null}
-                    </button>
-                  </th>
-                ))}
-                <th className="hidden sm:table-cell">Next</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((p) => (
-                <tr
-                  key={p.number}
-                  className="cursor-pointer"
-                  onClick={() => onProspect(p.number)}
-                >
-                  <td className="hidden tabular-nums text-base-content/50 sm:table-cell">
-                    {p.number}
-                  </td>
-                  <td className="max-w-44 sm:max-w-72">
-                    <div className="flex items-center gap-2">
-                      <Favicon src={favicons[p.number]} domain={p.domain} />
-                      <span className="truncate" title={p.prospect}>
-                        {p.prospect}
-                      </span>
-                    </div>
-                  </td>
-                  <td
-                    className="hidden max-w-64 truncate xl:table-cell"
-                    title={p.theirPage}
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {SORTABLE.map((column) => (
+                <TableHead key={column.key} className={column.className}>
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1 rounded-sm whitespace-nowrap outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+                    onClick={() =>
+                      setSort((current) => ({
+                        key: column.key,
+                        direction:
+                          current.key === column.key &&
+                          current.direction === "desc"
+                            ? "asc"
+                            : "desc",
+                      }))
+                    }
                   >
-                    {p.theirPageTitle}
-                  </td>
-                  <td
-                    className="hidden max-w-48 truncate 2xl:table-cell"
-                    title={p.ourPage}
-                  >
-                    {p.ourPage}
-                  </td>
-                  <td className="hidden whitespace-nowrap text-base-content/70 lg:table-cell">
-                    {p.angle ? (angleLabel.get(p.angle) ?? p.angle) : "—"}
-                  </td>
-                  <td className="text-right">
-                    <ScorePill prospect={p} />
-                  </td>
-                  <td className="hidden text-right tabular-nums 2xl:table-cell">
-                    {formatNumber(p.metrics?.authority)}
-                  </td>
-                  <td className="hidden text-right tabular-nums 2xl:table-cell">
-                    {formatNumber(p.metrics?.traffic)}
-                  </td>
-                  <td>
-                    <StatusBadge prospect={p} />
-                  </td>
-                  <td className="hidden whitespace-nowrap text-xs text-base-content/60 2xl:table-cell">
-                    {p.lastAction
-                      ? `${p.lastAction.label}, ${formatDateTime(p.lastAction.at)}`
-                      : "—"}
-                  </td>
-                  <td className="hidden sm:table-cell">
-                    <ActionPill prospect={p} />
-                  </td>
-                </tr>
+                    {column.label}
+                    {sort.key === column.key ? (
+                      sort.direction === "asc" ? (
+                        <ArrowUp className="size-3" />
+                      ) : (
+                        <ArrowDown className="size-3" />
+                      )
+                    ) : null}
+                  </button>
+                </TableHead>
               ))}
-            </tbody>
-          </table>
-        </div>
+              <TableHead className="hidden sm:table-cell">Next</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map((p) => (
+              <TableRow
+                key={p.number}
+                className="cursor-pointer"
+                onClick={() => onProspect(p.number)}
+              >
+                <TableCell className="hidden tabular-nums text-muted-foreground sm:table-cell">
+                  {p.number}
+                </TableCell>
+                <TableCell className="max-w-44 sm:max-w-72">
+                  <div className="flex items-center gap-2">
+                    <Favicon src={favicons[p.number]} domain={p.domain} />
+                    <span className="truncate" title={p.prospect}>
+                      {p.prospect}
+                    </span>
+                  </div>
+                </TableCell>
+                <TableCell
+                  className="hidden max-w-64 truncate xl:table-cell"
+                  title={p.theirPage}
+                >
+                  {p.theirPageTitle}
+                </TableCell>
+                <TableCell
+                  className="hidden max-w-48 truncate 2xl:table-cell"
+                  title={p.ourPage}
+                >
+                  {p.ourPage}
+                </TableCell>
+                <TableCell className="hidden whitespace-nowrap text-muted-foreground lg:table-cell">
+                  {p.angle ? (angleLabel.get(p.angle) ?? p.angle) : "—"}
+                </TableCell>
+                <TableCell className="text-right">
+                  <ScorePill prospect={p} />
+                </TableCell>
+                <TableCell className="hidden text-right tabular-nums 2xl:table-cell">
+                  {formatNumber(p.metrics?.authority)}
+                </TableCell>
+                <TableCell className="hidden text-right tabular-nums 2xl:table-cell">
+                  {formatNumber(p.metrics?.traffic)}
+                </TableCell>
+                <TableCell>
+                  <StatusBadge prospect={p} />
+                </TableCell>
+                <TableCell className="hidden whitespace-nowrap text-xs text-muted-foreground 2xl:table-cell">
+                  {p.lastAction
+                    ? `${p.lastAction.label}, ${formatDateTime(p.lastAction.at)}`
+                    : "—"}
+                </TableCell>
+                <TableCell className="hidden sm:table-cell">
+                  <ActionPill prospect={p} />
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       )}
     </Panel>
   );
@@ -835,11 +860,11 @@ function ProspectList({
 }) {
   if (prospects.length === 0) return <EmptyState>{empty}</EmptyState>;
   return (
-    <ul className="divide-y divide-base-300">
+    <ul className="divide-y divide-border">
       {prospects.map((p) => (
         <li
           key={p.number}
-          className="flex cursor-pointer items-start gap-3 px-4 py-3 text-sm hover:bg-base-200/60"
+          className="flex cursor-pointer items-start gap-3 px-4 py-3 text-sm transition-colors hover:bg-foreground/[0.03]"
           onClick={() => onProspect(p.number)}
         >
           <span className="mt-0.5">
@@ -847,12 +872,12 @@ function ProspectList({
           </span>
           <div className="min-w-0 flex-1 space-y-0.5">
             <div className="truncate font-medium">
-              <span className="font-normal text-base-content/50">
+              <span className="font-normal text-muted-foreground">
                 #{p.number}
               </span>{" "}
               {p.prospect}
             </div>
-            <div className="min-w-0 break-words text-base-content/80">
+            <div className="min-w-0 break-words text-foreground/80">
               {detail(p)}
             </div>
           </div>

@@ -7,11 +7,14 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { Check, ChevronDown, Search } from "lucide-react";
+import { cn } from "cn";
 
 // Toolbar controls for the fork's chart pages, in the style of the app's
 // Saved Keywords tag filter: a segmented group and a dropdown of the same
-// height (h-9) and type size (text-sm); a narrowed filter is tinted primary. The dropdown renders through a portal in fixed position so
-// no card can clip it, and can search a long list (countries).
+// height (h-9) and type size (text-sm), drawn like upstream's Select and
+// segmented toggle; a narrowed filter is tinted primary. The dropdown
+// renders through a portal in fixed position so no card can clip it, and
+// can search a long list (countries).
 
 export function SegmentGroup<T extends string>({
   items,
@@ -26,7 +29,7 @@ export function SegmentGroup<T extends string>({
 }) {
   return (
     <div
-      className="inline-flex h-9 items-center rounded-md border border-base-300 bg-base-100 p-0.5"
+      className="inline-flex h-9 max-w-full items-center gap-0.5 rounded-lg border border-border bg-muted p-0.5"
       role="group"
       aria-label={label}
     >
@@ -37,11 +40,12 @@ export function SegmentGroup<T extends string>({
             key={item.value}
             type="button"
             aria-pressed={active}
-            className={`h-7 rounded px-2.5 text-sm transition-colors ${
+            className={cn(
+              "h-7 rounded-md px-2.5 text-sm whitespace-nowrap transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
               active
-                ? "bg-base-content/10 font-medium text-base-content"
-                : "text-base-content/60 hover:bg-base-200 hover:text-base-content"
-            }`}
+                ? "bg-card font-medium text-foreground shadow-xs dark:bg-foreground/10"
+                : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
+            )}
             onClick={() => onChange(item.value)}
           >
             {item.label}
@@ -156,11 +160,12 @@ export function ChoiceMenu<T extends string>({
         aria-label={label}
         aria-haspopup="listbox"
         aria-expanded={open}
-        className={`inline-flex h-9 max-w-full items-center gap-2 rounded-md border px-3 text-sm transition ${
+        className={cn(
+          "inline-flex h-9 max-w-full items-center gap-1.5 rounded-lg border py-2 pr-2.5 pl-3 text-sm whitespace-nowrap text-foreground transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
           narrowed
-            ? "border-primary/50 bg-primary/10 text-base-content"
-            : "border-base-300 bg-base-100 hover:border-base-content/30"
-        }`}
+            ? "border-primary/50 bg-primary/10"
+            : "border-input bg-background hover:bg-foreground/5 aria-expanded:bg-foreground/5 dark:hover:bg-input/50",
+        )}
         onClick={() => {
           const rect = buttonRef.current?.getBoundingClientRect();
           if (rect) {
@@ -172,22 +177,25 @@ export function ChoiceMenu<T extends string>({
         }}
       >
         <span className="truncate">{display ?? selected?.label ?? label}</span>
-        <ChevronDown className="size-3.5 shrink-0 opacity-60" />
+        <ChevronDown className="pointer-events-none size-4 shrink-0 text-muted-foreground" />
       </button>
       {open && typeof document !== "undefined"
         ? createPortal(
             <div
               ref={menuRef}
-              className={`fixed z-[1000] max-w-[calc(100vw-16px)] overflow-hidden rounded-lg border border-base-300 bg-base-100 shadow-2xl ${menuWidth}`}
+              className={cn(
+                "fixed z-[1000] max-w-[calc(100vw-16px)] overflow-hidden rounded-lg bg-popover text-popover-foreground shadow-lg ring-1 ring-foreground/10",
+                menuWidth,
+              )}
               style={{ top: position.top, left: position.left }}
             >
               {searchable ? (
-                <div className="border-b border-base-300 p-2">
-                  <label className="flex items-center gap-2 rounded-md border border-base-300 bg-base-200/50 px-2 py-1.5">
-                    <Search className="size-3.5 opacity-50" />
+                <div className="border-b border-border p-1.5">
+                  <label className="flex h-8 items-center gap-2 rounded-md border border-input bg-background px-2 focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50">
+                    <Search className="size-3.5 shrink-0 text-muted-foreground" />
                     <input
                       autoFocus
-                      className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-base-content/40"
+                      className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
                       placeholder={searchPlaceholder}
                       value={query}
                       onChange={(event) => setQuery(event.target.value)}
@@ -202,10 +210,10 @@ export function ChoiceMenu<T extends string>({
               <ul
                 role="listbox"
                 aria-label={label}
-                className="max-h-64 overflow-y-auto"
+                className="max-h-64 overflow-y-auto p-1"
               >
                 {visible.length === 0 ? (
-                  <li className="px-3 py-6 text-center text-xs text-base-content/55">
+                  <li className="px-3 py-6 text-center text-xs text-muted-foreground">
                     No match
                   </li>
                 ) : (
@@ -219,17 +227,25 @@ export function ChoiceMenu<T extends string>({
                       >
                         <button
                           type="button"
-                          className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-base-200 ${active ? "font-medium text-base-content" : "text-base-content/80"}`}
+                          className={cn(
+                            "flex w-full items-center gap-2 rounded-md py-1.5 pr-2 pl-2 text-left text-sm outline-none hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground",
+                            active
+                              ? "font-medium text-foreground"
+                              : "text-foreground/80",
+                          )}
                           onClick={() => choose(option.value)}
                         >
                           <Check
-                            className={`size-3.5 shrink-0 ${active ? "opacity-100" : "opacity-0"}`}
+                            className={cn(
+                              "size-3.5 shrink-0",
+                              active ? "opacity-100" : "opacity-0",
+                            )}
                           />
                           <span className="min-w-0 flex-1 truncate">
                             {option.label}
                           </span>
                           {option.hint ? (
-                            <span className="shrink-0 text-xs tabular-nums text-base-content/45">
+                            <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
                               {option.hint}
                             </span>
                           ) : null}

@@ -1,6 +1,15 @@
 import * as React from "react";
 import { useMutation } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
+import { Button } from "@/client/components/ui/button";
+import { Input } from "@/client/components/ui/input";
+import { RadioGroup } from "@/client/components/ui/radio-group";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/client/components/ui/select";
 import {
   checkPosthogKey,
   connectPosthog,
@@ -17,6 +26,11 @@ import {
 
 // Fork addition (FORK-CHANGES.md): PostHog connection UI, see
 // AnalyticsSourceSection.
+
+const HOST_ITEMS = [
+  ...HOSTS.map((option) => ({ value: option.value, label: option.label })),
+  { value: "custom", label: "Self-hosted…" },
+];
 
 export function ConnectPosthog({
   projectId,
@@ -74,6 +88,10 @@ export function ConnectPosthog({
     setCheckedRef(null);
     check.reset();
   };
+  const projectItems = (listed ?? []).map((project) => ({
+    value: project.id,
+    label: `${project.name} (${project.id})`,
+  }));
   const usedIds = source.usedPosthogProjects.filter(
     (used) =>
       checkedRef?.kind !== "existing" || used.credentialId === checkedRef.id,
@@ -81,59 +99,66 @@ export function ConnectPosthog({
 
   return (
     <div className="space-y-5">
-      <fieldset className="space-y-2" disabled={!source.canManage}>
+      <fieldset className="min-w-0 space-y-2" disabled={!source.canManage}>
         <legend className="text-sm font-medium">1. API key</legend>
-        {source.savedKeys.map((saved) => (
-          <KeyOption
-            key={saved.id}
-            value={`existing:${saved.id}`}
-            choice={choice}
-            onChoose={pickChoice}
-          >
-            Use existing key <span className="font-mono">{saved.hint}</span>
-            <span className="text-base-content/60">
-              {" "}
-              · {new URL(saved.host).host}
-              {saved.projectCount > 0
-                ? ` · used by ${saved.projectCount} project${saved.projectCount === 1 ? "" : "s"}`
-                : ""}
-            </span>
-          </KeyOption>
-        ))}
-        {source.envKey ? (
-          <KeyOption value="env" choice={choice} onChoose={pickChoice}>
-            Use the key from the server's .env{" "}
-            <span className="font-mono">{source.envKey.hint}</span>
-            <span className="text-base-content/60">
-              {" "}
-              · {new URL(source.envKey.host).host} · stored encrypted on connect
-            </span>
-          </KeyOption>
-        ) : null}
-        <KeyOption value="new" choice={choice} onChoose={pickChoice}>
-          Paste a new personal API key
-        </KeyOption>
+        <RadioGroup
+          aria-label="PostHog API key"
+          value={choice}
+          onValueChange={(value) => {
+            if (typeof value === "string") pickChoice(value);
+          }}
+          disabled={!source.canManage}
+        >
+          {source.savedKeys.map((saved) => (
+            <KeyOption key={saved.id} value={`existing:${saved.id}`}>
+              Use existing key <span className="font-mono">{saved.hint}</span>
+              <span className="text-muted-foreground">
+                {" "}
+                · {new URL(saved.host).host}
+                {saved.projectCount > 0
+                  ? ` · used by ${saved.projectCount} project${saved.projectCount === 1 ? "" : "s"}`
+                  : ""}
+              </span>
+            </KeyOption>
+          ))}
+          {source.envKey ? (
+            <KeyOption value="env">
+              Use the key from the server's .env{" "}
+              <span className="font-mono">{source.envKey.hint}</span>
+              <span className="text-muted-foreground">
+                {" "}
+                · {new URL(source.envKey.host).host} · stored encrypted on
+                connect
+              </span>
+            </KeyOption>
+          ) : null}
+          <KeyOption value="new">Paste a new personal API key</KeyOption>
+        </RadioGroup>
         {choice === "new" ? (
-          <div className="grid gap-2 pl-7 sm:grid-cols-[10rem_1fr]">
-            <select
-              className="select select-bordered select-sm w-full"
-              aria-label="PostHog region"
+          <div className="grid gap-2 pl-6 sm:grid-cols-[10rem_1fr]">
+            <Select
+              items={HOST_ITEMS}
               value={host}
-              onChange={(event) => {
-                setHost(event.target.value);
+              onValueChange={(value) => {
+                if (value == null) return;
+                setHost(value);
                 setCheckedRef(null);
               }}
             >
-              {HOSTS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-              <option value="custom">Self-hosted…</option>
-            </select>
-            <input
+              <SelectTrigger className="h-9 w-full" aria-label="PostHog region">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {HOST_ITEMS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Input
               type="password"
-              className="input input-bordered input-sm w-full font-mono"
+              className="h-9 font-mono"
               autoComplete="off"
               placeholder="phx_…"
               aria-label="Personal API key"
@@ -144,35 +169,31 @@ export function ConnectPosthog({
               }}
             />
             {host === "custom" ? (
-              <input
-                className="input input-bordered input-sm w-full sm:col-span-2"
+              <Input
+                className="h-9 sm:col-span-2"
                 placeholder="https://posthog.example.com"
                 aria-label="PostHog host"
                 value={customHost}
                 onChange={(event) => setCustomHost(event.target.value)}
               />
             ) : null}
-            <p className="text-xs text-base-content/60 sm:col-span-2">
+            <p className="text-xs text-muted-foreground sm:col-span-2">
               PostHog → Settings → Personal API keys: scope Query: read, for
               this project or the organization.
             </p>
           </div>
         ) : null}
         <div className="flex flex-wrap items-center gap-2">
-          <button
+          <Button
             type="button"
-            className="btn btn-sm"
-            disabled={
-              check.isPending ||
-              (keyRef.kind === "new" && keyRef.apiKey.length < 20)
-            }
+            variant="outline"
+            size="sm"
+            pending={check.isPending}
+            disabled={keyRef.kind === "new" && keyRef.apiKey.length < 20}
             onClick={() => check.mutate(keyRef)}
           >
-            {check.isPending ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : null}
             Check key
-          </button>
+          </Button>
           {checkedRef ? (
             <span className="text-sm text-success">Key works.</span>
           ) : null}
@@ -181,26 +202,33 @@ export function ConnectPosthog({
       </fieldset>
 
       {checkedRef ? (
-        <fieldset className="space-y-2" disabled={!source.canManage}>
+        <fieldset className="min-w-0 space-y-2" disabled={!source.canManage}>
           <legend className="text-sm font-medium">2. PostHog project</legend>
           {listed && listed.length > 0 ? (
-            <select
-              className="select select-bordered select-sm w-full max-w-md"
-              aria-label="PostHog project"
-              value={posthogProjectId}
-              onChange={(event) => setPosthogProjectId(event.target.value)}
+            <Select
+              items={projectItems}
+              value={posthogProjectId === "" ? null : posthogProjectId}
+              onValueChange={(value) => setPosthogProjectId(value ?? "")}
+              disabled={!source.canManage}
             >
-              <option value="">Choose a project…</option>
-              {listed.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name} ({project.id})
-                </option>
-              ))}
-            </select>
+              <SelectTrigger
+                className="h-9 w-full max-w-md"
+                aria-label="PostHog project"
+              >
+                <SelectValue placeholder="Choose a project…" />
+              </SelectTrigger>
+              <SelectContent>
+                {projectItems.map((project) => (
+                  <SelectItem key={project.value} value={project.value}>
+                    {project.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           ) : (
             <>
-              <input
-                className="input input-bordered input-sm w-full max-w-xs tabular-nums"
+              <Input
+                className="h-9 max-w-xs tabular-nums"
                 inputMode="numeric"
                 autoComplete="off"
                 placeholder="Project ID, e.g. 352215"
@@ -208,7 +236,7 @@ export function ConnectPosthog({
                 value={posthogProjectId}
                 onChange={(event) => setPosthogProjectId(event.target.value)}
               />
-              <p className="text-xs text-base-content/60">
+              <p className="text-xs text-muted-foreground">
                 This key is limited to chosen projects, so PostHog won't list
                 them. Enter the number from PostHog's address bar (/project/
                 <b>352215</b>/…).
@@ -216,14 +244,18 @@ export function ConnectPosthog({
               {usedIds.length > 0 ? (
                 <div className="flex flex-wrap gap-1">
                   {usedIds.map((used) => (
-                    <button
+                    <Button
                       key={`${used.posthogProjectId}-${used.projectName}`}
                       type="button"
-                      className="btn btn-xs"
+                      variant="outline"
+                      size="xs"
+                      className="max-w-full"
                       onClick={() => setPosthogProjectId(used.posthogProjectId)}
                     >
-                      {used.posthogProjectId} · {used.projectName}
-                    </button>
+                      <span className="truncate">
+                        {used.posthogProjectId} · {used.projectName}
+                      </span>
+                    </Button>
                   ))}
                 </div>
               ) : null}
@@ -246,17 +278,15 @@ export function ConnectPosthog({
       {checkedRef ? (
         <>
           <MutationError mutation={connect} />
-          <button
+          <Button
             type="button"
-            className="btn btn-primary btn-sm"
-            disabled={!validId || connect.isPending || !source.canManage}
+            size="sm"
+            pending={connect.isPending}
+            disabled={!validId || !source.canManage}
             onClick={() => connect.mutate(undefined)}
           >
-            {connect.isPending ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : null}
             Connect PostHog
-          </button>
+          </Button>
         </>
       ) : null}
     </div>

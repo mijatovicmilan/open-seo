@@ -1,5 +1,14 @@
 import { createContext, useContext, type ReactNode } from "react";
 import { ArrowDownRight, ArrowUpRight } from "lucide-react";
+import { cn } from "cn";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/client/components/ui/table";
 import {
   formatCount,
   formatCtr,
@@ -27,7 +36,7 @@ function pathOf(url: string) {
 /** A URL shown as its path; click filters to the page, full URL on hover. */
 export function PageCell({ url }: { url: string | null }) {
   const onFilter = useContext(InsightsFilterContext);
-  if (!url) return <span className="text-base-content/40">—</span>;
+  if (!url) return <span className="text-muted-foreground">—</span>;
   const label = pathOf(url);
   if (!onFilter) {
     return (
@@ -44,7 +53,7 @@ export function PageCell({ url }: { url: string | null }) {
       type="button"
       title={`Filter to ${url}`}
       onClick={() => onFilter({ page: url })}
-      className="link link-hover block max-w-[12rem] truncate text-left 2xl:max-w-[22rem]"
+      className="block max-w-[12rem] truncate rounded-sm text-left underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50 2xl:max-w-[22rem]"
     >
       {label}
     </button>
@@ -54,28 +63,28 @@ export function PageCell({ url }: { url: string | null }) {
 function QueryCell({ query }: { query: string }) {
   const onFilter = useContext(InsightsFilterContext);
   return (
-    <td className="max-w-[10rem] truncate 2xl:max-w-[18rem]">
+    <TableCell className="max-w-[10rem] truncate 2xl:max-w-[18rem]">
       {onFilter ? (
         <button
           type="button"
           title={`Filter to "${query}"`}
           onClick={() => onFilter({ query })}
-          className="link link-hover max-w-full truncate text-left"
+          className="max-w-full truncate rounded-sm text-left underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
         >
           {query}
         </button>
       ) : (
         query
       )}
-    </td>
+    </TableCell>
   );
 }
 
 function Delta({ current, previous }: { current: number; previous: number }) {
   const diff = current - previous;
-  if (diff === 0) return <span className="text-base-content/40">0</span>;
+  if (diff === 0) return <span className="text-muted-foreground">0</span>;
   return (
-    <span className={diff > 0 ? "text-success" : "text-error"}>
+    <span className={diff > 0 ? "text-success" : "text-destructive"}>
       {diff > 0 ? "+" : ""}
       {formatCount(diff)}
     </span>
@@ -96,18 +105,18 @@ export function InsightSection({
   children: ReactNode;
 }) {
   return (
-    <section className="overflow-hidden rounded-xl border border-base-300 bg-base-100">
-      <div className="border-b border-base-300 px-4 py-3">
+    <section className="overflow-hidden rounded-xl border border-border bg-card">
+      <div className="border-b border-border px-4 py-3">
         <h2 className="font-semibold">
           {title}
-          <span className="ml-2 text-sm font-normal text-base-content/50">
+          <span className="ml-2 text-sm font-normal text-muted-foreground">
             {count}
           </span>
         </h2>
-        <p className="mt-0.5 text-sm text-base-content/60">{why}</p>
+        <p className="mt-0.5 text-sm text-muted-foreground">{why}</p>
       </div>
       {count === 0 ? (
-        <p className="px-4 py-5 text-sm text-base-content/50">{empty}</p>
+        <p className="px-4 py-5 text-sm text-muted-foreground">{empty}</p>
       ) : (
         <div className="overflow-x-auto">{children}</div>
       )}
@@ -124,43 +133,46 @@ export function ChangesTable({
 }) {
   const Icon = direction === "up" ? ArrowUpRight : ArrowDownRight;
   return (
-    <table className="table table-zebra table-sm">
-      <thead>
-        <tr>
-          <th>Page</th>
-          <th className="text-right">Clicks</th>
-          <th className="text-right">Change</th>
-          <th className="text-right">Impr. change</th>
-          <th className="hidden 2xl:table-cell">Driven by</th>
-        </tr>
-      </thead>
-      <tbody>
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Page</TableHead>
+          <TableHead className="text-right">Clicks</TableHead>
+          <TableHead className="text-right">Change</TableHead>
+          <TableHead className="text-right">Impr. change</TableHead>
+          <TableHead className="hidden 2xl:table-cell">Driven by</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
         {rows.map((row) => (
-          <tr key={row.page}>
-            <td>
+          <TableRow key={row.page}>
+            <TableCell>
               <div className="flex items-center gap-1.5">
                 <Icon
-                  className={`size-3.5 shrink-0 ${direction === "up" ? "text-success" : "text-error"}`}
+                  className={cn(
+                    "size-3.5 shrink-0",
+                    direction === "up" ? "text-success" : "text-destructive",
+                  )}
                 />
                 <PageCell url={row.page} />
               </div>
-            </td>
-            <td className="text-right tabular-nums">
+            </TableCell>
+            <TableCell className="text-right tabular-nums">
               {formatCount(row.clicks)}
-            </td>
-            <td className="text-right tabular-nums">
+            </TableCell>
+            <TableCell className="text-right tabular-nums">
               <Delta current={row.clicks} previous={row.prevClicks} />
-            </td>
-            <td className="text-right tabular-nums">
+            </TableCell>
+            <TableCell className="text-right tabular-nums">
               <Delta current={row.impressions} previous={row.prevImpressions} />
-            </td>
-            <td className="hidden max-w-xs text-xs text-base-content/70 2xl:table-cell">
+            </TableCell>
+            <TableCell className="hidden max-w-xs text-xs text-muted-foreground 2xl:table-cell">
               {row.drivers.length === 0
                 ? "—"
                 : row.drivers.map((driver) => (
                     <div key={driver.query} className="truncate">
                       {driver.query}{" "}
-                      <span className="text-base-content/50">
+                      <span className="text-muted-foreground/80">
                         (
                         {driver.clicks !== driver.prevClicks ? (
                           <>
@@ -185,124 +197,128 @@ export function ChangesTable({
                       </span>
                     </div>
                   ))}
-            </td>
-          </tr>
+            </TableCell>
+          </TableRow>
         ))}
-      </tbody>
-    </table>
+      </TableBody>
+    </Table>
   );
 }
 
 export function NewQueriesTable({ rows }: { rows: Insights["newQueries"] }) {
   return (
-    <table className="table table-zebra table-sm">
-      <thead>
-        <tr>
-          <th>Query</th>
-          <th>Best page</th>
-          <th>First seen</th>
-          <th className="text-right">Impr.</th>
-          <th className="text-right">Clicks</th>
-          <th className="text-right">Pos.</th>
-        </tr>
-      </thead>
-      <tbody>
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Query</TableHead>
+          <TableHead>Best page</TableHead>
+          <TableHead>First seen</TableHead>
+          <TableHead className="text-right">Impr.</TableHead>
+          <TableHead className="text-right">Clicks</TableHead>
+          <TableHead className="text-right">Pos.</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
         {rows.map((row) => (
-          <tr key={row.query}>
+          <TableRow key={row.query}>
             <QueryCell query={row.query} />
-            <td>
+            <TableCell>
               <PageCell url={row.page} />
-            </td>
-            <td className="whitespace-nowrap">{formatDay(row.firstDate)}</td>
-            <td className="text-right tabular-nums">
+            </TableCell>
+            <TableCell className="whitespace-nowrap">
+              {formatDay(row.firstDate)}
+            </TableCell>
+            <TableCell className="text-right tabular-nums">
               {formatCount(row.impressions)}
-            </td>
-            <td className="text-right tabular-nums">
+            </TableCell>
+            <TableCell className="text-right tabular-nums">
               {formatCount(row.clicks)}
-            </td>
-            <td className="text-right tabular-nums">
+            </TableCell>
+            <TableCell className="text-right tabular-nums">
               {formatPosition(row.position)}
-            </td>
-          </tr>
+            </TableCell>
+          </TableRow>
         ))}
-      </tbody>
-    </table>
+      </TableBody>
+    </Table>
   );
 }
 
 export function NearPageOneTable({ rows }: { rows: Insights["nearPageOne"] }) {
   return (
-    <table className="table table-zebra table-sm">
-      <thead>
-        <tr>
-          <th>Query</th>
-          <th>Best page</th>
-          <th className="text-right">Pos.</th>
-          <th className="text-right">Impr.</th>
-          <th className="text-right">Clicks</th>
-          <th className="text-right">At #3</th>
-        </tr>
-      </thead>
-      <tbody>
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Query</TableHead>
+          <TableHead>Best page</TableHead>
+          <TableHead className="text-right">Pos.</TableHead>
+          <TableHead className="text-right">Impr.</TableHead>
+          <TableHead className="text-right">Clicks</TableHead>
+          <TableHead className="text-right">At #3</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
         {rows.map((row) => (
-          <tr key={row.query}>
+          <TableRow key={row.query}>
             <QueryCell query={row.query} />
-            <td>
+            <TableCell>
               <PageCell url={row.page} />
-            </td>
-            <td className="text-right tabular-nums">
+            </TableCell>
+            <TableCell className="text-right tabular-nums">
               {formatPosition(row.position)}
-            </td>
-            <td className="text-right tabular-nums">
+            </TableCell>
+            <TableCell className="text-right tabular-nums">
               {formatCount(row.impressions)}
-            </td>
-            <td className="text-right tabular-nums">
+            </TableCell>
+            <TableCell className="text-right tabular-nums">
               {formatCount(row.clicks)}
-            </td>
-            <td className="text-right tabular-nums text-success">
+            </TableCell>
+            <TableCell className="text-right tabular-nums text-success">
               +{formatCount(row.potentialClicks)}
-            </td>
-          </tr>
+            </TableCell>
+          </TableRow>
         ))}
-      </tbody>
-    </table>
+      </TableBody>
+    </Table>
   );
 }
 
 export function CtrGapTable({ rows }: { rows: Insights["ctrGaps"] }) {
   return (
-    <table className="table table-zebra table-sm">
-      <thead>
-        <tr>
-          <th>Query</th>
-          <th>Page</th>
-          <th className="text-right">Pos.</th>
-          <th className="text-right">CTR</th>
-          <th className="text-right">Expected</th>
-          <th className="text-right">Click gap</th>
-        </tr>
-      </thead>
-      <tbody>
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Query</TableHead>
+          <TableHead>Page</TableHead>
+          <TableHead className="text-right">Pos.</TableHead>
+          <TableHead className="text-right">CTR</TableHead>
+          <TableHead className="text-right">Expected</TableHead>
+          <TableHead className="text-right">Click gap</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
         {rows.map((row) => (
-          <tr key={`${row.query}::${row.page}`}>
+          <TableRow key={`${row.query}::${row.page}`}>
             <QueryCell query={row.query} />
-            <td>
+            <TableCell>
               <PageCell url={row.page} />
-            </td>
-            <td className="text-right tabular-nums">
+            </TableCell>
+            <TableCell className="text-right tabular-nums">
               {formatPosition(row.position)}
-            </td>
-            <td className="text-right tabular-nums">{formatCtr(row.ctr)}</td>
-            <td className="text-right tabular-nums">
+            </TableCell>
+            <TableCell className="text-right tabular-nums">
+              {formatCtr(row.ctr)}
+            </TableCell>
+            <TableCell className="text-right tabular-nums">
               {formatCtr(row.expectedCtr)}
-            </td>
-            <td className="text-right tabular-nums text-error">
+            </TableCell>
+            <TableCell className="text-right tabular-nums text-destructive">
               {formatCount(row.clickGap)}
-            </td>
-          </tr>
+            </TableCell>
+          </TableRow>
         ))}
-      </tbody>
-    </table>
+      </TableBody>
+    </Table>
   );
 }
 
@@ -312,105 +328,45 @@ export function CannibalizationTable({
   rows: Insights["cannibalization"];
 }) {
   return (
-    <table className="table table-zebra table-sm">
-      <thead>
-        <tr>
-          <th>Query</th>
-          <th className="text-right">Impr.</th>
-          <th>Competing pages (share, position)</th>
-          <th className="text-right">Flips</th>
-        </tr>
-      </thead>
-      <tbody>
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Query</TableHead>
+          <TableHead className="text-right">Impr.</TableHead>
+          <TableHead>Competing pages (share, position)</TableHead>
+          <TableHead className="text-right">Flips</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
         {rows.map((row) => (
-          <tr key={row.query}>
+          <TableRow key={row.query}>
             <QueryCell query={row.query} />
-            <td className="text-right tabular-nums">
+            <TableCell className="text-right tabular-nums">
               {formatCount(row.impressions)}
-            </td>
-            <td>
+            </TableCell>
+            <TableCell>
               {row.pages.map((page) => (
                 <div key={page.page} className="flex items-center gap-2">
                   <PageCell url={page.page} />
-                  <span className="shrink-0 text-xs text-base-content/60">
+                  <span className="shrink-0 text-xs text-muted-foreground">
                     {Math.round(page.share * 100)}%, #
                     {formatPosition(page.position)}
                   </span>
                 </div>
               ))}
-            </td>
-            <td
-              className={`text-right tabular-nums ${row.flips > 0 ? "font-medium text-warning" : ""}`}
+            </TableCell>
+            <TableCell
+              className={cn(
+                "text-right tabular-nums",
+                row.flips > 0 &&
+                  "font-medium text-warning-foreground dark:text-warning",
+              )}
             >
               {row.flips}
-            </td>
-          </tr>
+            </TableCell>
+          </TableRow>
         ))}
-      </tbody>
-    </table>
-  );
-}
-
-function Sparkline({ values }: { values: number[] }) {
-  if (values.length < 2) return null;
-  const maxValue = Math.max(...values, 1);
-  const width = 80;
-  const height = 20;
-  const step = width / (values.length - 1);
-  const points = values
-    .map(
-      (v, i) =>
-        `${(i * step).toFixed(1)},${(height - (v / maxValue) * height).toFixed(1)}`,
-    )
-    .join(" ");
-  return (
-    <svg width={width} height={height} aria-hidden className="text-info">
-      <polyline
-        points={points}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={1.5}
-      />
-    </svg>
-  );
-}
-
-export function NewPagesTable({ rows }: { rows: Insights["newPages"] }) {
-  return (
-    <table className="table table-zebra table-sm">
-      <thead>
-        <tr>
-          <th>Page</th>
-          <th>First impressions</th>
-          <th className="text-right">Impr.</th>
-          <th className="text-right">Clicks</th>
-          <th>Weekly impressions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((row) => (
-          <tr key={row.page}>
-            <td>
-              <PageCell url={row.page} />
-            </td>
-            <td className="whitespace-nowrap">{formatDay(row.firstDate)}</td>
-            <td className="text-right tabular-nums">
-              {formatCount(row.impressions)}
-            </td>
-            <td className="text-right tabular-nums">
-              {formatCount(row.clicks)}
-            </td>
-            <td>
-              <div className="flex items-center gap-2">
-                <Sparkline values={row.weeklyImpressions} />
-                <span className="text-xs text-base-content/50">
-                  {row.weeklyImpressions.length} wk
-                </span>
-              </div>
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+      </TableBody>
+    </Table>
   );
 }

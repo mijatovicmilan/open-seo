@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Pencil, Trash2, X } from "lucide-react";
+import { Pencil, Trash2, X } from "lucide-react";
 import { reverse } from "remeda";
 import { toast } from "sonner";
+import { Button } from "@/client/components/ui/button";
+import { Input } from "@/client/components/ui/input";
 import { SegmentGroup } from "@/client/features/charts/ChoiceMenu";
 import {
   ANNOTATION_STYLES,
@@ -125,7 +127,7 @@ export function NoteEditor({
   return createPortal(
     <form
       ref={ref}
-      className="fixed z-[1000] max-w-[calc(100vw-16px)] space-y-3 rounded-lg border border-base-300 bg-base-100 p-3 shadow-2xl"
+      className="fixed z-[1000] max-w-[calc(100vw-16px)] space-y-3 rounded-lg bg-popover p-3 text-popover-foreground shadow-lg ring-1 ring-foreground/10"
       style={{ left, top, width: POPOVER_WIDTH }}
       onSubmit={(event) => {
         event.preventDefault();
@@ -144,19 +146,20 @@ export function NoteEditor({
         <span className="text-sm font-medium">
           {value.id ? "Edit note" : "Add a note"}
         </span>
-        <button
-          type="button"
-          className="btn btn-ghost btn-xs btn-square"
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          className="text-muted-foreground"
           aria-label="Close"
           onClick={onClose}
         >
           <X className="size-3.5" />
-        </button>
+        </Button>
       </div>
-      <input
+      <Input
         type="date"
         aria-label="Date"
-        className="input input-bordered h-9 w-full text-sm"
+        className="h-9 text-sm"
         value={value.date}
         onChange={(event) =>
           setValue((current) => ({ ...current, date: event.target.value }))
@@ -168,49 +171,38 @@ export function NoteEditor({
         value={value.kind}
         onChange={(kind) => setValue((current) => ({ ...current, kind }))}
       />
-      <input
+      <Input
         autoFocus
         type="text"
         aria-label="What happened"
         placeholder="What happened"
         maxLength={200}
-        className="input input-bordered h-9 w-full text-sm"
+        className="h-9 text-sm"
         value={value.label}
         onChange={(event) => {
           setError(null);
           setValue((current) => ({ ...current, label: event.target.value }));
         }}
       />
-      <input
+      <Input
         type="url"
         aria-label="Link (optional)"
         placeholder="Link (optional)"
-        className="input input-bordered h-9 w-full text-sm"
+        className="h-9 text-sm"
         value={value.url}
         onChange={(event) => {
           setError(null);
           setValue((current) => ({ ...current, url: event.target.value }));
         }}
       />
-      {error ? <p className="text-xs text-error">{error}</p> : null}
+      {error ? <p className="text-xs text-destructive">{error}</p> : null}
       <div className="flex justify-end gap-2">
-        <button
-          type="button"
-          className="btn btn-ghost btn-sm"
-          onClick={onClose}
-        >
+        <Button type="button" variant="ghost" size="sm" onClick={onClose}>
           Cancel
-        </button>
-        <button
-          type="submit"
-          className="btn btn-primary btn-sm"
-          disabled={save.isPending}
-        >
-          {save.isPending ? (
-            <Loader2 className="size-3.5 animate-spin" />
-          ) : null}
+        </Button>
+        <Button type="submit" size="sm" pending={save.isPending}>
           Save
-        </button>
+        </Button>
       </div>
     </form>,
     document.body,
@@ -242,7 +234,7 @@ export function NotesList({
   const listed = reverse(annotations.filter((a) => a.kind !== "first_seen"));
   if (listed.length === 0) return null;
   return (
-    <ul className="divide-y divide-base-300">
+    <ul className="divide-y divide-border">
       {listed.map((note, index) => {
         const kind = note.kind;
         return (
@@ -250,7 +242,7 @@ export function NotesList({
             key={note.id ?? `${kind}-${note.date}-${index}`}
             className="flex items-center gap-3 py-1.5 text-sm"
           >
-            <span className="w-24 shrink-0 text-xs tabular-nums text-base-content/50">
+            <span className="w-24 shrink-0 text-xs tabular-nums text-muted-foreground">
               {formatDay(note.date)}
             </span>
             <span
@@ -258,7 +250,7 @@ export function NotesList({
               style={{ backgroundColor: ANNOTATION_STYLES[kind].color }}
               aria-hidden
             />
-            <span className="hidden w-24 shrink-0 text-xs text-base-content/60 sm:inline">
+            <span className="hidden w-24 shrink-0 text-xs text-muted-foreground sm:inline">
               {ANNOTATION_STYLES[kind].label}
             </span>
             <span
@@ -270,7 +262,7 @@ export function NotesList({
                   href={note.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="link link-hover"
+                  className="underline-offset-4 hover:underline"
                 >
                   {note.label}
                 </a>
@@ -280,9 +272,10 @@ export function NotesList({
             </span>
             {note.id && isManual(kind) ? (
               <span className="flex shrink-0 items-center">
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-xs btn-square text-base-content/50"
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  className="text-muted-foreground"
                   aria-label="Edit note"
                   onClick={(event) => {
                     const rect = event.currentTarget.getBoundingClientRect();
@@ -299,10 +292,11 @@ export function NotesList({
                   }}
                 >
                   <Pencil className="size-3.5" />
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-xs btn-square text-base-content/50 hover:text-error"
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  className="text-muted-foreground hover:text-destructive"
                   aria-label="Delete note"
                   disabled={remove.isPending}
                   onClick={() => {
@@ -310,10 +304,10 @@ export function NotesList({
                   }}
                 >
                   <Trash2 className="size-3.5" />
-                </button>
+                </Button>
               </span>
             ) : (
-              <span className="w-16 shrink-0 text-right text-xs text-base-content/40">
+              <span className="w-16 shrink-0 text-right text-xs text-muted-foreground">
                 Outreach
               </span>
             )}

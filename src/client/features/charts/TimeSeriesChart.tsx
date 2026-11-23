@@ -89,12 +89,15 @@ export type ChartMetric = {
 export type ChartSeries = {
   key: string;
   metric: ChartMetric;
-  /** A theme colour, e.g. "var(--color-primary)". */
+  /** A theme colour, e.g. "var(--chart-1)". */
   color: string;
 };
 
-const NOTE = "color-mix(in oklab, var(--color-base-content) 55%, transparent)";
-const AXIS = "color-mix(in oklab, var(--color-base-content) 55%, transparent)";
+// Neutral greys from the theme: markers and axis labels from the text
+// colour, the grid from the border colour.
+const NOTE = "color-mix(in oklab, var(--foreground) 55%, transparent)";
+const AXIS = "var(--muted-foreground)";
+const GRID = "var(--border)";
 const faint = (color: string) =>
   `color-mix(in oklab, ${color} 35%, transparent)`;
 /** Fresh days: lighter than the line, but clear in both themes. */
@@ -183,7 +186,7 @@ function NoteMarker({
         cy={cy}
         r={count > 1 ? 6 : 3.5}
         fill={NOTE}
-        stroke="var(--color-base-100)"
+        stroke="var(--card)"
         strokeWidth={1.5}
       />
       {count > 1 ? (
@@ -193,7 +196,7 @@ function NoteMarker({
           textAnchor="middle"
           fontSize={8}
           fontWeight={600}
-          fill="var(--color-base-100)"
+          fill="var(--card)"
         >
           {count}
         </text>
@@ -368,8 +371,7 @@ export function TimeSeriesChart({
     <>
       <CartesianGrid
         vertical={false}
-        stroke="currentColor"
-        strokeOpacity={0.08}
+        stroke={GRID}
         yAxisId={baseAxis?.series.key}
       />
       <XAxis
@@ -408,7 +410,7 @@ export function TimeSeriesChart({
             // Mixed toward the text colour so light tones stay readable.
             fill:
               axes.length > 1
-                ? `color-mix(in oklab, ${axis.series.color} 70%, var(--color-base-content))`
+                ? `color-mix(in oklab, ${axis.series.color} 70%, var(--foreground))`
                 : AXIS,
           }}
           tickLine={false}
@@ -427,7 +429,7 @@ export function TimeSeriesChart({
         <ReferenceLine
           x={shownRow.key}
           yAxisId={baseAxis?.series.key}
-          stroke={shownNotes.length ? NOTE : "currentColor"}
+          stroke={shownNotes.length ? NOTE : "var(--foreground)"}
           strokeOpacity={shownNotes.length ? 1 : 0.2}
           strokeDasharray={shownNotes.length ? "3 3" : undefined}
           ifOverflow="visible"
@@ -490,7 +492,7 @@ export function TimeSeriesChart({
       aria-label="Chart. Arrow keys move between days; Escape closes the details."
       onKeyDown={onKeyDown}
       // recharts focuses its surface on click; the app shows no ring there.
-      className="relative w-full min-w-0 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/50 [&_.recharts-wrapper_*:focus]:outline-none"
+      className="relative w-full min-w-0 rounded-md outline-none focus-visible:ring-3 focus-visible:ring-ring/50 [&_.recharts-wrapper_*:focus]:outline-none"
       style={{ height }}
     >
       {width > 0 ? (

@@ -1,6 +1,10 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { cn } from "cn";
+import { Button } from "@/client/components/ui/button";
+import { Input } from "@/client/components/ui/input";
+import { Textarea } from "@/client/components/ui/textarea";
 import { outreachQueryKey } from "@/client/features/outreach/outreachUi";
 import { outreachScheduleKey } from "@/client/features/outreach/OutreachSchedule";
 import { ScheduleSection } from "@/client/features/outreach/OutreachScheduleSettings";
@@ -95,9 +99,9 @@ export function OutreachSettingsForm({
     placeholder?: string,
   ) => (
     <label className="flex w-full flex-col">
-      <span className="label-text mb-1 text-sm font-medium">{label}</span>
-      <input
-        className="input input-sm input-bordered w-full"
+      <span className="mb-1 text-sm font-medium">{label}</span>
+      <Input
+        className="h-9"
         value={form[key]}
         placeholder={placeholder}
         onChange={(event) =>
@@ -105,16 +109,16 @@ export function OutreachSettingsForm({
         }
       />
       {hint ? (
-        <span className="mt-1 text-xs text-base-content/60">{hint}</span>
+        <span className="mt-1 text-xs text-muted-foreground">{hint}</span>
       ) : null}
     </label>
   );
   const number = (key: NumberKey, label: string) => (
     <label className="flex flex-col">
-      <span className="label-text mb-1 text-sm font-medium">{label}</span>
-      <input
+      <span className="mb-1 text-sm font-medium">{label}</span>
+      <Input
         type="number"
-        className="input input-sm input-bordered w-full"
+        className="h-9"
         value={form[key]}
         onChange={(event) =>
           setForm((current) => ({
@@ -128,19 +132,22 @@ export function OutreachSettingsForm({
 
   return (
     <div className="max-w-3xl space-y-4">
-      <div className="flex items-start gap-2 rounded-lg border border-base-300 bg-base-200/50 px-4 py-3 text-sm">
+      <div className="flex items-start gap-2 rounded-lg border border-border bg-muted px-4 py-3 text-sm">
         <span
-          className={`mt-1.5 size-1.5 shrink-0 rounded-full ${settings.mailReady ? "bg-success" : "bg-base-content/30"}`}
+          className={cn(
+            "mt-1.5 size-1.5 shrink-0 rounded-full",
+            settings.mailReady ? "bg-success" : "bg-muted-foreground/40",
+          )}
           aria-hidden
         />
-        <span className="text-base-content/80">
+        <span className="text-foreground/80">
           {settings.mailReady
             ? "Sending from the app is ready."
             : `Sending from the app is off. ${settings.mailProblem ?? ""} Prospects, drafts and approvals still work.`}
         </span>
       </div>
 
-      <section className="space-y-3 rounded-xl border border-base-300 bg-base-100 p-4">
+      <section className="space-y-3 rounded-xl border border-border bg-card p-4">
         <h3 className="font-semibold">Site</h3>
         {text(
           "siteUrl",
@@ -156,7 +163,7 @@ export function OutreachSettingsForm({
         )}
       </section>
 
-      <section className="space-y-3 rounded-xl border border-base-300 bg-base-100 p-4">
+      <section className="space-y-3 rounded-xl border border-border bg-card p-4">
         <h3 className="font-semibold">Sender</h3>
         {text(
           "senderName",
@@ -171,14 +178,14 @@ export function OutreachSettingsForm({
           "outreach@example.com",
         )}
         <label className="flex w-full flex-col">
-          <span className="label-text mb-1 text-sm font-medium">Signature</span>
-          <textarea
-            className="textarea textarea-bordered h-24 w-full text-sm"
+          <span className="mb-1 text-sm font-medium">Signature</span>
+          <Textarea
+            className="h-24 field-sizing-fixed text-sm"
             value={form.signature}
             placeholder={"Alex\nExample\nhttps://example.com"}
             onChange={(event) => set("signature", event.target.value)}
           />
-          <span className="mt-1 text-xs text-base-content/60">
+          <span className="mt-1 text-xs text-muted-foreground">
             Pen name, brand and site, one per line. Added under every email.
           </span>
         </label>
@@ -196,7 +203,7 @@ export function OutreachSettingsForm({
         )}
       </section>
 
-      <section className="space-y-3 rounded-xl border border-base-300 bg-base-100 p-4">
+      <section className="space-y-3 rounded-xl border border-border bg-card p-4">
         <h3 className="font-semibold">Pace</h3>
         {text(
           "timeZone",
@@ -211,7 +218,7 @@ export function OutreachSettingsForm({
           {number("weeklyMax", "Per week, max")}
           {number("followUpDays", "Follow up after (days)")}
         </div>
-        <p className="text-xs text-base-content/60">
+        <p className="text-xs text-muted-foreground">
           A new mailbox: 2 to 3 a working day and 10 to 20 a week, counting
           first emails, follow-ups and replies.
         </p>
@@ -224,19 +231,13 @@ export function OutreachSettingsForm({
       />
 
       <div className="flex flex-wrap gap-2">
-        <button
-          className="btn btn-primary btn-sm"
-          disabled={saving}
-          onClick={() => void save()}
-        >
-          {saving ? (
-            <span className="loading loading-spinner loading-xs" />
-          ) : null}
+        <Button pending={saving} onClick={() => void save()}>
           Save settings
-        </button>
-        <button
-          className="btn btn-ghost btn-sm"
-          disabled={testing || !settings.mailReady}
+        </Button>
+        <Button
+          variant="ghost"
+          pending={testing}
+          disabled={!settings.mailReady}
           title={
             settings.mailReady
               ? "Log in to the SMTP server and out again; sends nothing."
@@ -244,11 +245,8 @@ export function OutreachSettingsForm({
           }
           onClick={() => void testConnection()}
         >
-          {testing ? (
-            <span className="loading loading-spinner loading-xs" />
-          ) : null}
           Test mail login
-        </button>
+        </Button>
       </div>
     </div>
   );

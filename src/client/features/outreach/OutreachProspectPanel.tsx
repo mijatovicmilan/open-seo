@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- the prospect slide-over and its sections (fork feature) */
 import { LinkTrafficSection } from "@/client/features/posthog/LinkTraffic";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   CheckCircle2,
   ExternalLink,
@@ -11,6 +11,17 @@ import {
   Undo2,
   X,
 } from "lucide-react";
+import { Alert } from "@/client/components/ui/alert";
+import { Badge } from "@/client/components/ui/badge";
+import { Button } from "@/client/components/ui/button";
+import { Input } from "@/client/components/ui/input";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetTitle,
+} from "@/client/components/ui/sheet";
+import { Textarea } from "@/client/components/ui/textarea";
 import {
   Favicon,
   formatNumber,
@@ -59,53 +70,54 @@ export function OutreachProspectPanel({
   onClose: () => void;
 }) {
   const angle = angles.find((item) => item.key === prospect.angle);
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !event.defaultPrevented) onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  // A modal sheet over the page: Escape and a click on the backdrop close it,
+  // and focus stays inside while it is open.
   return (
-    <div
-      className="fixed inset-0 z-50 flex justify-end bg-black/50"
-      onClick={onClose}
+    <Sheet
+      open
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
     >
-      <aside
-        className="flex h-full w-full max-w-2xl flex-col overflow-hidden border-l border-base-300 bg-base-100 shadow-xl"
-        onClick={(event) => event.stopPropagation()}
-        aria-label={`Prospect ${prospect.number}`}
+      <SheetContent
+        side="right"
+        showCloseButton={false}
+        className="gap-0 overflow-hidden bg-card p-0 data-[side=right]:w-full data-[side=right]:sm:max-w-2xl"
       >
-        <header className="flex items-start gap-3 border-b border-base-300 px-5 py-4">
+        <header className="flex items-start gap-3 border-b border-border px-5 py-4">
           <div className="min-w-0 flex-1 space-y-1">
             <div className="flex items-center gap-2">
               <Favicon src={favicon} domain={prospect.domain} />
-              <h2 className="truncate text-lg font-semibold">
-                <span className="text-base-content/50">#{prospect.number}</span>{" "}
+              <SheetTitle className="truncate text-lg font-semibold">
+                <span className="text-muted-foreground">
+                  #{prospect.number}
+                </span>{" "}
                 {prospect.prospect}
-              </h2>
+              </SheetTitle>
             </div>
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+            <SheetDescription className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
               <StatusBadge prospect={prospect} />
-              <span className="text-base-content/40">·</span>
+              <span className="text-muted-foreground/70">·</span>
               <span
                 className={
                   prospect.action.who === "owner"
                     ? "font-medium text-primary"
-                    : "text-base-content/70"
+                    : "text-muted-foreground"
                 }
               >
                 {prospect.nextStep}
               </span>
-            </div>
+            </SheetDescription>
           </div>
-          <button
-            className="btn btn-ghost btn-sm btn-square"
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
             onClick={onClose}
             aria-label="Close"
           >
-            <X className="size-4" />
-          </button>
+            <X />
+          </Button>
         </header>
 
         <div className="flex-1 space-y-6 overflow-y-auto px-5 py-4">
@@ -117,14 +129,14 @@ export function OutreachProspectPanel({
           />
 
           <section className="space-y-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-base-content/60">
+            <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
               Prospect
             </h3>
-            <dl className="grid grid-cols-[6rem_1fr] sm:grid-cols-[8rem_1fr] gap-x-3 gap-y-1.5 text-sm">
-              <dt className="text-base-content/60">Their page</dt>
+            <dl className="grid grid-cols-[6rem_1fr] gap-x-3 gap-y-1.5 text-sm sm:grid-cols-[8rem_1fr]">
+              <dt className="text-muted-foreground">Their page</dt>
               <dd className="min-w-0">
                 <a
-                  className="link inline-flex max-w-full items-center gap-1"
+                  className="inline-flex max-w-full items-center gap-1 text-primary underline-offset-4 hover:underline"
                   href={prospect.theirPage}
                   target="_blank"
                   rel="noreferrer noopener"
@@ -133,11 +145,11 @@ export function OutreachProspectPanel({
                   <ExternalLink className="size-3 shrink-0" />
                 </a>
               </dd>
-              <dt className="text-base-content/60">Our page</dt>
+              <dt className="text-muted-foreground">Our page</dt>
               <dd className="break-words">
                 {prospect.ourPageUrl ? (
                   <a
-                    className="link"
+                    className="text-primary underline-offset-4 hover:underline"
                     href={prospect.ourPageUrl}
                     target="_blank"
                     rel="noreferrer noopener"
@@ -148,13 +160,13 @@ export function OutreachProspectPanel({
                   prospect.ourPage
                 )}
               </dd>
-              <dt className="text-base-content/60">Contact</dt>
+              <dt className="text-muted-foreground">Contact</dt>
               <dd className="min-w-0">
                 {prospect.contact.kind === "none" ? (
                   "None found"
                 ) : prospect.contact.kind === "form" ? (
                   <a
-                    className="link link-hover block truncate"
+                    className="block truncate text-primary underline-offset-4 hover:underline"
                     href={prospect.contact.value}
                     target="_blank"
                     rel="noreferrer noopener"
@@ -175,16 +187,16 @@ export function OutreachProspectPanel({
                   </span>
                 )}
                 {"note" in prospect.contact && prospect.contact.note ? (
-                  <span className="block text-base-content/60">
+                  <span className="block text-muted-foreground">
                     {prospect.contact.note}
                   </span>
                 ) : null}
               </dd>
-              <dt className="text-base-content/60">Angle</dt>
+              <dt className="text-muted-foreground">Angle</dt>
               <dd>
                 {angle ? angle.label : (prospect.angle ?? "Not set")}
                 {prospect.angleNote ? (
-                  <span className="text-base-content/60">
+                  <span className="text-muted-foreground">
                     {" "}
                     — {prospect.angleNote}
                   </span>
@@ -192,21 +204,21 @@ export function OutreachProspectPanel({
               </dd>
               {prospect.gain ? (
                 <>
-                  <dt className="text-base-content/60">Gain</dt>
+                  <dt className="text-muted-foreground">Gain</dt>
                   <dd>{prospect.gain}</dd>
                 </>
               ) : null}
               {prospect.notes ? (
                 <>
-                  <dt className="text-base-content/60">Notes</dt>
+                  <dt className="text-muted-foreground">Notes</dt>
                   <dd className="whitespace-pre-wrap">{prospect.notes}</dd>
                 </>
               ) : null}
               {prospect.replySummary ? (
                 <>
-                  <dt className="text-base-content/60">Latest reply</dt>
+                  <dt className="text-muted-foreground">Latest reply</dt>
                   <dd>
-                    <span className="text-base-content/60">
+                    <span className="text-muted-foreground">
                       {prospect.replyAt}:{" "}
                     </span>
                     {prospect.replySummary}
@@ -215,7 +227,7 @@ export function OutreachProspectPanel({
               ) : null}
               {prospect.closedReason ? (
                 <>
-                  <dt className="text-base-content/60">Closed</dt>
+                  <dt className="text-muted-foreground">Closed</dt>
                   <dd>{prospect.closedReason}</dd>
                 </>
               ) : null}
@@ -227,14 +239,14 @@ export function OutreachProspectPanel({
           <MovesSection projectId={projectId} prospect={prospect} />
 
           <section className="space-y-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-base-content/60">
+            <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
               History
             </h3>
             <OutreachTimeline history={prospect.history} />
           </section>
         </div>
-      </aside>
-    </div>
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -293,7 +305,7 @@ function EmailSection({
 
   if (!prospect.subject && !prospect.body) {
     return (
-      <section className="rounded-box border border-dashed border-base-300 p-4 text-sm text-base-content/70">
+      <section className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
         No email drafted yet. The agent drafts it with draft_outreach_email.
       </section>
     );
@@ -311,7 +323,7 @@ function EmailSection({
   return (
     <section className="space-y-3">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-base-content/60">
+        <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
           {!pending
             ? `Last sent (${prospect.messageSentAt})`
             : prospect.approval?.state === "valid"
@@ -319,28 +331,30 @@ function EmailSection({
               : `${prospect.messageKind ?? "first"} email to approve`}
         </h3>
         {pending && !editing ? (
-          <button
-            className="btn btn-ghost btn-xs"
+          <Button
+            type="button"
+            variant="ghost"
+            size="xs"
             onClick={() => {
               setSubject(prospect.subject);
               setBody(prospect.body);
               setEditing(true);
             }}
           >
-            <Pencil className="size-3" /> Edit
-          </button>
+            <Pencil data-icon="inline-start" /> Edit
+          </Button>
         ) : null}
       </div>
 
-      <div className="rounded-box border border-base-300 bg-base-200/40 p-4 text-sm">
-        <div className="mb-2 space-y-0.5 text-base-content/70">
+      <div className="rounded-lg border border-border bg-muted p-4 text-sm">
+        <div className="mb-2 space-y-0.5 text-muted-foreground">
           <div>
-            <span className="text-base-content/50">From:</span>{" "}
+            <span className="text-muted-foreground/80">From:</span>{" "}
             {settings.senderName || "—"} &lt;{settings.senderEmail || "not set"}
             &gt;
           </div>
           <div className="break-all">
-            <span className="text-base-content/50">
+            <span className="text-muted-foreground/80">
               {prospect.contact.kind === "form" ? "Form:" : "To:"}
             </span>{" "}
             {prospect.contact.value || "—"}
@@ -348,25 +362,26 @@ function EmailSection({
         </div>
         {editing ? (
           <div className="space-y-2">
-            <input
-              className="input input-sm input-bordered w-full"
+            <Input
+              className="h-9"
               value={subject}
               onChange={(event) => setSubject(event.target.value)}
               aria-label="Subject"
             />
-            <textarea
-              className="textarea textarea-bordered h-72 w-full font-mono text-sm"
+            <Textarea
+              className="h-72 field-sizing-fixed font-mono text-sm"
               value={body}
               onChange={(event) => setBody(event.target.value)}
               aria-label="Body"
             />
-            <p className="text-xs text-base-content/60">
+            <p className="text-xs text-muted-foreground">
               The signature is added automatically. An approved email stays
               approved with your edit.
             </p>
             <div className="flex gap-2">
-              <button
-                className="btn btn-primary btn-sm"
+              <Button
+                type="button"
+                size="sm"
                 disabled={busy}
                 onClick={() =>
                   edit.mutate(undefined, {
@@ -375,19 +390,21 @@ function EmailSection({
                 }
               >
                 Save
-              </button>
-              <button
-                className="btn btn-ghost btn-sm"
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
                 onClick={() => setEditing(false)}
               >
                 Cancel
-              </button>
+              </Button>
             </div>
           </div>
         ) : (
           <>
             <div className="mb-3 font-semibold">{prospect.subject}</div>
-            <pre className="whitespace-pre-wrap break-words font-sans leading-relaxed">
+            <pre className="font-sans leading-relaxed break-words whitespace-pre-wrap">
               {prospect.body}
             </pre>
           </>
@@ -395,31 +412,31 @@ function EmailSection({
       </div>
 
       {prospect.problems.length ? (
-        <div className="alert alert-warning py-2 text-sm">
-          {prospect.problems.join(" ")}
-        </div>
+        <Alert variant="warning">{prospect.problems.join(" ")}</Alert>
       ) : null}
       {prospect.approval && prospect.approval.state !== "valid" ? (
-        <div className="alert alert-warning py-2 text-sm">
+        <Alert variant="warning">
           The email changed after approval. Approve it again.
-        </div>
+        </Alert>
       ) : null}
 
       {pending && !editing ? (
         <div className="flex flex-wrap items-center gap-2">
           {prospect.canApprove ? (
-            <button
-              className="btn btn-primary btn-sm"
+            <Button
+              type="button"
+              size="sm"
               disabled={busy}
               onClick={() => approve.mutate(undefined)}
             >
-              <CheckCircle2 className="size-4" /> Approve this exact email
-            </button>
+              <CheckCircle2 data-icon="inline-start" /> Approve this exact email
+            </Button>
           ) : null}
           {prospect.status === "approved" ? (
             channel === "form" ? (
-              <button
-                className="btn btn-primary btn-sm"
+              <Button
+                type="button"
+                size="sm"
                 disabled={busy || Boolean(blocker)}
                 onClick={() => {
                   if (
@@ -431,12 +448,14 @@ function EmailSection({
                   }
                 }}
               >
-                <Send className="size-4" /> Mark sent via form
-              </button>
+                <Send data-icon="inline-start" /> Mark sent via form
+              </Button>
             ) : (
-              <button
-                className="btn btn-primary btn-sm"
+              <Button
+                type="button"
+                size="sm"
                 disabled={busy || Boolean(blocker) || mailOff}
+                pending={send.isPending}
                 onClick={() => {
                   if (
                     window.confirm(
@@ -447,26 +466,24 @@ function EmailSection({
                   }
                 }}
               >
-                {send.isPending ? (
-                  <span className="loading loading-spinner loading-xs" />
-                ) : (
-                  <Send className="size-4" />
-                )}
+                {send.isPending ? null : <Send data-icon="inline-start" />}
                 Send now
-              </button>
+              </Button>
             )
           ) : null}
           {prospect.canUndo ? (
-            <button
-              className="btn btn-ghost btn-sm"
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
               disabled={busy}
               onClick={() => undo.mutate(undefined)}
             >
-              <Undo2 className="size-4" /> Undo approval
-            </button>
+              <Undo2 data-icon="inline-start" /> Undo approval
+            </Button>
           ) : null}
           {prospect.status === "approved" && (blocker || mailOff) ? (
-            <span className="text-sm text-base-content/70">
+            <span className="text-sm text-muted-foreground">
               {blocker ??
                 `Sending from the app is off: ${settings.mailProblem}`}
             </span>
@@ -491,8 +508,8 @@ function ScheduleLine({
   const schedule = prospect.schedule;
   if (prospect.status !== "approved" || !schedule) return null;
   return (
-    <p className="flex items-start gap-2 text-sm text-base-content/70">
-      <CalendarClock className="mt-0.5 size-4 shrink-0 text-base-content/50" />
+    <p className="flex items-start gap-2 text-sm text-muted-foreground">
+      <CalendarClock className="mt-0.5 size-4 shrink-0" />
       <span>
         {schedule.at
           ? `Scheduled: ${bothTimes(schedule.at, settings.scheduleTimeZone)}${settings.schedulePaused ? " (sending is paused)" : ""}.`
@@ -506,12 +523,12 @@ function ScoreSection({ prospect }: { prospect: OutreachProspect }) {
   return (
     <section className="space-y-2">
       <div className="flex items-center gap-2">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-base-content/60">
+        <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
           Score
         </h3>
         <ScorePill prospect={prospect} />
         {prospect.score?.band ? (
-          <span className="text-sm text-base-content/70">
+          <span className="text-sm text-muted-foreground">
             {prospect.score.band}
           </span>
         ) : null}
@@ -523,21 +540,21 @@ function ScoreSection({ prospect }: { prospect: OutreachProspect }) {
               key={part.key}
               className="grid grid-cols-[1fr_auto] gap-x-2 sm:grid-cols-[9rem_3rem_1fr]"
             >
-              <span className="text-base-content/70">{part.label}</span>
+              <span className="text-muted-foreground">{part.label}</span>
               <span className="tabular-nums">
                 {part.value ?? "?"}/{part.max}
               </span>
-              <span className="col-span-2 text-xs text-base-content/60 sm:col-span-1 sm:text-sm">
+              <span className="col-span-2 text-xs text-muted-foreground sm:col-span-1 sm:text-sm">
                 {part.reason}
               </span>
             </li>
           ))}
         </ul>
       ) : (
-        <p className="text-sm text-base-content/60">Not scored yet.</p>
+        <p className="text-sm text-muted-foreground">Not scored yet.</p>
       )}
       {prospect.metrics && !prospect.score ? (
-        <p className="text-sm text-base-content/70">
+        <p className="text-sm text-muted-foreground">
           Authority {formatNumber(prospect.metrics.authority)} · traffic{" "}
           {formatNumber(prospect.metrics.traffic)}
           {prospect.metrics.trafficLocation
@@ -568,13 +585,13 @@ function LinkSection({
   if (!contacted) return null;
   return (
     <section className="space-y-2">
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-base-content/60">
+      <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
         Link
       </h3>
       <div className="flex flex-wrap items-center gap-3 text-sm">
         {prospect.linkUrl ? (
           <a
-            className="link break-all"
+            className="break-all text-primary underline-offset-4 hover:underline"
             href={prospect.linkUrl}
             target="_blank"
             rel="noreferrer noopener"
@@ -582,31 +599,29 @@ function LinkSection({
             {prospect.linkUrl}
           </a>
         ) : (
-          <span className="text-base-content/60">No link found yet.</span>
+          <span className="text-muted-foreground">No link found yet.</span>
         )}
         {prospect.rel ? (
-          <span className="badge badge-xs border-0 bg-base-300 text-base-content/70">
+          <Badge variant="secondary" size="sm">
             {prospect.rel}
-          </span>
+          </Badge>
         ) : null}
         {prospect.linkLost ? (
-          <span className="text-xs text-error">Lost</span>
+          <span className="text-xs text-destructive">Lost</span>
         ) : null}
-        <span className="text-base-content/60">
+        <span className="text-muted-foreground">
           Checked {prospect.linkCheckedAt || "never"}
         </span>
-        <button
-          className="btn btn-ghost btn-xs"
-          disabled={check.isPending}
+        <Button
+          type="button"
+          variant="ghost"
+          size="xs"
+          pending={check.isPending}
           onClick={() => check.mutate(undefined)}
         >
-          {check.isPending ? (
-            <span className="loading loading-spinner loading-xs" />
-          ) : (
-            <Link2 className="size-3" />
-          )}
+          {check.isPending ? null : <Link2 data-icon="inline-start" />}
           Check now
-        </button>
+        </Button>
       </div>
       {/* PostHog visits and signups from this link. */}
       <LinkTrafficSection projectId={projectId} number={prospect.number} />
@@ -631,14 +646,16 @@ function MovesSection({
   if (!prospect.statusMoves.length) return null;
   return (
     <section className="space-y-2">
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-base-content/60">
+      <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
         Status
       </h3>
       <div className="flex flex-wrap gap-2">
         {prospect.statusMoves.map((item) => (
-          <button
+          <Button
             key={item}
-            className="btn btn-ghost btn-sm"
+            type="button"
+            variant="ghost"
+            size="sm"
             disabled={move.isPending}
             onClick={() => {
               if (item === "drop") {
@@ -658,7 +675,7 @@ function MovesSection({
             }}
           >
             {OUTREACH_STATUS_MOVE_LABELS[item]}
-          </button>
+          </Button>
         ))}
       </div>
     </section>

@@ -2,6 +2,15 @@ import * as React from "react";
 import { sort } from "remeda";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { ArrowDown, ArrowUp } from "lucide-react";
+import { Alert } from "@/client/components/ui/alert";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/client/components/ui/table";
 import {
   formatCount,
   formatCtr,
@@ -138,15 +147,13 @@ export function SearchSignupsSection({
   });
   if (error) {
     return (
-      <div role="alert" className="alert alert-warning text-sm">
-        Visits and signups from PostHog: {error}
-      </div>
+      <Alert variant="warning">Visits and signups from PostHog: {error}</Alert>
     );
   }
   if (!data) return null;
   if (data.unsupportedFilter) {
     return (
-      <p className="text-xs text-base-content/50">
+      <p className="text-xs text-muted-foreground">
         Visits and signups from PostHog can't be split by{" "}
         {data.unsupportedFilter}; clear that filter to see them.
       </p>
@@ -171,12 +178,12 @@ export function SearchSignupsSection({
       count={rows.length}
       empty="No page had Search Console clicks or Google visits in this period."
     >
-      <table className="table table-zebra table-sm">
-        <thead>
-          <tr>
-            <th>Page</th>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Page</TableHead>
             {COLUMNS.map((column) => (
-              <th
+              <TableHead
                 key={column.key}
                 className="text-right"
                 title={column.title}
@@ -190,7 +197,7 @@ export function SearchSignupsSection({
               >
                 <button
                   type="button"
-                  className="inline-flex items-center gap-0.5 whitespace-nowrap hover:text-base-content"
+                  className="inline-flex items-center gap-0.5 rounded-sm whitespace-nowrap outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
                   onClick={() =>
                     setOrder((current) => ({
                       key: column.key,
@@ -207,41 +214,41 @@ export function SearchSignupsSection({
                     )
                   ) : null}
                 </button>
-              </th>
+              </TableHead>
             ))}
-          </tr>
-        </thead>
-        <tbody>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {rows.map((row) => (
-            <tr key={row.page}>
-              <td>
+            <TableRow key={row.page}>
+              <TableCell>
                 <PageCell url={row.page} />
-              </td>
-              <td className="text-right tabular-nums">
+              </TableCell>
+              <TableCell className="text-right tabular-nums">
                 {formatCount(row.clicks)}
-              </td>
-              <td className="text-right tabular-nums">
+              </TableCell>
+              <TableCell className="text-right tabular-nums">
                 {row.position === null ? "—" : formatPosition(row.position)}
-              </td>
-              <td className="text-right tabular-nums">
+              </TableCell>
+              <TableCell className="text-right tabular-nums">
                 {formatCount(row.visits)}
-              </td>
-              <td className="text-right tabular-nums">
+              </TableCell>
+              <TableCell className="text-right tabular-nums">
                 {row.visitsPerClick === null
                   ? "—"
                   : row.visitsPerClick.toFixed(2)}
-              </td>
-              <td className="text-right tabular-nums">
+              </TableCell>
+              <TableCell className="text-right tabular-nums">
                 {formatCount(row.signups)}
-              </td>
-              <td className="text-right tabular-nums">
+              </TableCell>
+              <TableCell className="text-right tabular-nums">
                 {row.signupRate === null ? "—" : formatCtr(row.signupRate)}
-              </td>
-            </tr>
+              </TableCell>
+            </TableRow>
           ))}
-        </tbody>
-      </table>
-      <p className="border-t border-base-300 px-4 py-2 text-xs text-base-content/50">
+        </TableBody>
+      </Table>
+      <p className="border-t border-border px-4 py-2 text-xs text-muted-foreground">
         Visits are PostHog sessions from Google organic search, by landing page,
         in days of {data.source.timeZone} (Search Console uses Pacific time). On
         cookieless sites visits are estimates.

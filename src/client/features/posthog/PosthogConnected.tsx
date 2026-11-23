@@ -1,5 +1,9 @@
 import * as React from "react";
-import { KeyRound, Loader2 } from "lucide-react";
+import { KeyRound } from "lucide-react";
+import { ConfirmDialog } from "@/client/components/ConfirmDialog";
+import { Button } from "@/client/components/ui/button";
+import { Input } from "@/client/components/ui/input";
+import { Label } from "@/client/components/ui/label";
 import {
   connectPosthog,
   disconnectPosthog,
@@ -27,6 +31,7 @@ export function ConnectedPosthog({
   const [replacing, setReplacing] = React.useState(false);
   const [confirming, setConfirming] = React.useState(false);
   const [newKey, setNewKey] = React.useState("");
+  const newKeyId = React.useId();
   const posthogProjectId = source.posthogProjectId ?? "";
   const saveEvents = useSourceMutation(
     (events: string[]) =>
@@ -60,24 +65,24 @@ export function ConnectedPosthog({
 
   return (
     <div className="space-y-5">
-      <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[auto_1fr]">
-        <dt className="text-base-content/60">PostHog project</dt>
+      <dl className="grid min-w-0 gap-x-6 gap-y-2 text-sm sm:grid-cols-[auto_1fr]">
+        <dt className="text-muted-foreground">PostHog project</dt>
         <dd className="tabular-nums">
           {posthogProjectId}
           {source.posthogTimeZone ? (
-            <span className="text-base-content/60">
+            <span className="text-muted-foreground">
               {" "}
               · days in {source.posthogTimeZone}
             </span>
           ) : null}
         </dd>
-        <dt className="text-base-content/60">API key</dt>
+        <dt className="text-muted-foreground">API key</dt>
         <dd className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
           {key ? (
             <>
-              <KeyRound className="size-3.5 text-base-content/50" />
+              <KeyRound className="size-3.5 text-muted-foreground" />
               <span className="font-mono">{key.hint}</span>
-              <span className="text-base-content/60">
+              <span className="text-muted-foreground">
                 {new URL(key.host).host}
                 {key.kind === "env"
                   ? " · from the server's .env"
@@ -87,7 +92,7 @@ export function ConnectedPosthog({
               </span>
             </>
           ) : (
-            <span className="text-error">
+            <span className="text-destructive">
               No key: the stored key is gone or can't be decrypted.
             </span>
           )}
@@ -95,66 +100,64 @@ export function ConnectedPosthog({
       </dl>
 
       {source.canManage ? (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-1">
           {key?.kind === "env" ? (
-            <button
+            <Button
               type="button"
-              className="btn btn-sm"
-              disabled={importEnv.isPending}
+              variant="outline"
+              size="sm"
+              pending={importEnv.isPending}
               onClick={() => importEnv.mutate(undefined)}
             >
-              {importEnv.isPending ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : null}
               Store this key encrypted
-            </button>
+            </Button>
           ) : null}
           {key?.kind === "stored" || !key ? (
-            <button
+            <Button
               type="button"
-              className="btn btn-sm"
+              variant="outline"
+              size="sm"
+              aria-expanded={replacing}
               onClick={() => setReplacing((value) => !value)}
             >
               Replace key
-            </button>
+            </Button>
           ) : null}
-          <button
+          <Button
             type="button"
-            className="btn btn-ghost btn-sm text-error"
+            variant="destructive"
+            size="sm"
             disabled={disconnect.isPending}
-            onClick={() =>
-              confirming ? disconnect.mutate(undefined) : setConfirming(true)
-            }
+            onClick={() => setConfirming(true)}
           >
-            {disconnect.isPending ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : null}
-            {confirming ? "Confirm disconnect" : "Disconnect"}
-          </button>
-          {confirming ? (
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm"
-              onClick={() => setConfirming(false)}
-            >
-              Cancel
-            </button>
-          ) : null}
+            Disconnect
+          </Button>
         </div>
       ) : null}
       {confirming ? (
-        <p className="text-sm text-base-content/70">
+        <ConfirmDialog
+          title="Disconnect PostHog?"
+          confirmLabel="Disconnect"
+          destructive
+          pending={disconnect.isPending}
+          onClose={() => setConfirming(false)}
+          onConfirm={() =>
+            disconnect.mutate(undefined, {
+              onSettled: () => setConfirming(false),
+            })
+          }
+        >
           This project goes back to Google Analytics. The key is deleted when no
           other project uses it; the PostHog project ID and key events are kept
           for a later reconnect.
-        </p>
+        </ConfirmDialog>
       ) : null}
       <MutationError mutation={importEnv} />
       <MutationError mutation={disconnect} />
 
       {replacing ? (
         <form
-          className="space-y-2 rounded-lg border border-base-300 p-3"
+          className="space-y-2 rounded-lg border border-border p-3"
           onSubmit={(event) => {
             event.preventDefault();
             replace.mutate(newKey, {
@@ -167,34 +170,33 @@ export function ConnectedPosthog({
             });
           }}
         >
-          <label className="block space-y-1">
-            <span className="text-sm font-medium">New personal API key</span>
-            <input
+          <div className="space-y-1.5">
+            <Label htmlFor={newKeyId}>New personal API key</Label>
+            <Input
+              id={newKeyId}
               type="password"
-              className="input input-bordered w-full font-mono"
+              className="h-9 font-mono"
               autoComplete="off"
               placeholder="phx_…"
               value={newKey}
               onChange={(event) => setNewKey(event.target.value)}
             />
-          </label>
-          <p className="text-xs text-base-content/60">
+          </div>
+          <p className="text-xs text-muted-foreground">
             Checked against project {posthogProjectId} first.
             {key?.kind === "stored" && key.projectCount > 1
               ? ` All ${key.projectCount} projects sharing this key switch to the new one.`
               : ""}
           </p>
           <MutationError mutation={replace} />
-          <button
+          <Button
             type="submit"
-            className="btn btn-primary btn-sm"
-            disabled={newKey.trim().length < 20 || replace.isPending}
+            size="sm"
+            pending={replace.isPending}
+            disabled={newKey.trim().length < 20}
           >
-            {replace.isPending ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : null}
             Replace
-          </button>
+          </Button>
         </form>
       ) : null}
 
@@ -208,17 +210,15 @@ export function ConnectedPosthog({
       />
       <MutationError mutation={saveEvents} />
       {source.canManage ? (
-        <button
+        <Button
           type="button"
-          className="btn btn-primary btn-sm"
-          disabled={!changed || saveEvents.isPending}
+          size="sm"
+          pending={saveEvents.isPending}
+          disabled={!changed}
           onClick={() => saveEvents.mutate(keyEvents)}
         >
-          {saveEvents.isPending ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : null}
           Save key events
-        </button>
+        </Button>
       ) : null}
     </div>
   );

@@ -1,5 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { cn } from "cn";
+import { Badge } from "@/client/components/ui/badge";
 import {
   type OutreachProspect,
   type OutreachSnapshot,
@@ -54,8 +56,8 @@ const STATUS_DOTS = {
   healthy: "bg-success",
   degraded: "bg-warning",
   attention: "bg-info",
-  down: "bg-error",
-  unknown: "bg-base-content/30",
+  down: "bg-destructive",
+  unknown: "bg-muted-foreground/40",
 } as const;
 
 export function StatusBadge({
@@ -64,9 +66,12 @@ export function StatusBadge({
   prospect: Pick<OutreachProspect, "status" | "approval">;
 }) {
   return (
-    <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs text-base-content/70">
+    <span className="inline-flex items-center gap-1.5 text-xs whitespace-nowrap text-muted-foreground">
       <span
-        className={`size-1.5 shrink-0 rounded-full ${STATUS_DOTS[outreachStatusTone(prospect)]}`}
+        className={cn(
+          "size-1.5 shrink-0 rounded-full",
+          STATUS_DOTS[outreachStatusTone(prospect)],
+        )}
         aria-hidden
       />
       {outreachStatusLabel(prospect.status)}
@@ -74,19 +79,22 @@ export function StatusBadge({
   );
 }
 
-const SCORE_TEXT = {
-  top: "text-success",
-  good: "text-success",
-  warn: "text-warning",
-  low: "text-error",
-  none: "text-base-content/50",
+// The score's band as an upstream badge tone: good scores green, borderline
+// amber, low red, unscored a quiet outline.
+const SCORE_BADGE = {
+  top: "success",
+  good: "success",
+  warn: "warning",
+  low: "destructive",
+  none: "outline",
 } as const;
 
 export function ScorePill({ prospect }: { prospect: OutreachProspect }) {
-  const percent = outreachScorePercent(prospect.score);
+  const tone = outreachScoreTone(outreachScorePercent(prospect.score));
   return (
-    <span
-      className={`badge badge-sm border-0 bg-base-300 tabular-nums ${SCORE_TEXT[outreachScoreTone(percent)]}`}
+    <Badge
+      variant={SCORE_BADGE[tone]}
+      className={cn("tabular-nums", tone === "none" && "text-muted-foreground")}
       title={
         prospect.score
           ? `${prospect.score.total ?? "?"}/10, ${prospect.score.band ?? "incomplete"}`
@@ -94,7 +102,7 @@ export function ScorePill({ prospect }: { prospect: OutreachProspect }) {
       }
     >
       {prospect.score?.total ?? "—"}
-    </span>
+    </Badge>
   );
 }
 
@@ -104,14 +112,19 @@ export function ActionPill({ prospect }: { prospect: OutreachProspect }) {
   const { action } = prospect;
   if (action.who === "owner") {
     return (
-      <span className="whitespace-nowrap text-xs font-medium text-primary">
+      <span className="text-xs font-medium whitespace-nowrap text-primary">
         {action.label}
       </span>
     );
   }
   return (
     <span
-      className={`whitespace-nowrap text-xs ${action.who === "agent" ? "text-base-content/60" : "text-base-content/40"}`}
+      className={cn(
+        "text-xs whitespace-nowrap",
+        action.who === "agent"
+          ? "text-muted-foreground"
+          : "text-muted-foreground/70",
+      )}
     >
       {action.who === "agent" ? `Agent · ${action.label}` : action.label}
     </span>
@@ -136,7 +149,7 @@ export function Favicon({
     );
   }
   return (
-    <span className="flex size-4 shrink-0 items-center justify-center rounded-sm bg-base-300 text-[10px] font-semibold uppercase text-base-content/60">
+    <span className="flex size-4 shrink-0 items-center justify-center rounded-sm bg-muted text-[10px] font-semibold text-muted-foreground uppercase">
       {domain.charAt(0) || "?"}
     </span>
   );

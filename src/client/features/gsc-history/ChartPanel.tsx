@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Plus } from "lucide-react";
+import { Button } from "@/client/components/ui/button";
 import { TimeSeriesChart } from "@/client/features/charts/TimeSeriesChart";
 import {
   type NoteAnchor,
@@ -125,16 +126,16 @@ export function ChartPanel({
       : null;
   const noData = !insights.firstDataDay;
   return (
-    <section className="rounded-xl border border-base-300 bg-base-100 p-4">
+    <section className="rounded-xl border border-border bg-card p-4">
       <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-2">
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 text-xs leading-6 text-base-content/60 [&>span]:whitespace-nowrap">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 text-xs leading-6 text-muted-foreground [&>span]:whitespace-nowrap">
           <span className="inline-flex items-center gap-1.5">
-            <span className="h-0.5 w-4 rounded bg-base-content/70" />
+            <span className="h-0.5 w-4 rounded bg-foreground/70" />
             {periodText({ start: shownStart, end: period.current.end })}
           </span>
           {comparable && period.previous && !noData ? (
             <span className="inline-flex items-center gap-1.5">
-              <span className="h-0.5 w-4 rounded bg-base-content/25" />
+              <span className="h-0.5 w-4 rounded bg-foreground/25" />
               {periodText({
                 start: addDay(period.previous.start, shift),
                 end: period.previous.end,
@@ -146,7 +147,7 @@ export function ChartPanel({
               className="inline-flex items-center gap-1.5"
               title="Search Console is still adding data for these days (fresh data), so they are lower than they will end up."
             >
-              <span className="w-4 border-t-2 border-dotted border-base-content/30" />
+              <span className="w-4 border-t-2 border-dotted border-foreground/30" />
               {fresh
                 ? `Partial data, ${shortRange(fresh.start, fresh.end)}`
                 : "Partial data"}
@@ -162,18 +163,20 @@ export function ChartPanel({
         </div>
         <div className="-ml-2 flex shrink-0 items-center gap-1 sm:ml-0">
           {noteCount > 0 ? (
-            <button
-              type="button"
-              className="btn btn-ghost btn-xs text-base-content/60"
+            <Button
+              variant="ghost"
+              size="xs"
+              className="text-muted-foreground"
               aria-expanded={showNotes}
               onClick={() => setShowNotes((current) => !current)}
             >
               Notes ({noteCount})
-            </button>
+            </Button>
           ) : null}
-          <button
-            type="button"
-            className="btn btn-ghost btn-xs gap-1 text-base-content/60"
+          <Button
+            variant="ghost"
+            size="xs"
+            className="text-muted-foreground"
             title="Add a note"
             onClick={(event) => {
               const rect = event.currentTarget.getBoundingClientRect();
@@ -188,29 +191,25 @@ export function ChartPanel({
               );
             }}
           >
-            <Plus className="size-3.5" /> Note
-          </button>
+            <Plus data-icon="inline-start" /> Note
+          </Button>
         </div>
       </div>
       {noData ? (
-        <div className="flex h-60 items-center justify-center text-sm text-base-content/50">
+        <div className="flex h-60 items-center justify-center text-sm text-muted-foreground">
           {Object.values(insights.filter).some(Boolean)
             ? "No impressions with these filters in this period."
             : "No impressions in this period."}
         </div>
       ) : granularity !== "day" && points.length < 3 ? (
-        <div className="flex h-60 flex-col items-center justify-center gap-2 text-sm text-base-content/50">
+        <div className="flex h-60 flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
           <span>
             {points.length === 1 ? "One" : "Two"} {granularity}
             {points.length === 1 ? "" : "s"} of data so far, too few for a line.
           </span>
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm text-base-content/70"
-            onClick={onShowDays}
-          >
+          <Button variant="outline" size="sm" onClick={onShowDays}>
             Show by day
-          </button>
+          </Button>
         </div>
       ) : (
         <TimeSeriesChart
@@ -247,7 +246,7 @@ export function ChartPanel({
         />
       )}
       {showNotes ? (
-        <div className="mt-3 border-t border-base-300 pt-2">
+        <div className="mt-3 border-t border-border pt-2">
           <NotesList
             projectId={projectId}
             annotations={insights.annotations}

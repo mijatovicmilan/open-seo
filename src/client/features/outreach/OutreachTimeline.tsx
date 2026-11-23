@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { cn } from "cn";
+import { Button } from "@/client/components/ui/button";
 import {
   type OutreachHistoryEntry,
   type OutreachTimelineItem,
@@ -49,32 +51,36 @@ function TimelineRow({ item }: { item: OutreachTimelineItem }) {
   const owner = item.actor === "owner";
   return (
     <li className="relative grid grid-cols-[2.75rem_1fr] gap-x-3 py-1">
-      <span className="whitespace-nowrap pt-0.5 text-xs tabular-nums text-base-content/40">
+      <span className="pt-0.5 text-xs whitespace-nowrap text-muted-foreground/70 tabular-nums">
         {timeLabel(item.at)}
       </span>
-      <div className="relative min-w-0 border-l border-base-300 pl-4">
+      <div className="relative min-w-0 border-l border-border pl-4">
         <span
-          className={`absolute -left-[3.5px] top-2 size-1.5 rounded-full ${
+          className={cn(
+            "absolute top-2 -left-[3.5px] size-1.5 rounded-full",
             owner
               ? "bg-primary"
               : item.background
-                ? "bg-base-content/20"
-                : "bg-base-content/50"
-          }`}
+                ? "bg-muted-foreground/30"
+                : "bg-muted-foreground",
+          )}
           aria-hidden
         />
         <div
-          className={`text-sm ${item.background ? "text-base-content/60" : "text-base-content"}`}
+          className={cn(
+            "text-sm",
+            item.background ? "text-muted-foreground" : "text-foreground",
+          )}
         >
           {item.label}
           {repeat ? (
-            <span className="text-base-content/40"> · {repeat}</span>
+            <span className="text-muted-foreground/70"> · {repeat}</span>
           ) : null}
           {owner ? <span className="text-primary"> · you</span> : null}
         </div>
         {item.detail ? (
           <div
-            className="truncate text-xs text-base-content/50"
+            className="truncate text-xs text-muted-foreground"
             title={item.detail}
           >
             {item.detail}
@@ -93,7 +99,7 @@ export function OutreachTimeline({
   const [showAll, setShowAll] = useState(false);
   const items = outreachTimeline(history);
   if (items.length === 0) {
-    return <p className="text-sm text-base-content/50">No activity yet.</p>;
+    return <p className="text-sm text-muted-foreground">No activity yet.</p>;
   }
   const visible = showAll ? items : items.slice(0, COLLAPSED_ROWS);
   const days: Array<{ day: string; items: OutreachTimelineItem[] }> = [];
@@ -107,7 +113,7 @@ export function OutreachTimeline({
     <div className="space-y-3">
       {days.map((group) => (
         <div key={`${group.day}-${group.items[0]?.at}`}>
-          <div className="mb-1 text-xs font-medium text-base-content/50">
+          <div className="mb-1 text-xs font-medium text-muted-foreground">
             {group.day}
           </div>
           <ol>
@@ -118,13 +124,15 @@ export function OutreachTimeline({
         </div>
       ))}
       {items.length > COLLAPSED_ROWS ? (
-        <button
+        <Button
           type="button"
-          className="btn btn-ghost btn-xs -ml-2 text-base-content/60"
+          variant="ghost"
+          size="xs"
+          className="-ml-2 text-muted-foreground"
           onClick={() => setShowAll((current) => !current)}
         >
           {showAll ? "Show less" : `Show all (${items.length})`}
-        </button>
+        </Button>
       ) : null}
     </div>
   );

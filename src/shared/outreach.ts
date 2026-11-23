@@ -4,7 +4,7 @@
 // operations dashboard. Domain rules live in
 // src/server/features/outreach/outreachDomain.ts.
 
-import { sort } from "remeda";
+import { reverse, sort } from "remeda";
 
 export type OutreachStatus =
   | "drafted"
@@ -32,6 +32,8 @@ export type OutreachApprovalState =
   | "missing";
 
 export type OutreachHistoryEntry = {
+  // The stored event type ("drafted", "enriched"); repeats are grouped by it.
+  type: string;
   date: string | null;
   // The full timestamp, when the event has one.
   at?: string;
@@ -392,7 +394,7 @@ export const OUTREACH_STATUS_MOVE_LABELS: Record<OutreachStatusMove, string> = {
 // Short labels for status pills. Statuses stay separate (not merged).
 const STATUS_LABELS: Record<OutreachStatus, string> = {
   drafted: "Draft",
-  "awaiting approval": "Review",
+  "awaiting approval": "Needs approval",
   approved: "Approved",
   sent: "Sent",
   "follow-up sent": "Followed up",
@@ -641,4 +643,48 @@ export function outreachSendBlocker(
       : `This week's limit is reached (${limits.sentWeek} of ${limits.weeklyMax}).`;
   }
   return null;
+}
+
+export type OutreachTimelineItem = {
+  type: string;
+  label: string;
+  detail?: string;
+  at: string;
+  actor?: "owner" | "agent";
+  background: boolean;
+  // How many consecutive events of this kind the row stands for.
+  count: number;
+};
+
+// History newest first, with consecutive events of the same kind on the same
+// day merged into one row (four page reads in two minutes are one row, six
+// drafts are "6 versions"). The latest event's detail is kept.
+export function outreachTimeline(
+  history: OutreachHistoryEntry[],
+): OutreachTimelineItem[] {
+  const items: OutreachTimelineItem[] = [];
+  for (const entry of reverse(history)) {
+    const at = entry.at ?? entry.date ?? "";
+    const previous = items.at(-1);
+    if (
+      previous &&
+      previous.type === entry.type &&
+      previous.label === entry.label &&
+      previous.actor === entry.actor &&
+      previous.at.slice(0, 10) === at.slice(0, 10)
+    ) {
+      previous.count += 1;
+      continue;
+    }
+    items.push({
+      type: entry.type,
+      label: entry.label,
+      ...(entry.detail ? { detail: entry.detail } : {}),
+      at,
+      ...(entry.actor ? { actor: entry.actor } : {}),
+      background: Boolean(entry.background),
+      count: 1,
+    });
+  }
+  return items;
 }

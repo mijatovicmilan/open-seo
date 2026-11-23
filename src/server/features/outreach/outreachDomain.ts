@@ -7,6 +7,7 @@
 
 import { createHash } from "node:crypto";
 import { sort } from "remeda";
+import { describeOutreachEvent } from "@/server/features/outreach/outreachHistory";
 import type {
   OutreachAction,
   OutreachAnalytics,
@@ -464,14 +465,11 @@ function statusMoves(
   return moves;
 }
 
-function capitalize(value: string) {
-  return value.charAt(0).toUpperCase() + value.slice(1);
-}
-
 // Outreach steps the owner cares about. Everything else (added, imported,
 // enriched, scored, link checks) is background: it never moves Last action.
 const OUTREACH_STEP_EVENTS = new Set([
   "drafted",
+  "rewritten",
   "edited",
   "approved",
   "approval undone",
@@ -488,13 +486,6 @@ const OUTREACH_STEP_EVENTS = new Set([
   "reopened",
   "status",
 ]);
-
-const EVENT_LABELS: Record<string, string> = {
-  edited: "Edited by owner",
-  replied: "Reply",
-  "reply sent": "Reply sent",
-  status: "Status changed",
-};
 
 export function pendingMessage(messages: MessageRow[]) {
   return (
@@ -723,7 +714,7 @@ function lastStepFor(
   if (latestStep) {
     return {
       at: latestStep.at,
-      label: EVENT_LABELS[latestStep.type] ?? capitalize(latestStep.type),
+      label: describeOutreachEvent(latestStep).label,
       actor: latestStep.actor,
     };
   }
@@ -735,10 +726,10 @@ function lastStepFor(
 
 function historyFrom(ordered: EventRow[]): OutreachHistoryEntry[] {
   return ordered.map((event) => ({
+    type: event.type,
     date: day(event.at),
     at: event.at,
-    label: EVENT_LABELS[event.type] ?? capitalize(event.type),
-    ...(event.detail ? { detail: event.detail } : {}),
+    ...describeOutreachEvent(event),
     actor: event.actor,
     ...(OUTREACH_STEP_EVENTS.has(event.type) ? {} : { background: true }),
   }));

@@ -23,12 +23,16 @@ export const ANNOTATION_STYLES: Record<
   Annotation["kind"],
   { color: string; label: string }
 > = {
-  deploy: { color: "#f59e0b", label: "Deploy" },
-  page: { color: "#10b981", label: "Page" },
-  link: { color: "#ec4899", label: "Link" },
-  note: { color: "#6b7280", label: "Note" },
-  outreach: { color: "#db2777", label: "Outreach link" },
-  first_seen: { color: "#14b8a6", label: "New page" },
+  // Theme tokens, so notes follow the app's light and dark palettes.
+  deploy: { color: "var(--color-warning)", label: "Deploy" },
+  page: { color: "var(--color-success)", label: "Page" },
+  link: { color: "var(--color-primary)", label: "Link" },
+  note: {
+    color: "color-mix(in oklab, var(--color-base-content) 45%, transparent)",
+    label: "Note",
+  },
+  outreach: { color: "var(--color-primary)", label: "Outreach link" },
+  first_seen: { color: "var(--color-info)", label: "New page" },
 };
 
 const CHART_HEIGHT = 260;

@@ -174,45 +174,49 @@ export function AnnotationsPanel({
           in the chart can be traced to a cause.
         </p>
       ) : (
-        <ul className="divide-y divide-base-300 text-sm">
+        <ol>
           {listed.map((annotation, index) => (
             <li
               key={
                 annotation.id ??
                 `${annotation.kind}-${annotation.date}-${index}`
               }
-              className="flex items-center gap-3 py-1.5"
+              className="grid grid-cols-[5.5rem_1fr_auto] items-start gap-x-3 py-1"
             >
-              <span className="w-28 shrink-0 whitespace-nowrap text-base-content/60">
+              <span className="whitespace-nowrap pt-0.5 text-xs tabular-nums text-base-content/40">
                 {formatDay(annotation.date)}
               </span>
-              <span
-                className="w-24 shrink-0 text-xs font-medium"
-                style={{ color: ANNOTATION_STYLES[annotation.kind].color }}
-              >
-                {ANNOTATION_STYLES[annotation.kind].label}
-              </span>
-              <span
-                className="min-w-0 flex-1 truncate"
-                title={annotation.url ?? undefined}
-              >
-                {annotation.url ? (
-                  <a
-                    href={annotation.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="link link-hover"
-                  >
-                    {annotation.label}
-                  </a>
-                ) : (
-                  annotation.label
-                )}
-              </span>
+              <div className="relative min-w-0 border-l border-base-300 pl-4">
+                <span
+                  className="absolute -left-[3.5px] top-2 size-1.5 rounded-full"
+                  style={{
+                    backgroundColor: ANNOTATION_STYLES[annotation.kind].color,
+                  }}
+                  aria-hidden
+                />
+                <div className="truncate text-sm">
+                  {annotation.url ? (
+                    <a
+                      href={annotation.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="link link-hover"
+                      title={annotation.url}
+                    >
+                      {annotation.label}
+                    </a>
+                  ) : (
+                    annotation.label
+                  )}
+                </div>
+                <div className="text-xs text-base-content/50">
+                  {ANNOTATION_STYLES[annotation.kind].label}
+                </div>
+              </div>
               {annotation.id ? (
                 <button
                   type="button"
-                  className="btn btn-ghost btn-xs"
+                  className="btn btn-ghost btn-xs btn-square text-base-content/40 hover:text-error"
                   aria-label="Delete note"
                   disabled={deleteMutation.isPending}
                   onClick={() => {
@@ -222,11 +226,11 @@ export function AnnotationsPanel({
                   <Trash2 className="size-3.5" />
                 </button>
               ) : (
-                <span className="w-8 shrink-0" />
+                <span className="w-6" />
               )}
             </li>
           ))}
-        </ul>
+        </ol>
       )}
     </div>
   );

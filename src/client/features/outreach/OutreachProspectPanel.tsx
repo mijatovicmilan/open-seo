@@ -1,6 +1,5 @@
 /* eslint-disable max-lines -- the prospect slide-over and its sections (fork feature) */
 import { useEffect, useState } from "react";
-import { reverse } from "remeda";
 import {
   CheckCircle2,
   ExternalLink,
@@ -12,12 +11,12 @@ import {
 } from "lucide-react";
 import {
   Favicon,
-  formatDateTime,
   formatNumber,
   ScorePill,
   StatusBadge,
   useProspectMutation,
 } from "@/client/features/outreach/outreachUi";
+import { OutreachTimeline } from "@/client/features/outreach/OutreachTimeline";
 import {
   approveOutreach,
   checkOutreachLink,
@@ -147,10 +146,31 @@ export function OutreachProspectPanel({
                 )}
               </dd>
               <dt className="text-base-content/60">Contact</dt>
-              <dd className="break-all">
-                {prospect.contact.kind === "none"
-                  ? "None found"
-                  : `${prospect.contact.kind === "form" ? "Form: " : ""}${prospect.contact.value}`}
+              <dd className="min-w-0">
+                {prospect.contact.kind === "none" ? (
+                  "None found"
+                ) : prospect.contact.kind === "form" ? (
+                  <a
+                    className="link link-hover block truncate"
+                    href={prospect.contact.value}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    title={prospect.contact.value}
+                  >
+                    Contact form ·{" "}
+                    {prospect.contact.value.replace(
+                      /^https?:\/\/(www\.)?/u,
+                      "",
+                    )}
+                  </a>
+                ) : (
+                  <span
+                    className="block truncate"
+                    title={prospect.contact.value}
+                  >
+                    {prospect.contact.value}
+                  </span>
+                )}
                 {"note" in prospect.contact && prospect.contact.note ? (
                   <span className="block text-base-content/60">
                     {prospect.contact.note}
@@ -167,8 +187,12 @@ export function OutreachProspectPanel({
                   </span>
                 ) : null}
               </dd>
-              <dt className="text-base-content/60">Gain</dt>
-              <dd>{prospect.gain || "—"}</dd>
+              {prospect.gain ? (
+                <>
+                  <dt className="text-base-content/60">Gain</dt>
+                  <dd>{prospect.gain}</dd>
+                </>
+              ) : null}
               {prospect.notes ? (
                 <>
                   <dt className="text-base-content/60">Notes</dt>
@@ -203,34 +227,7 @@ export function OutreachProspectPanel({
             <h3 className="text-xs font-semibold uppercase tracking-wide text-base-content/60">
               History
             </h3>
-            <ol className="space-y-1.5 text-sm">
-              {reverse(prospect.history).map((entry, index) => (
-                <li
-                  key={`${entry.at ?? entry.date}-${index}`}
-                  className={
-                    entry.background ? "text-base-content/50" : undefined
-                  }
-                >
-                  <span className="tabular-nums text-base-content/60">
-                    {entry.at ? formatDateTime(entry.at) : entry.date}
-                  </span>{" "}
-                  <span className="font-medium">{entry.label}</span>
-                  {entry.actor ? (
-                    <span className="text-base-content/50">
-                      {" "}
-                      · {entry.actor}
-                    </span>
-                  ) : null}
-                  {entry.detail ? (
-                    <span className="block whitespace-pre-wrap break-words text-base-content/70">
-                      {entry.detail.length > 400
-                        ? `${entry.detail.slice(0, 400)}…`
-                        : entry.detail}
-                    </span>
-                  ) : null}
-                </li>
-              ))}
-            </ol>
+            <OutreachTimeline history={prospect.history} />
           </section>
         </div>
       </aside>
@@ -511,7 +508,7 @@ function ScoreSection({ prospect }: { prospect: OutreachProspect }) {
       ) : (
         <p className="text-sm text-base-content/60">Not scored yet.</p>
       )}
-      {prospect.metrics ? (
+      {prospect.metrics && !prospect.score ? (
         <p className="text-sm text-base-content/70">
           Authority {formatNumber(prospect.metrics.authority)} · traffic{" "}
           {formatNumber(prospect.metrics.traffic)}

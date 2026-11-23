@@ -32,7 +32,7 @@ export function SyncStatusLine({
 
   return (
     <div className="flex flex-col gap-2 rounded-xl border border-base-300 bg-base-100 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
-      <div className="space-y-0.5">
+      <div className="min-w-0 space-y-0.5">
         <div className="text-base-content/70">
           {status.daysStored > 0 ? (
             <>
@@ -45,10 +45,12 @@ export function SyncStatusLine({
           ) : (
             "No days stored yet"
           )}
-          {status.siteUrl ? (
-            <span className="text-base-content/50"> · {status.siteUrl}</span>
-          ) : null}
         </div>
+        {status.siteUrl ? (
+          <div className="truncate text-xs text-base-content/50">
+            {status.siteUrl}
+          </div>
+        ) : null}
         {busy ? (
           <div className="flex items-center gap-2 text-base-content/60">
             <Loader2 className="size-3.5 animate-spin" />

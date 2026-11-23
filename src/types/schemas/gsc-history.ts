@@ -65,7 +65,8 @@ export const searchInsightsSearchSchema = z.object({
   end: isoDay.optional(),
   compare: z.enum(SEARCH_INSIGHTS_COMPARE).optional(),
   gran: z.enum(["auto", "day", "week", "month"]).optional(),
-  metric: z.enum(["clicks", "impressions", "ctr", "position"]).optional(),
+  // Comma-separated chart metrics, e.g. "clicks,impressions".
+  metrics: z.string().max(60).optional(),
   page: z.string().max(2000).optional(),
   query: z.string().max(500).optional(),
   country: z.string().max(3).optional(),

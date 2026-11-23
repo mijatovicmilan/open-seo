@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the shared chart, its axes, markers and tooltip (fork feature) */
 import { useMemo, useState } from "react";
 import {
   Bar,
@@ -14,12 +15,17 @@ import {
 import type { TooltipContentProps } from "recharts";
 import { useChartWidth } from "@/client/features/rank-tracking/RankTrackingTrendChart";
 
-// One time-series chart for the fork's Outreach and Search Insights pages:
-// one metric at a time on one honest axis (whole-number ticks for counts,
-// reversed for position), straight segments between real values, an optional
-// muted comparison line, days still being reported drawn dashed, and notes
-// as small markers on the baseline that show a guide line on hover. Colours
-// come from the theme, so light and dark both work.
+// One time-series chart for the fork's Outreach and Search Insights pages,
+// working like Search Console's: one or more metrics, each in its own theme
+// colour and on its own scale. At most two scales show an axis (left and
+// right, ticks in the series colour so it is clear which line they belong
+// to); further metrics are drawn to their own hidden scale. Counts get
+// whole-number round ticks and position runs top to bottom. Segments are
+// straight between real values; days still being reported (or a bucket the
+// range cuts short) are dashed; the comparison period is a faint solid line
+// in the same colour. Notes are small neutral markers under the baseline,
+// merged with a count when close, with a guide line on hover. The tooltip
+// always shows every selected metric's real value.
 
 export type ChartNote = {
   kind: string;
@@ -35,8 +41,10 @@ export type ChartPoint = {
   label: string;
   /** Axis label ("Nov 10"). */
   tick: string;
-  value: number | null;
-  compare?: number | null;
+  /** Value per series key; null where there is nothing to show. */
+  values: Record<string, number | null>;
+  /** Comparison value per series key, when a comparison is shown. */
+  compare?: Record<string, number | null>;
   compareLabel?: string;
   /** Drawn dashed: days Search Console is still reporting, or a bucket the
    *  range only partly covers. */
@@ -57,9 +65,17 @@ export type ChartMetric = {
   percent?: boolean;
 };
 
-const PRIMARY = "var(--color-primary)";
-const MUTED = "color-mix(in oklab, var(--color-base-content) 35%, transparent)";
+export type ChartSeries = {
+  key: string;
+  metric: ChartMetric;
+  /** A theme colour, e.g. "var(--color-primary)". */
+  color: string;
+};
+
+const NOTE = "color-mix(in oklab, var(--color-base-content) 55%, transparent)";
 const AXIS = "color-mix(in oklab, var(--color-base-content) 55%, transparent)";
+const faint = (color: string) =>
+  `color-mix(in oklab, ${color} 35%, transparent)`;
 
 /** Round numbers for an axis: about four steps of 1, 2 or 5 × 10^n (2.5 is
  *  allowed for rates), always starting at 0 and reaching at least `max`. */
@@ -79,24 +95,39 @@ export function niceTicks(max: number, integer: boolean): number[] {
   return ticks;
 }
 
-type Row = ChartPoint & {
-  settled: number | null;
-  reporting: number | null;
-  noteY: number;
-};
+/** An axis for one series: domain and ticks from its own values (and its
+ *  comparison), position reversed and starting at 1. */
+function axisFor(points: ChartPoint[], series: ChartSeries) {
+  const values = points.flatMap((p) => [
+    p.values[series.key] ?? null,
+    p.compare?.[series.key] ?? null,
+  ]);
+  const max = Math.max(0, ...values.filter((v): v is number => v !== null));
+  if (series.metric.inverted) {
+    const ticks = niceTicks(Math.max(max, 2), true).filter((t) => t > 0);
+    const top = ticks.at(-1) ?? 2;
+    return {
+      domain: [1, top] as [number, number],
+      ticks: [1, ...ticks.filter((t) => t > 1)],
+    };
+  }
+  const ticks = niceTicks(max, series.metric.integer);
+  return { domain: [0, ticks.at(-1) ?? 1] as [number, number], ticks };
+}
+
+type Row = ChartPoint & Record<string, unknown>;
 
 function TooltipCard({
   point,
-  metric,
-  compareName,
+  series,
 }: {
-  point: Row;
-  metric: ChartMetric;
-  compareName?: string;
+  point: ChartPoint;
+  series: ChartSeries[];
 }) {
   const notes = point.notes ?? [];
+  const hasCompare = Boolean(point.compare);
   return (
-    <div className="w-60 rounded-lg border border-base-300 bg-base-100 p-3 text-xs shadow-lg">
+    <div className="w-64 rounded-lg border border-base-300 bg-base-100 p-3 text-xs shadow-lg">
       <div className="mb-2 flex items-baseline justify-between gap-2">
         <span className="font-medium text-base-content">{point.label}</span>
         {point.partial ? (
@@ -105,32 +136,53 @@ function TooltipCard({
           </span>
         ) : null}
       </div>
-      <div className="space-y-1">
-        <div className="flex items-center gap-2">
-          <span
-            className="size-2 shrink-0 rounded-full"
-            style={{ backgroundColor: PRIMARY }}
-          />
-          <span className="flex-1 text-base-content/70">{metric.name}</span>
-          <span className="tabular-nums font-medium text-base-content">
-            {point.value === null ? "—" : metric.format(point.value)}
-          </span>
-        </div>
-        {point.compare !== undefined ? (
-          <div className="flex items-center gap-2">
-            <span
-              className="size-2 shrink-0 rounded-full"
-              style={{ backgroundColor: MUTED }}
-            />
-            <span className="min-w-0 flex-1 truncate text-base-content/60">
-              {point.compareLabel ?? compareName ?? "Before"}
-            </span>
-            <span className="tabular-nums text-base-content/70">
-              {point.compare === null ? "—" : metric.format(point.compare)}
-            </span>
-          </div>
+      <table className="w-full">
+        {hasCompare ? (
+          <thead>
+            <tr className="text-[10px] uppercase tracking-wide text-base-content/40">
+              <th />
+              <th className="pb-1 text-right font-normal">This</th>
+              <th
+                className="max-w-20 truncate pb-1 pl-2 text-right font-normal"
+                title={point.compareLabel}
+              >
+                {point.compareLabel ?? "Before"}
+              </th>
+            </tr>
+          </thead>
         ) : null}
-      </div>
+        <tbody>
+          {series.map((s) => {
+            const value = point.values[s.key];
+            const prior = point.compare?.[s.key];
+            return (
+              <tr key={s.key}>
+                <td className="py-0.5">
+                  <span className="flex items-center gap-2 text-base-content/70">
+                    <span
+                      className="size-2 shrink-0 rounded-full"
+                      style={{ backgroundColor: s.color }}
+                    />
+                    {s.metric.name}
+                  </span>
+                </td>
+                <td className="py-0.5 text-right font-medium tabular-nums text-base-content">
+                  {value === null || value === undefined
+                    ? "—"
+                    : s.metric.format(value)}
+                </td>
+                {hasCompare ? (
+                  <td className="py-0.5 pl-2 text-right tabular-nums text-base-content/50">
+                    {prior === null || prior === undefined
+                      ? "—"
+                      : s.metric.format(prior)}
+                  </td>
+                ) : null}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
       {notes.length ? (
         <ul className="mt-2 space-y-1 border-t border-base-300 pt-2">
           {notes.slice(0, 4).map((note, index) => (
@@ -161,62 +213,56 @@ function TooltipCard({
 
 export function TimeSeriesChart({
   points,
-  metric,
+  series,
   kind = "line",
   height = 240,
-  compareName,
 }: {
   points: ChartPoint[];
-  metric: ChartMetric;
+  series: ChartSeries[];
   kind?: "line" | "bar";
   height?: number;
-  compareName?: string;
 }) {
   const { containerRef, width } = useChartWidth();
   const [activeKey, setActiveKey] = useState<string | null>(null);
-
-  const { rows, ticks, domain } = useMemo(() => {
-    const values = points.flatMap((p) => [p.value, p.compare ?? null]);
-    const max = Math.max(0, ...values.filter((v): v is number => v !== null));
-    const tickList = metric.inverted
-      ? niceTicks(Math.max(max, 1), true).filter((t) => t > 0)
-      : niceTicks(max, metric.integer);
-    const axisDomain: [number, number] = metric.inverted
-      ? [1, Math.max(tickList.at(-1) ?? 1, 2)]
-      : [0, tickList.at(-1) ?? 1];
-    const finalTicks = metric.inverted
-      ? [1, ...tickList.filter((t) => t > 1)]
-      : tickList;
-    // Solid between complete points; dashed on any segment that touches a
-    // partial point (drawn underneath, so the two lines join).
-    const built: Row[] = points.map((p, index) => {
-      const near =
-        p.partial ||
-        Boolean(points[index - 1]?.partial) ||
-        Boolean(points[index + 1]?.partial);
-      return {
-        ...p,
-        settled: p.partial ? null : p.value,
-        reporting: near ? p.value : null,
-        noteY: metric.inverted ? axisDomain[1] : 0,
-      };
-    });
-    return { rows: built, ticks: finalTicks, domain: axisDomain };
-  }, [points, metric]);
-
-  const hasCompare = points.some((p) => p.compare !== undefined);
+  const hasCompare = points.some((p) => p.compare);
   const hasNotes = points.some((p) => p.notes?.length);
   const showDots = points.length <= 45;
-  const activeRow = rows.find((row) => row.key === activeKey);
+
+  const axes = useMemo(
+    () => series.map((s) => ({ series: s, ...axisFor(points, s) })),
+    [points, series],
+  );
+
+  // Per series: the complete points (solid), the points next to a partial
+  // one (dashed, drawn underneath so the two join) and the comparison.
+  const rows: Row[] = useMemo(
+    () =>
+      points.map((p, index) => {
+        const near =
+          p.partial ||
+          Boolean(points[index - 1]?.partial) ||
+          Boolean(points[index + 1]?.partial);
+        const row: Row = { ...p };
+        for (const s of series) {
+          const value = p.values[s.key] ?? null;
+          row[`${s.key}__solid`] = p.partial ? null : value;
+          row[`${s.key}__partial`] = near ? value : null;
+          row[`${s.key}__compare`] = p.compare?.[s.key] ?? null;
+        }
+        return row;
+      }),
+    [points, series],
+  );
+
   // Markers closer than ~16px merge into one with a count; the tooltip still
   // lists each day's own notes.
   const markers = useMemo(() => {
-    const plotWidth = Math.max(1, width - 56);
+    const plotWidth = Math.max(1, width - 96);
     const window = Math.max(
       1,
       Math.ceil(16 / (plotWidth / Math.max(1, rows.length))),
     );
-    const out: Array<{ key: string; noteY: number; notes: ChartNote[] }> = [];
+    const out: Array<{ key: string; notes: ChartNote[] }> = [];
     let lastIndex = -Infinity;
     rows.forEach((row, index) => {
       if (!row.notes?.length) return;
@@ -225,18 +271,25 @@ export function TimeSeriesChart({
         last.notes.push(...row.notes);
         return;
       }
-      out.push({ key: row.key, noteY: row.noteY, notes: [...row.notes] });
+      out.push({ key: row.key, notes: [...row.notes] });
       lastIndex = index;
     });
     return out;
   }, [rows, width]);
 
-  const axes = (
+  const activeRow = rows.find((row) => row.key === activeKey);
+  const baseAxis = axes[0];
+  const baseline = baseAxis?.series.metric.inverted
+    ? (baseAxis.domain[1] ?? 1)
+    : 0;
+
+  const chartParts = (
     <>
       <CartesianGrid
         vertical={false}
         stroke="currentColor"
         strokeOpacity={0.08}
+        yAxisId={baseAxis?.series.key}
       />
       <XAxis
         dataKey="key"
@@ -250,23 +303,38 @@ export function TimeSeriesChart({
         minTickGap={28}
         interval="preserveStartEnd"
       />
-      <YAxis
-        domain={domain}
-        ticks={ticks}
-        reversed={Boolean(metric.inverted)}
-        allowDecimals={!metric.integer}
-        tickFormatter={(value: number) =>
-          metric.percent
-            ? metric.format(value)
-            : new Intl.NumberFormat("en-US", { notation: "compact" }).format(
-                value,
-              )
-        }
-        tick={{ fontSize: 11, fill: AXIS }}
-        tickLine={false}
-        axisLine={false}
-        width={40}
-      />
+      {axes.map((axis, index) => (
+        <YAxis
+          key={axis.series.key}
+          yAxisId={axis.series.key}
+          orientation={index === 1 ? "right" : "left"}
+          hide={index > 1}
+          domain={axis.domain}
+          ticks={axis.ticks}
+          reversed={Boolean(axis.series.metric.inverted)}
+          allowDecimals={!axis.series.metric.integer}
+          tickFormatter={(value: number) =>
+            axis.series.metric.percent
+              ? axis.series.metric.format(value)
+              : new Intl.NumberFormat("en-US", {
+                  notation: "compact",
+                }).format(value)
+          }
+          // With two scales the ticks take each line's colour, so it is
+          // clear which axis belongs to which line.
+          tick={{
+            fontSize: 11,
+            // Mixed toward the text colour so light tones stay readable.
+            fill:
+              axes.length > 1
+                ? `color-mix(in oklab, ${axis.series.color} 70%, var(--color-base-content))`
+                : AXIS,
+          }}
+          tickLine={false}
+          axisLine={false}
+          width={44}
+        />
+      ))}
       <Tooltip
         cursor={
           kind === "bar"
@@ -278,42 +346,37 @@ export function TimeSeriesChart({
           const key = typeof props.label === "string" ? props.label : null;
           const row = rows.find((item) => item.key === key);
           if (!props.active || !row) return null;
-          return (
-            <TooltipCard
-              point={row}
-              metric={metric}
-              compareName={compareName}
-            />
-          );
+          return <TooltipCard point={row} series={series} />;
         }}
       />
       {activeRow?.notes?.length ? (
         <ReferenceLine
           x={activeRow.key}
-          stroke={activeRow.notes[0]?.color ?? MUTED}
+          yAxisId={baseAxis?.series.key}
+          stroke={NOTE}
           strokeDasharray="3 3"
           ifOverflow="visible"
         />
       ) : null}
-      {markers.map((row) => (
+      {markers.map((marker) => (
         <ReferenceDot
-          key={`note-${row.key}`}
-          x={row.key}
-          y={row.noteY}
+          key={`note-${marker.key}`}
+          x={marker.key}
+          y={baseline}
+          yAxisId={baseAxis?.series.key}
           ifOverflow="visible"
           shape={(shapeProps: { cx?: number; cy?: number }) => {
             const cx = shapeProps.cx ?? 0;
-            // Just under the baseline, apart from the line's own dots.
+            // Just under the baseline, apart from the lines' own dots.
             const cy = (shapeProps.cy ?? 0) + 10;
-            const count = row.notes.length;
-            const color = row.notes[0]?.color ?? MUTED;
+            const count = marker.notes.length;
             return (
               <g>
                 <circle
                   cx={cx}
                   cy={cy}
                   r={count > 1 ? 6 : 3.5}
-                  fill={color}
+                  fill={NOTE}
                   stroke="var(--color-base-100)"
                   strokeWidth={1.5}
                 />
@@ -342,6 +405,12 @@ export function TimeSeriesChart({
       typeof state.activeLabel === "string" ? state.activeLabel : null;
     if (label !== activeKey) setActiveKey(label);
   };
+  const margin = {
+    top: 8,
+    right: axes.length > 1 ? 0 : 8,
+    bottom: 12,
+    left: 0,
+  };
 
   return (
     <div ref={containerRef} className="w-full min-w-0" style={{ height }}>
@@ -351,65 +420,79 @@ export function TimeSeriesChart({
             width={width}
             height={height}
             data={rows}
-            margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
+            margin={margin}
             onMouseMove={onMove}
             onMouseLeave={() => setActiveKey(null)}
           >
-            {axes}
-            <Bar
-              dataKey="value"
-              fill={PRIMARY}
-              fillOpacity={0.85}
-              radius={[3, 3, 0, 0]}
-              maxBarSize={18}
-              isAnimationActive={false}
-            />
+            {chartParts}
+            {series.map((s) => (
+              <Bar
+                key={s.key}
+                yAxisId={s.key}
+                dataKey={`${s.key}__solid`}
+                fill={s.color}
+                fillOpacity={0.85}
+                radius={[3, 3, 0, 0]}
+                maxBarSize={18}
+                isAnimationActive={false}
+              />
+            ))}
           </BarChart>
         ) : (
           <LineChart
             width={width}
             height={height}
             data={rows}
-            margin={{ top: 8, right: 8, bottom: 12, left: 0 }}
+            margin={margin}
             onMouseMove={onMove}
             onMouseLeave={() => setActiveKey(null)}
           >
-            {axes}
-            {hasCompare ? (
+            {chartParts}
+            {hasCompare
+              ? series.map((s) => (
+                  <Line
+                    key={`${s.key}-compare`}
+                    yAxisId={s.key}
+                    type="linear"
+                    dataKey={`${s.key}__compare`}
+                    stroke={faint(s.color)}
+                    strokeWidth={1.5}
+                    dot={false}
+                    activeDot={false}
+                    connectNulls={false}
+                    isAnimationActive={false}
+                  />
+                ))
+              : null}
+            {series.map((s) => (
               <Line
+                key={`${s.key}-partial`}
+                yAxisId={s.key}
                 type="linear"
-                dataKey="compare"
-                stroke={MUTED}
-                strokeWidth={1.5}
-                strokeDasharray="4 3"
+                dataKey={`${s.key}__partial`}
+                stroke={s.color}
+                strokeWidth={2}
+                strokeDasharray="3 4"
                 dot={false}
                 activeDot={false}
                 connectNulls={false}
                 isAnimationActive={false}
               />
-            ) : null}
-            <Line
-              type="linear"
-              dataKey="reporting"
-              stroke={PRIMARY}
-              strokeOpacity={0.55}
-              strokeWidth={2}
-              strokeDasharray="4 4"
-              dot={false}
-              activeDot={{ r: 4, strokeWidth: 0, fill: PRIMARY }}
-              connectNulls={false}
-              isAnimationActive={false}
-            />
-            <Line
-              type="linear"
-              dataKey="settled"
-              stroke={PRIMARY}
-              strokeWidth={2}
-              dot={showDots ? { r: 2, strokeWidth: 0, fill: PRIMARY } : false}
-              activeDot={{ r: 4, strokeWidth: 0, fill: PRIMARY }}
-              connectNulls={false}
-              isAnimationActive={false}
-            />
+            ))}
+            {series.map((s) => (
+              <Line
+                key={`${s.key}-solid`}
+                yAxisId={s.key}
+                type="linear"
+                dataKey={`${s.key}__solid`}
+                stroke={s.color}
+                strokeWidth={2}
+                dot={showDots ? { r: 2, strokeWidth: 0, fill: s.color } : false}
+                activeDot={{ r: 4, strokeWidth: 0, fill: s.color }}
+                connectNulls={false}
+                isAnimationActive={false}
+              />
+            ))}
           </LineChart>
         )
       ) : null}

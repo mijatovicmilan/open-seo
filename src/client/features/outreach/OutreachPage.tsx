@@ -3,8 +3,8 @@ import { useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowDown, ArrowUp, Loader2, Search, Settings2 } from "lucide-react";
 import {
-  type ChartMetric,
   type ChartPoint,
+  type ChartSeries,
   TimeSeriesChart,
 } from "@/client/features/charts/TimeSeriesChart";
 import { OutreachProspectPanel } from "@/client/features/outreach/OutreachProspectPanel";
@@ -448,11 +448,13 @@ function Stat({
   );
 }
 
-const SENT_METRIC: ChartMetric = {
-  name: "Sent",
-  integer: true,
-  format: (value) => `${value}`,
-};
+const SENT_SERIES: ChartSeries[] = [
+  {
+    key: "sent",
+    color: "var(--color-primary)",
+    metric: { name: "Sent", integer: true, format: (value) => `${value}` },
+  },
+];
 
 function sentTick(date: string) {
   return new Date(`${date}T00:00:00Z`).toLocaleDateString("en-US", {
@@ -486,7 +488,7 @@ function SentChart({
             timeZone: "UTC",
           })
         : `Week of ${sentTick(item.date)}`,
-    value: item.value,
+    values: { sent: item.value },
   }));
   return (
     <Panel
@@ -511,7 +513,7 @@ function SentChart({
       <div className="px-2 pb-3 pt-4 sm:px-4">
         <TimeSeriesChart
           points={points}
-          metric={SENT_METRIC}
+          series={SENT_SERIES}
           kind="bar"
           height={180}
         />

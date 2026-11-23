@@ -27,12 +27,13 @@ describe("buildChartPoints", () => {
     const points = buildChartPoints({
       series,
       annotations: [],
-      metric: "impressions",
       granularity: "week",
       from: null,
       hasCompare: false,
     });
-    expect(points.map((p) => [p.key, p.value, p.partialNote])).toEqual([
+    expect(
+      points.map((p) => [p.key, p.values.impressions, p.partialNote]),
+    ).toEqual([
       ["2026-11-09", 5, "1 of 7 days"],
       ["2026-11-16", 70, undefined],
     ]);

@@ -3,6 +3,7 @@ import {
   SearchInsightsPage,
   type SearchInsightsPatch,
 } from "@/client/features/gsc-history/SearchInsightsPage";
+import { parseMetrics } from "@/client/features/gsc-history/searchSeries";
 import { searchInsightsSearchSchema } from "@/types/schemas/gsc-history";
 
 // Search Insights (fork feature, see FORK-CHANGES.md). Period, comparison,
@@ -20,14 +21,20 @@ function SearchInsightsRoute() {
   const onChange = (patch: SearchInsightsPatch) =>
     void navigate({
       search: (current) => {
-        const next = { ...current, ...patch };
+        const { metrics, ...rest } = patch;
+        const next = {
+          ...current,
+          ...rest,
+          ...(metrics ? { metrics: metrics.join(",") } : {}),
+        };
         // Defaults stay out of the URL.
         return {
           ...next,
           range: next.range === "28d" ? undefined : next.range,
           compare: next.compare === "previous" ? undefined : next.compare,
           gran: next.gran === "auto" ? undefined : next.gran,
-          metric: next.metric === "clicks" ? undefined : next.metric,
+          metrics:
+            next.metrics === "clicks,impressions" ? undefined : next.metrics,
           start: next.range === "custom" ? next.start : undefined,
           end: next.range === "custom" ? next.end : undefined,
           page: next.page || undefined,
@@ -47,7 +54,7 @@ function SearchInsightsRoute() {
         end: search.end,
         compare: search.compare ?? "previous",
         gran: search.gran ?? "auto",
-        metric: search.metric ?? "clicks",
+        metrics: parseMetrics(search.metrics),
         page: search.page,
         query: search.query,
         country: search.country,

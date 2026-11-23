@@ -6,7 +6,7 @@ import type {
 import { ANNOTATION_STYLES } from "@/client/features/gsc-history/annotationStyles";
 import type { Insights } from "@/client/features/gsc-history/types";
 
-// Turns the server's daily series into chart points for one metric at a
+// Turns the server's daily series into chart points with every metric at a
 // chosen granularity, with the notes that fall in each bucket.
 
 export type MetricKey = "clicks" | "impressions" | "ctr" | "position";
@@ -14,13 +14,24 @@ export type Granularity = "auto" | "day" | "week" | "month";
 
 const count = (value: number) => Math.round(value).toLocaleString("en-US");
 
-export const METRICS: Record<MetricKey, ChartMetric & { key: MetricKey }> = {
-  clicks: { key: "clicks", name: "Clicks", integer: true, format: count },
+export const METRICS: Record<
+  MetricKey,
+  ChartMetric & { key: MetricKey; color: string }
+> = {
+  // One fixed theme colour per metric: card, line and tooltip dot.
+  clicks: {
+    key: "clicks",
+    name: "Clicks",
+    integer: true,
+    format: count,
+    color: "var(--color-primary)",
+  },
   impressions: {
     key: "impressions",
     name: "Impressions",
     integer: true,
     format: count,
+    color: "var(--color-warning)",
   },
   ctr: {
     key: "ctr",
@@ -28,6 +39,7 @@ export const METRICS: Record<MetricKey, ChartMetric & { key: MetricKey }> = {
     integer: false,
     percent: true,
     format: (value) => `${(value * 100).toFixed(value >= 0.1 ? 0 : 1)}%`,
+    color: "var(--color-success)",
   },
   position: {
     key: "position",
@@ -35,6 +47,8 @@ export const METRICS: Record<MetricKey, ChartMetric & { key: MetricKey }> = {
     integer: false,
     inverted: true,
     format: (value) => value.toFixed(1),
+    // Orange-red, apart from the blue clicks line (as in Search Console).
+    color: "var(--color-error)",
   },
 };
 
@@ -102,6 +116,36 @@ function valueOf(sums: Sums, metric: MetricKey): number | null {
   }
 }
 
+export const METRIC_KEYS: MetricKey[] = [
+  "clicks",
+  "impressions",
+  "ctr",
+  "position",
+];
+
+/** The metrics in the URL ("clicks,ctr"); clicks and impressions by default. */
+export function parseMetrics(value: string | undefined): MetricKey[] {
+  const picked = METRIC_KEYS.filter((key) =>
+    (value ?? "").split(",").includes(key),
+  );
+  return picked.length ? picked : ["clicks", "impressions"];
+}
+const EMPTY_VALUES: Record<MetricKey, null> = {
+  clicks: null,
+  impressions: null,
+  ctr: null,
+  position: null,
+};
+
+function valuesOf(sums: Sums): Record<MetricKey, number | null> {
+  return {
+    clicks: valueOf(sums, "clicks"),
+    impressions: valueOf(sums, "impressions"),
+    ctr: valueOf(sums, "ctr"),
+    position: valueOf(sums, "position"),
+  };
+}
+
 function add(
   sums: Sums,
   day: { clicks: number; impressions: number; position: number | null },
@@ -128,12 +172,11 @@ export function chartStart(
 export function buildChartPoints(input: {
   series: Insights["series"];
   annotations: Insights["annotations"];
-  metric: MetricKey;
   granularity: "day" | "week" | "month";
   from: string | null;
   hasCompare: boolean;
 }): ChartPoint[] {
-  const { metric, granularity } = input;
+  const { granularity } = input;
   const days = input.from
     ? input.series.filter((day) => day.date >= (input.from ?? ""))
     : input.series;
@@ -213,19 +256,21 @@ export function buildChartPoints(input: {
       key,
       label,
       tick,
-      value: valueOf(bucket.current, metric),
+      values: valuesOf(bucket.current),
       ...(input.hasCompare
         ? {
-            compare: bucket.hasCompare ? valueOf(bucket.compare, metric) : null,
+            compare: bucket.hasCompare
+              ? valuesOf(bucket.compare)
+              : EMPTY_VALUES,
+            // Short: it heads a narrow tooltip column.
             compareLabel: bucket.compareStart
-              ? granularity === "day"
-                ? fmt(bucket.compareStart, {
-                    weekday: "short",
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                  })
-                : `From ${fmt(bucket.compareStart, { month: "short", day: "numeric", year: "numeric" })}`
+              ? fmt(bucket.compareStart, {
+                  month: "short",
+                  day: "numeric",
+                  ...(bucket.compareStart.slice(0, 4) !== key.slice(0, 4)
+                    ? { year: "2-digit" }
+                    : {}),
+                })
               : undefined,
           }
         : {}),

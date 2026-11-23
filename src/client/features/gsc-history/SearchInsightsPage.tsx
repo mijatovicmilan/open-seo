@@ -15,6 +15,7 @@ import {
   buildChartPoints,
   chartStart,
   type Granularity,
+  METRIC_KEYS,
   METRICS,
   type MetricKey,
   resolveGranularity,
@@ -45,7 +46,7 @@ export type SearchInsightsState = {
   end?: string;
   compare: SearchInsightsCompare;
   gran: Granularity;
-  metric: MetricKey;
+  metrics: MetricKey[];
   page?: string;
   query?: string;
   country?: string;
@@ -168,9 +169,9 @@ export function SearchInsightsPage({
                   <InsightsBody
                     projectId={projectId}
                     insights={insights}
-                    metric={state.metric}
+                    metrics={state.metrics}
                     granularity={resolvedGranularity}
-                    onMetric={(metric) => onChange({ metric })}
+                    onMetrics={(metrics) => onChange({ metrics })}
                   />
                 </InsightsFilterContext.Provider>
               </>
@@ -193,11 +194,11 @@ function periodText(range: { start: string; end: string }) {
 
 function ChartPanel({
   insights,
-  metric,
+  metrics,
   granularity,
 }: {
   insights: Insights;
-  metric: MetricKey;
+  metrics: MetricKey[];
   granularity: "day" | "week" | "month";
 }) {
   const { period } = insights;
@@ -213,12 +214,20 @@ function ChartPanel({
             (!insights.filter.page && !insights.filter.query) ||
             note.url === insights.filter.page,
         ),
-        metric,
         granularity,
         from,
         hasCompare: Boolean(period.previous),
       }),
-    [insights, metric, granularity, from, period.previous],
+    [insights, granularity, from, period.previous],
+  );
+  const series = useMemo(
+    () =>
+      METRIC_KEYS.filter((key) => metrics.includes(key)).map((key) => ({
+        key,
+        metric: METRICS[key],
+        color: METRICS[key].color,
+      })),
+    [metrics],
   );
   const trimmed = from && insights.series[0] && from > insights.series[0].date;
   const hasPartial = points.some((point) => point.partial);
@@ -227,19 +236,19 @@ function ChartPanel({
     <section className="rounded-xl border border-base-300 bg-base-100 p-4">
       <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-base-content/60">
         <span className="inline-flex items-center gap-1.5">
-          <span className="h-0.5 w-4 rounded bg-primary" />
+          <span className="h-0.5 w-4 rounded bg-base-content/70" />
           {periodText(period.current)}
         </span>
         {period.previous ? (
           <span className="inline-flex items-center gap-1.5">
-            <span className="w-4 border-t-2 border-dashed border-base-content/35" />
+            <span className="h-0.5 w-4 rounded bg-base-content/25" />
             {periodText(period.previous)}
           </span>
         ) : null}
         {hasPartial ? (
           <span className="inline-flex items-center gap-1.5">
-            <span className="w-4 border-t-2 border-dashed border-primary/55" />
-            Still reporting
+            <span className="w-4 border-t-2 border-dotted border-base-content/70" />
+            Incomplete days
           </span>
         ) : null}
         {period.compareMissing ? (
@@ -254,13 +263,7 @@ function ChartPanel({
           No impressions in this period.
         </div>
       ) : (
-        <TimeSeriesChart
-          points={points}
-          metric={METRICS[metric]}
-          compareName={
-            period.previous ? periodText(period.previous) : undefined
-          }
-        />
+        <TimeSeriesChart points={points} series={series} />
       )}
     </section>
   );
@@ -269,15 +272,15 @@ function ChartPanel({
 function InsightsBody({
   projectId,
   insights,
-  metric,
+  metrics,
   granularity,
-  onMetric,
+  onMetrics,
 }: {
   projectId: string;
   insights: Insights;
-  metric: MetricKey;
+  metrics: MetricKey[];
   granularity: "day" | "week" | "month";
-  onMetric: (metric: MetricKey) => void;
+  onMetrics: (metrics: MetricKey[]) => void;
 }) {
   const { period, changes } = insights;
   const curveNote =
@@ -292,14 +295,14 @@ function InsightsBody({
       <MetricCards
         totals={insights.totals}
         prevTotals={insights.prevTotals}
-        selected={metric}
-        onSelect={onMetric}
+        selected={metrics}
+        onChange={onMetrics}
         compareLabel={period.previous ? periodText(period.previous) : null}
       />
 
       <ChartPanel
         insights={insights}
-        metric={metric}
+        metrics={metrics}
         granularity={granularity}
       />
 

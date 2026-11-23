@@ -72,7 +72,10 @@ export function DashboardOnboarding({
       <header className="border-b border-base-300 px-5 py-5 sm:px-6">
         <h2 className="text-lg font-semibold">Set up your workspace</h2>
         <p className="mt-1 text-sm text-base-content/65">
-          Add your website, connect your tools, and invite your team.
+          {/* Fork addition (FORK-CHANGES.md): no team when self-hosted. */}
+          {isHostedClientAuthMode()
+            ? "Add your website, connect your tools, and invite your team."
+            : "Add your website and connect your tools."}
         </p>
       </header>
       {remaining.map((item) => {

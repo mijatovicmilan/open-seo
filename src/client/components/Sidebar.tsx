@@ -81,13 +81,17 @@ function SidebarNavLink({
   );
 }
 
+// Fork addition (FORK-CHANGES.md): SAM, the in-app chat agent, is hidden
+// (no Chat tab); the code stays for upstream merges.
+const SHOW_SAM_CHAT = false;
+
 export function Sidebar({ projectId, onNavigate, onClose }: SidebarProps) {
   const navGroups = projectId
     ? getProjectNavGroups(projectId)
     : [connectNavGroup];
   const navigate = useNavigate();
   const location = useLocation();
-  const onSamRoute = location.pathname.includes("/sam");
+  const onSamRoute = SHOW_SAM_CHAT && location.pathname.includes("/sam");
 
   // PostHog-style sidebar tabs: Browse shows the regular nav, Chat shows the
   // SAM chat history. The tab is view state (switching to Browse leaves the
@@ -151,7 +155,7 @@ export function Sidebar({ projectId, onNavigate, onClose }: SidebarProps) {
         />
       </div>
 
-      {projectId ? (
+      {projectId && SHOW_SAM_CHAT ? (
         // Same underline tab idiom as the in-page tab strips (e.g. Domain
         // Overview's Top Keywords / Top Pages).
         <div className="px-3 pb-1">
@@ -261,12 +265,16 @@ function SidebarFooter({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <div className="shrink-0 border-t border-base-300 px-2 py-2 pb-safe">
-      <SidebarNavLink
-        icon={CircleHelp}
-        label="Help & Community"
-        onNavigate={onNavigate}
-        linkProps={{ to: "/support" }}
-      />
+      {/* Fork addition (FORK-CHANGES.md): no Help & Community (support)
+          link when self-hosted. */}
+      {isHostedMode ? (
+        <SidebarNavLink
+          icon={CircleHelp}
+          label="Help & Community"
+          onNavigate={onNavigate}
+          linkProps={{ to: "/support" }}
+        />
+      ) : null}
 
       {email ? (
         <div className="dropdown dropdown-top w-full">

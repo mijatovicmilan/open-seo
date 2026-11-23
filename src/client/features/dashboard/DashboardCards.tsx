@@ -64,7 +64,8 @@ export function GscCard({
       stamp="Google Search Console · last 28 days"
       action={
         <Link
-          to="/p/$projectId/search-performance"
+          // Fork addition (FORK-CHANGES.md): Search Insights replaces GSC Insights.
+          to="/p/$projectId/search-insights"
           params={{ projectId }}
           className={moreDetailsClass}
         >

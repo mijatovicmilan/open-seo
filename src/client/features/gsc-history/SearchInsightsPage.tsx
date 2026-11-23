@@ -1,6 +1,5 @@
-import { Link } from "@tanstack/react-router";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { ArrowRight, Info, Loader2 } from "lucide-react";
+import { Info, Loader2 } from "lucide-react";
 import { SearchConsoleConnectionCard } from "@/client/features/gsc/SearchConsoleConnectionCard";
 import {
   ChartPanel,
@@ -312,13 +311,6 @@ function InsightsBody({
             <Info className="size-3.5" aria-label="About this data" />
           </span>
         </span>
-        <Link
-          to="/p/$projectId/search-performance"
-          params={{ projectId }}
-          className="btn btn-ghost btn-xs gap-1 text-base-content/60"
-        >
-          Live GSC view <ArrowRight className="size-3" />
-        </Link>
       </div>
     </>
   );

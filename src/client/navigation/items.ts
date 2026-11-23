@@ -145,7 +145,8 @@ export function getProjectNavGroups(projectId: string) {
     {
       label: "My Site",
       items: [
-        byPath("/p/$projectId/search-performance"),
+        // Fork addition (FORK-CHANGES.md): GSC Insights (search-performance)
+        // is hidden; Search Insights replaces it and its route redirects.
         byPath("/p/$projectId/search-insights"),
         byPath("/p/$projectId/rank-tracking"),
         byPath("/p/$projectId/saved"),

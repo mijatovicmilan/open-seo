@@ -81,8 +81,8 @@ export function CompetitorsSection({
       {competitors.length === 0 ? (
         adding ? null : (
           <EmptyState>
-            No competitors yet. Add the sites you compete with, or ask SAM to
-            find them from your rankings and save them here.
+            No competitors yet. Add the sites you compete with, or ask your AI
+            client to find them from your rankings and save them here.
           </EmptyState>
         )
       ) : (

@@ -4,6 +4,7 @@ import { TimeSeriesChart } from "@/client/features/charts/TimeSeriesChart";
 import {
   type NoteAnchor,
   type NoteDraft,
+  isManual,
   NoteEditor,
   NotesList,
 } from "@/client/features/gsc-history/AnnotationsPanel";
@@ -124,7 +125,7 @@ export function ChartPanel({
           <button
             type="button"
             className="btn btn-ghost btn-xs gap-1 text-base-content/60"
-            title="Add a note, or click a day on the chart"
+            title="Add a note"
             onClick={(event) => {
               const rect = event.currentTarget.getBoundingClientRect();
               openEditor(
@@ -150,7 +151,7 @@ export function ChartPanel({
         <TimeSeriesChart
           points={points}
           series={series}
-          onPointClick={(key, at) =>
+          onAddNote={(key, at) =>
             openEditor(
               {
                 date:
@@ -164,6 +165,20 @@ export function ChartPanel({
               at,
             )
           }
+          onEditNote={(note, at) => {
+            const kind = note.kind;
+            if (!note.id || !note.date || !isManual(kind)) return;
+            openEditor(
+              {
+                id: note.id,
+                date: note.date,
+                kind,
+                label: note.text,
+                url: note.url ?? "",
+              },
+              at,
+            );
+          }}
         />
       )}
       {showNotes ? (

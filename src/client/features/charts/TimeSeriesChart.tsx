@@ -1,5 +1,11 @@
 /* eslint-disable max-lines -- the shared chart, its axes, markers and tooltip (fork feature) */
-import { type SyntheticEvent, useMemo, useState } from "react";
+import {
+  type KeyboardEvent,
+  type SyntheticEvent,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 import {
   Bar,
   BarChart,
@@ -12,7 +18,11 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { TooltipContentProps } from "recharts";
+import { TooltipLayer } from "@/client/features/charts/ChartTooltip";
+import {
+  type ShownDay,
+  useChartTooltip,
+} from "@/client/features/charts/useChartTooltip";
 import { useChartWidth } from "@/client/features/rank-tracking/RankTrackingTrendChart";
 
 // One time-series chart for the fork's Outreach and Search Insights pages,
@@ -34,6 +44,13 @@ export type ChartNote = {
   color: string;
   /** Text for the tooltip ("Link from Example Blog"). */
   text: string;
+  /** The day it belongs to (YYYY-MM-DD). */
+  date?: string;
+  /** Opened in a new tab from the tooltip. */
+  url?: string | null;
+  id?: string | null;
+  /** A note people wrote: the tooltip offers to edit it. */
+  editable?: boolean;
 };
 
 export type ChartPoint = {
@@ -125,148 +142,111 @@ function axisFor(points: ChartPoint[], series: ChartSeries) {
 
 type Row = ChartPoint & Record<string, unknown>;
 
-/** The change against the comparison, as Plausible's tooltip shows it: a
- *  plain difference for small counts (2 → 5 is +3, not +150%), a percentage
- *  otherwise; position counts places, and fewer places is better. */
-function ChangeCell({
-  metric,
-  value,
-  prior,
+export type ScreenPoint = { x: number; y: number };
+
+type HandlerState = {
+  activeLabel?: string | number;
+  activeCoordinate?: { x: number; y: number };
+};
+
+const AXIS_WIDTH = 44;
+
+/** A note marker under the baseline; merged markers show their count. A
+ *  click pins a tooltip with every mark it holds. */
+function NoteMarker({
+  cx,
+  cy,
+  count,
+  onOpen,
 }: {
-  metric: ChartMetric;
-  value: number | null | undefined;
-  prior: number | null | undefined;
+  cx: number;
+  cy: number;
+  count: number;
+  onOpen: (cx: number, cy: number) => void;
 }) {
-  if (
-    value === null ||
-    value === undefined ||
-    prior === null ||
-    prior === undefined
-  ) {
-    return <td className="py-0.5 pl-2 text-right text-base-content/30">—</td>;
-  }
-  const diff = value - prior;
-  let text: string;
-  if (metric.inverted) {
-    text = `${diff < 0 ? "+" : diff > 0 ? "−" : ""}${Math.abs(diff).toFixed(1)}`;
-  } else if (metric.percent) {
-    text = `${diff >= 0 ? "+" : "−"}${Math.abs(diff * 100).toFixed(1)} pt`;
-  } else if (prior < 20 || prior === 0) {
-    text = `${diff > 0 ? "+" : diff < 0 ? "−" : ""}${Math.abs(diff).toLocaleString("en-US")}`;
-  } else {
-    const pct = (diff / prior) * 100;
-    text = `${pct >= 0 ? "+" : "−"}${Math.abs(pct).toFixed(0)}%`;
-  }
-  const better = metric.inverted ? diff < 0 : diff > 0;
-  const tone =
-    Math.abs(diff) < 1e-9
-      ? "text-base-content/40"
-      : better
-        ? "text-success"
-        : "text-error";
   return (
-    <td className={`py-0.5 pl-2 text-right tabular-nums ${tone}`}>
-      {Math.abs(diff) < 1e-9 ? "0" : text}
-    </td>
+    <g
+      role="button"
+      aria-label={`${count} ${count === 1 ? "mark" : "marks"}`}
+      style={{ cursor: "pointer" }}
+      onClick={(event) => {
+        event.stopPropagation();
+        onOpen(cx, cy);
+      }}
+    >
+      <circle cx={cx} cy={cy} r={11} fill="transparent" />
+      <circle
+        cx={cx}
+        cy={cy}
+        r={count > 1 ? 6 : 3.5}
+        fill={NOTE}
+        stroke="var(--color-base-100)"
+        strokeWidth={1.5}
+      />
+      {count > 1 ? (
+        <text
+          x={cx}
+          y={cy + 3}
+          textAnchor="middle"
+          fontSize={8}
+          fontWeight={600}
+          fill="var(--color-base-100)"
+        >
+          {count}
+        </text>
+      ) : null}
+    </g>
   );
 }
 
-function TooltipCard({
-  point,
-  series,
-}: {
-  point: ChartPoint;
-  series: ChartSeries[];
-}) {
-  const notes = point.notes ?? [];
-  const hasCompare = Boolean(point.compare);
-  return (
-    <div className="w-72 max-w-[calc(100vw-32px)] rounded-lg border border-base-300 bg-base-100 p-3 text-xs shadow-lg">
-      <div className="mb-2 flex items-baseline justify-between gap-2">
-        <span className="font-medium text-base-content">{point.label}</span>
-        {point.partial ? (
-          <span className="text-base-content/50">
-            {point.partialNote ?? "partial data"}
-          </span>
-        ) : null}
-      </div>
-      <table className="w-full">
-        {hasCompare ? (
-          <thead>
-            <tr className="text-[10px] uppercase tracking-wide text-base-content/40">
-              <th />
-              <th className="pb-1 text-right font-normal">This</th>
-              <th
-                className="max-w-20 truncate pb-1 pl-2 text-right font-normal"
-                title={point.compareLabel}
-              >
-                {point.compareLabel ?? "Before"}
-              </th>
-              <th className="pb-1 pl-2 text-right font-normal">Change</th>
-            </tr>
-          </thead>
-        ) : null}
-        <tbody>
-          {series.map((s) => {
-            const value = point.values[s.key];
-            const prior = point.compare?.[s.key];
-            return (
-              <tr key={s.key}>
-                <td className="py-0.5">
-                  <span className="flex items-center gap-2 text-base-content/70">
-                    <span
-                      className="size-2 shrink-0 rounded-full"
-                      style={{ backgroundColor: s.color }}
-                    />
-                    {s.metric.name}
-                  </span>
-                </td>
-                <td className="py-0.5 text-right font-medium tabular-nums text-base-content">
-                  {value === null || value === undefined
-                    ? "—"
-                    : s.metric.format(value)}
-                </td>
-                {hasCompare ? (
-                  <td className="py-0.5 pl-2 text-right tabular-nums text-base-content/50">
-                    {prior === null || prior === undefined
-                      ? "—"
-                      : s.metric.format(prior)}
-                  </td>
-                ) : null}
-                {hasCompare ? (
-                  <ChangeCell metric={s.metric} value={value} prior={prior} />
-                ) : null}
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-      {notes.length ? (
-        <ul className="mt-2 space-y-1 border-t border-base-300 pt-2">
-          {notes.slice(0, 4).map((note, index) => (
-            <li
-              key={`${note.kind}-${index}`}
-              className="flex items-start gap-2"
-            >
-              <span
-                className="mt-1 size-1.5 shrink-0 rounded-full"
-                style={{ backgroundColor: note.color }}
-              />
-              <span className="min-w-0 flex-1">
-                <span className="text-base-content/50">{note.label} · </span>
-                <span className="break-words text-base-content/80">
-                  {note.text}
-                </span>
-              </span>
-            </li>
-          ))}
-          {notes.length > 4 ? (
-            <li className="text-base-content/50">+{notes.length - 4} more</li>
-          ) : null}
-        </ul>
-      ) : null}
-    </div>
+/** Markers closer than ~16px merge into one with a count; clicking one
+ *  pins a tooltip listing all of them. */
+/** Per series: the complete points (solid line), the incomplete ones (a
+ *  separate faint line) and the comparison. */
+function toRows(points: ChartPoint[], series: ChartSeries[]): Row[] {
+  return points.map((p) => {
+    const row: Row = { ...p };
+    for (const s of series) {
+      const value = p.values[s.key] ?? null;
+      row[`${s.key}__solid`] = p.partial ? null : value;
+      // Incomplete days stand apart: faint, never joined to the last
+      // complete day, so a half-reported day does not read as a drop.
+      row[`${s.key}__partial`] = p.partial ? value : null;
+      row[`${s.key}__compare`] = p.compare?.[s.key] ?? null;
+    }
+    return row;
+  });
+}
+
+function mergeMarkers(rows: Row[], width: number) {
+  const plotWidth = Math.max(1, width - 96);
+  const window = Math.max(
+    1,
+    Math.ceil(16 / (plotWidth / Math.max(1, rows.length))),
   );
+  const out: Array<{ key: string; notes: ChartNote[] }> = [];
+  let lastIndex = -Infinity;
+  rows.forEach((row, index) => {
+    if (!row.notes?.length) return;
+    const last = out.at(-1);
+    if (last && index - lastIndex < window) {
+      last.notes.push(...row.notes);
+      return;
+    }
+    out.push({ key: row.key, notes: [...row.notes] });
+    lastIndex = index;
+  });
+  return out;
+}
+
+/** The day the arrow keys, Home and End move to; null for other keys. */
+function keyMove(key: string, current: number, last: number): number | null {
+  if (key === "Home") return 0;
+  if (key === "End") return last;
+  if (key === "ArrowRight")
+    return current < 0 ? last : Math.min(last, current + 1);
+  if (key === "ArrowLeft") return current < 0 ? last : Math.max(0, current - 1);
+  return null;
 }
 
 export function TimeSeriesChart({
@@ -274,17 +254,28 @@ export function TimeSeriesChart({
   series,
   kind = "line",
   height = 240,
-  onPointClick,
+  onAddNote,
+  onEditNote,
 }: {
   points: ChartPoint[];
   series: ChartSeries[];
   kind?: "line" | "bar";
   height?: number;
-  /** Clicking a day (e.g. to add a note there), with where it was clicked. */
-  onPointClick?: (key: string, at: { x: number; y: number }) => void;
+  /** "Note on this day" in the pinned tooltip, with where to open the editor
+   *  (viewport pixels). */
+  onAddNote?: (key: string, at: ScreenPoint) => void;
+  /** The pencil next to a note people wrote. */
+  onEditNote?: (note: ChartNote, at: ScreenPoint) => void;
 }) {
   const { containerRef, width } = useChartWidth();
-  const [activeKey, setActiveKey] = useState<string | null>(null);
+  const boxRef = useRef<HTMLDivElement | null>(null);
+  const setBox = useCallback(
+    (el: HTMLDivElement | null) => {
+      boxRef.current = el;
+      containerRef(el);
+    },
+    [containerRef],
+  );
   const hasCompare = points.some((p) => p.compare);
   const hasNotes = points.some((p) => p.notes?.length);
   const showDots = points.length <= 45;
@@ -294,49 +285,50 @@ export function TimeSeriesChart({
     [points, series],
   );
 
-  // Per series: the complete points (solid line), the incomplete ones (a
-  // separate faint line) and the comparison.
-  const rows: Row[] = useMemo(
-    () =>
-      points.map((p) => {
-        const row: Row = { ...p };
-        for (const s of series) {
-          const value = p.values[s.key] ?? null;
-          row[`${s.key}__solid`] = p.partial ? null : value;
-          // Incomplete days stand apart: faint, never joined to the last
-          // complete day, so a half-reported day does not read as a drop.
-          row[`${s.key}__partial`] = p.partial ? value : null;
-          row[`${s.key}__compare`] = p.compare?.[s.key] ?? null;
-        }
-        return row;
-      }),
-    [points, series],
-  );
+  const rows = useMemo(() => toRows(points, series), [points, series]);
 
-  // Markers closer than ~16px merge into one with a count; the tooltip still
-  // lists each day's own notes.
-  const markers = useMemo(() => {
-    const plotWidth = Math.max(1, width - 96);
-    const window = Math.max(
-      1,
-      Math.ceil(16 / (plotWidth / Math.max(1, rows.length))),
-    );
-    const out: Array<{ key: string; notes: ChartNote[] }> = [];
-    let lastIndex = -Infinity;
-    rows.forEach((row, index) => {
-      if (!row.notes?.length) return;
-      const last = out.at(-1);
-      if (last && index - lastIndex < window) {
-        last.notes.push(...row.notes);
-        return;
-      }
-      out.push({ key: row.key, notes: [...row.notes] });
-      lastIndex = index;
-    });
-    return out;
-  }, [rows, width]);
+  const markers = useMemo(() => mergeMarkers(rows, width), [rows, width]);
 
-  const activeRow = rows.find((row) => row.key === activeKey);
+  const notesOf = (day: ShownDay) =>
+    day.group ?? rows.find((row) => row.key === day.key)?.notes ?? [];
+  const tip = useChartTooltip(boxRef, (day) => notesOf(day).length > 0);
+  const shownRow = tip.shown
+    ? rows.find((row) => row.key === tip.shown?.key)
+    : undefined;
+  const shownNotes = tip.shown ? notesOf(tip.shown) : [];
+
+  const margin = {
+    top: 8,
+    right: axes.length > 1 ? 0 : 8,
+    bottom: 12,
+    left: 0,
+  };
+  // Where a day sits, for the keyboard (the pointer reports its own).
+  const plotLeft = margin.left + AXIS_WIDTH;
+  const plotWidth =
+    width - margin.right - (axes.length > 1 ? AXIS_WIDTH : 0) - plotLeft;
+  const xAt = (index: number) => {
+    const n = rows.length;
+    if (kind === "bar") return plotLeft + ((index + 0.5) * plotWidth) / n;
+    return n > 1 ? plotLeft + (index * plotWidth) / (n - 1) : plotLeft;
+  };
+  const dayFrom = (
+    state: HandlerState,
+    event: SyntheticEvent,
+  ): ShownDay | null => {
+    const key =
+      typeof state.activeLabel === "string" ? state.activeLabel : null;
+    if (!key) return null;
+    const index = rows.findIndex((row) => row.key === key);
+    const native = event.nativeEvent;
+    const top = boxRef.current?.getBoundingClientRect().top ?? 0;
+    return {
+      key,
+      x: state.activeCoordinate?.x ?? xAt(index),
+      y: native instanceof MouseEvent ? native.clientY - top : height * 0.35,
+    };
+  };
+
   const baseAxis = axes[0];
   const baseline = baseAxis?.series.metric.inverted
     ? (baseAxis.domain[1] ?? 1)
@@ -394,26 +386,20 @@ export function TimeSeriesChart({
           width={44}
         />
       ))}
+      {/* Only for the hover dots; the card is drawn below, outside the SVG,
+          so it can be reached and pinned. */}
       <Tooltip
-        cursor={
-          kind === "bar"
-            ? { fill: "currentColor", fillOpacity: 0.05 }
-            : { stroke: "currentColor", strokeOpacity: 0.2 }
-        }
-        wrapperStyle={{ outline: "none", zIndex: 20 }}
-        content={(props: TooltipContentProps<number, string>) => {
-          const key = typeof props.label === "string" ? props.label : null;
-          const row = rows.find((item) => item.key === key);
-          if (!props.active || !row) return null;
-          return <TooltipCard point={row} series={series} />;
-        }}
+        cursor={false}
+        active={tip.pinned ? false : undefined}
+        content={() => null}
       />
-      {activeRow?.notes?.length ? (
+      {shownRow ? (
         <ReferenceLine
-          x={activeRow.key}
+          x={shownRow.key}
           yAxisId={baseAxis?.series.key}
-          stroke={NOTE}
-          strokeDasharray="3 3"
+          stroke={shownNotes.length ? NOTE : "currentColor"}
+          strokeOpacity={shownNotes.length ? 1 : 0.2}
+          strokeDasharray={shownNotes.length ? "3 3" : undefined}
           ifOverflow="visible"
         />
       ) : null}
@@ -424,73 +410,57 @@ export function TimeSeriesChart({
           y={baseline}
           yAxisId={baseAxis?.series.key}
           ifOverflow="visible"
-          shape={(shapeProps: { cx?: number; cy?: number }) => {
-            const cx = shapeProps.cx ?? 0;
-            // Just under the baseline, apart from the lines' own dots.
-            const cy = (shapeProps.cy ?? 0) + 10;
-            const count = marker.notes.length;
-            return (
-              <g>
-                <circle
-                  cx={cx}
-                  cy={cy}
-                  r={count > 1 ? 6 : 3.5}
-                  fill={NOTE}
-                  stroke="var(--color-base-100)"
-                  strokeWidth={1.5}
-                />
-                {count > 1 ? (
-                  <text
-                    x={cx}
-                    y={cy + 3}
-                    textAnchor="middle"
-                    fontSize={8}
-                    fontWeight={600}
-                    fill="var(--color-base-100)"
-                  >
-                    {count}
-                  </text>
-                ) : null}
-              </g>
-            );
-          }}
+          shape={(shapeProps: { cx?: number; cy?: number }) => (
+            <NoteMarker
+              cx={shapeProps.cx ?? 0}
+              // Just under the baseline, apart from the lines' own dots.
+              cy={(shapeProps.cy ?? 0) + 10}
+              count={marker.notes.length}
+              onOpen={(cx, cy) =>
+                tip.pin({
+                  key: marker.key,
+                  x: cx,
+                  y: cy - 10,
+                  group: marker.notes,
+                })
+              }
+            />
+          )}
         />
       ))}
     </>
   );
 
-  const onMove = (state: { activeLabel?: string | number }) => {
-    const label =
-      typeof state.activeLabel === "string" ? state.activeLabel : null;
-    if (label !== activeKey) setActiveKey(label);
+  const onMove = (state: HandlerState, event: SyntheticEvent) => {
+    const day = dayFrom(state, event);
+    if (day) tip.hover(day);
   };
-  const onClick = (
-    state: { activeLabel?: string | number },
-    event: SyntheticEvent,
-  ) => {
-    const label =
-      typeof state.activeLabel === "string" ? state.activeLabel : null;
-    if (!label || !onPointClick) return;
-    const native = event.nativeEvent;
-    onPointClick(
-      label,
-      native instanceof MouseEvent
-        ? { x: native.clientX, y: native.clientY }
-        : { x: window.innerWidth / 2, y: window.innerHeight / 3 },
+  const onClick = (state: HandlerState, event: SyntheticEvent) => {
+    const day = dayFrom(state, event);
+    if (day) tip.click(day);
+  };
+  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.target !== event.currentTarget || rows.length === 0) return;
+    const index = keyMove(
+      event.key,
+      rows.findIndex((row) => row.key === tip.shown?.key),
+      rows.length - 1,
     );
-  };
-  const margin = {
-    top: 8,
-    right: axes.length > 1 ? 0 : 8,
-    bottom: 12,
-    left: 0,
+    const row = index === null ? undefined : rows[index];
+    if (index === null || !row) return;
+    event.preventDefault();
+    tip.pin({ key: row.key, x: xAt(index), y: height * 0.35 });
   };
 
   return (
     <div
-      ref={containerRef}
+      ref={setBox}
+      tabIndex={0}
+      role="group"
+      aria-label="Chart. Arrow keys move between days; Escape closes the details."
+      onKeyDown={onKeyDown}
       // recharts focuses its surface on click; the app shows no ring there.
-      className="w-full min-w-0 [&_*:focus]:outline-none"
+      className="relative w-full min-w-0 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/50 [&_.recharts-wrapper_*:focus]:outline-none"
       style={{ height }}
     >
       {width > 0 ? (
@@ -501,7 +471,9 @@ export function TimeSeriesChart({
             data={rows}
             margin={margin}
             onMouseMove={onMove}
-            onMouseLeave={() => setActiveKey(null)}
+            onMouseLeave={tip.leave}
+            onClick={onClick}
+            accessibilityLayer={false}
           >
             {chartParts}
             {series.map((s) => (
@@ -524,9 +496,10 @@ export function TimeSeriesChart({
             data={rows}
             margin={margin}
             onMouseMove={onMove}
-            onMouseLeave={() => setActiveKey(null)}
+            onMouseLeave={tip.leave}
             onClick={onClick}
-            style={onPointClick ? { cursor: "pointer" } : undefined}
+            accessibilityLayer={false}
+            style={{ cursor: "pointer" }}
           >
             {chartParts}
             {hasCompare
@@ -576,6 +549,37 @@ export function TimeSeriesChart({
             ))}
           </LineChart>
         )
+      ) : null}
+      {tip.shown && shownRow ? (
+        <TooltipLayer
+          key={`${shownRow.key}-${tip.shown.group ? "group" : "day"}`}
+          day={tip.shown}
+          pinned={tip.pinned}
+          point={shownRow}
+          series={series}
+          notes={shownNotes}
+          chartWidth={width}
+          chartHeight={height}
+          onEnter={tip.enterCard}
+          onLeave={tip.leaveCard}
+          onClose={tip.close}
+          onAddNote={
+            onAddNote
+              ? (at) => {
+                  tip.close();
+                  onAddNote(shownRow.key, at);
+                }
+              : undefined
+          }
+          onEditNote={
+            onEditNote
+              ? (note, at) => {
+                  tip.close();
+                  onEditNote(note, at);
+                }
+              : undefined
+          }
+        />
       ) : null}
     </div>
   );

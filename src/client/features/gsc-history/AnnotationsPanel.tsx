@@ -43,7 +43,7 @@ const KIND_ITEMS = GSC_ANNOTATION_KINDS.map((kind) => ({
 const POPOVER_WIDTH = 320;
 
 /** Notes people add; outreach links and first-seen pages are derived. */
-function isManual(kind: string): kind is GscAnnotationKind {
+export function isManual(kind: string): kind is GscAnnotationKind {
   return GSC_ANNOTATION_KINDS.some((item) => item === kind);
 }
 

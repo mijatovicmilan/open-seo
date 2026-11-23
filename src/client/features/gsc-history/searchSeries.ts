@@ -5,6 +5,7 @@ import type {
 } from "@/client/features/charts/TimeSeriesChart";
 import { ANNOTATION_STYLES } from "@/client/features/gsc-history/annotationStyles";
 import type { Insights } from "@/client/features/gsc-history/types";
+import { GSC_ANNOTATION_KINDS } from "@/types/schemas/gsc-history";
 
 // Turns the server's daily series into chart points with every metric at a
 // chosen granularity, with the notes that fall in each bucket.
@@ -84,12 +85,13 @@ function bucketKey(day: string, granularity: "day" | "week" | "month") {
   return addDays(day, -((weekday + 6) % 7));
 }
 
-function shortPath(url: string) {
+/** The page's path; the tooltip truncates it with "…" and shows it whole
+ *  on hover. */
+function pathOf(url: string) {
   try {
-    const path = new URL(url).pathname;
-    return path.length > 48 ? `${path.slice(0, 47)}…` : path;
+    return new URL(url).pathname;
   } catch {
-    return url.length > 48 ? `${url.slice(0, 47)}…` : url;
+    return url;
   }
 }
 
@@ -97,13 +99,19 @@ function noteFor(annotation: Insights["annotations"][number]): ChartNote {
   const style = ANNOTATION_STYLES[annotation.kind];
   const text =
     annotation.kind === "first_seen" && annotation.url
-      ? shortPath(annotation.url)
+      ? pathOf(annotation.url)
       : annotation.label;
   return {
     kind: annotation.kind,
     label: style.label,
     color: style.color,
     text,
+    date: annotation.date,
+    url: annotation.url,
+    id: annotation.id,
+    editable:
+      Boolean(annotation.id) &&
+      GSC_ANNOTATION_KINDS.some((kind) => kind === annotation.kind),
   };
 }
 

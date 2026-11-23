@@ -26,6 +26,14 @@ const COMPARE_OPTIONS: Array<{ value: SearchInsightsCompare; label: string }> =
     { value: "none", label: "No comparison" },
   ];
 
+type Device = "desktop" | "mobile" | "tablet";
+
+const DEVICE_OPTIONS: Array<{ value: Device; label: string }> = [
+  { value: "desktop", label: "Desktop" },
+  { value: "mobile", label: "Mobile" },
+  { value: "tablet", label: "Tablet" },
+];
+
 const GRANULARITY_LABELS: Array<{ value: Granularity; label: string }> = [
   { value: "auto", label: "Auto" },
   { value: "day", label: "Day" },
@@ -69,6 +77,10 @@ export function InsightsControls({
   granularity,
   resolvedGranularity,
   bounds,
+  country,
+  device,
+  countries,
+  segmentsPending,
   onChange,
 }: {
   range: SearchInsightsRange;
@@ -78,12 +90,18 @@ export function InsightsControls({
   granularity: Granularity;
   resolvedGranularity: "day" | "week" | "month";
   bounds: { oldest: string | null; newest: string | null };
+  country?: string;
+  device?: Device;
+  countries: Array<{ country: string; impressions: number }>;
+  segmentsPending: boolean;
   onChange: (patch: {
     range?: SearchInsightsRange;
     start?: string;
     end?: string;
     compare?: SearchInsightsCompare;
     gran?: Granularity;
+    country?: string;
+    device?: Device;
   }) => void;
 }) {
   const [draftStart, setDraftStart] = useState(start ?? "");
@@ -136,6 +154,48 @@ export function InsightsControls({
           value={granularity}
           onChange={(value) => onChange({ gran: value })}
         />
+        <select
+          className="select select-bordered select-xs w-auto"
+          value={country ?? ""}
+          aria-label="Country"
+          title={
+            segmentsPending
+              ? "Country data is still being added for older days"
+              : undefined
+          }
+          onChange={(event) =>
+            onChange({ country: event.target.value || undefined })
+          }
+        >
+          <option value="">All countries</option>
+          {country && !countries.some((row) => row.country === country) ? (
+            <option value={country}>{country.toUpperCase()}</option>
+          ) : null}
+          {countries.map((row) => (
+            <option key={row.country} value={row.country}>
+              {row.country.toUpperCase()} ·{" "}
+              {row.impressions.toLocaleString("en-US")}
+            </option>
+          ))}
+        </select>
+        <select
+          className="select select-bordered select-xs w-auto"
+          value={device ?? ""}
+          aria-label="Device"
+          onChange={(event) => {
+            const next = DEVICE_OPTIONS.find(
+              (option) => option.value === event.target.value,
+            );
+            onChange({ device: next?.value });
+          }}
+        >
+          <option value="">All devices</option>
+          {DEVICE_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
       </div>
       {showCustom ? (
         <form
@@ -185,17 +245,23 @@ export function InsightsControls({
   );
 }
 
+type FilterKey = "page" | "query" | "country" | "device";
+
 export function FilterChips({
   page,
   query,
+  country,
+  device,
   onClear,
 }: {
   page?: string;
   query?: string;
-  onClear: (key: "page" | "query") => void;
+  country?: string;
+  device?: Device;
+  onClear: (key: FilterKey) => void;
 }) {
-  if (!page && !query) return null;
-  const chip = (key: "page" | "query", label: string, value: string) => (
+  if (!page && !query && !country && !device) return null;
+  const chip = (key: FilterKey, label: string, value: string) => (
     <span className="badge badge-sm gap-1 border-base-300 bg-base-200 py-2.5 pl-2 pr-1 text-base-content/80">
       <span className="text-base-content/50">{label}</span>
       <span className="max-w-[14rem] truncate" title={value}>
@@ -222,6 +288,15 @@ export function FilterChips({
       <span className="text-xs text-base-content/50">Filtered to</span>
       {page ? chip("page", "Page", path) : null}
       {query ? chip("query", "Query", query) : null}
+      {country ? chip("country", "Country", country.toUpperCase()) : null}
+      {device
+        ? chip(
+            "device",
+            "Device",
+            DEVICE_OPTIONS.find((option) => option.value === device)?.label ??
+              device,
+          )
+        : null}
     </div>
   );
 }

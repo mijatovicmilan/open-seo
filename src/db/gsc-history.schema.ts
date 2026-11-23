@@ -33,6 +33,9 @@ export const gscDailyTotals = sqliteTable(
     // Impression-weighted average position.
     position: real("position").notNull(),
     syncedAt: text("synced_at").notNull().default(isoNow),
+    // When the day's country and device rows were stored; null while they
+    // are still to fetch (days stored before those tables existed).
+    segmentsSyncedAt: text("segments_synced_at"),
   },
   (table) => [primaryKey({ columns: [table.projectId, table.date] })],
 );
@@ -85,6 +88,60 @@ export const gscDailyQueryPages = sqliteTable(
       table.query,
       table.date,
     ),
+  ],
+);
+
+// Per country and device per day (dimensions country, device): the
+// totals behind the country and device filters. Country is GSC's ISO 3166
+// alpha-3 code in lower case ("usa"), device is desktop, mobile or tablet.
+export const gscDailySegments = sqliteTable(
+  "gsc_daily_segments",
+  {
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    date: text("date").notNull(),
+    country: text("country").notNull(),
+    device: text("device").notNull(),
+    clicks: integer("clicks").notNull(),
+    impressions: integer("impressions").notNull(),
+    position: real("position").notNull(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.projectId, table.date, table.country, table.device],
+    }),
+  ],
+);
+
+// Per query, page, country and device per day, capped per day like the
+// query x page rows: the tables under a country or device filter.
+export const gscDailyQueryPageSegments = sqliteTable(
+  "gsc_daily_query_page_segments",
+  {
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    date: text("date").notNull(),
+    query: text("query").notNull(),
+    page: text("page").notNull(),
+    country: text("country").notNull(),
+    device: text("device").notNull(),
+    clicks: integer("clicks").notNull(),
+    impressions: integer("impressions").notNull(),
+    position: real("position").notNull(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [
+        table.projectId,
+        table.date,
+        table.query,
+        table.page,
+        table.country,
+        table.device,
+      ],
+    }),
   ],
 );
 

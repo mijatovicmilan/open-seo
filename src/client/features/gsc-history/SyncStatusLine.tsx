@@ -51,11 +51,22 @@ export function SyncStatusLine({
             {status.siteUrl}
           </div>
         ) : null}
-        {busy ? (
+        {busy && status.missingDays === 0 && status.segmentDaysMissing > 0 ? (
+          <div className="flex items-center gap-2 text-base-content/60">
+            <Loader2 className="size-3.5 animate-spin" />
+            Adding country and device data:{" "}
+            {formatCount(status.segmentDaysMissing)} days left.
+          </div>
+        ) : busy ? (
           <div className="flex items-center gap-2 text-base-content/60">
             <Loader2 className="size-3.5 animate-spin" />
             Filling history: {formatCount(status.daysStored)} of{" "}
             {formatCount(total)} days. You can keep using the page.
+          </div>
+        ) : status.segmentDaysMissing > 0 ? (
+          <div className="text-base-content/60">
+            Country and device data still to add for{" "}
+            {formatCount(status.segmentDaysMissing)} days.
           </div>
         ) : status.missingDays > 0 ? (
           <div className="text-base-content/60">

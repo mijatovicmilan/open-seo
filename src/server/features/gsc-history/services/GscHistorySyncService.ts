@@ -9,6 +9,8 @@ import {
   type DayMetrics,
   type PageDayRow,
   type QueryPageDayRow,
+  type QueryPageSegmentDayRow,
+  type SegmentDayRow,
 } from "@/server/features/gsc-history/repositories/GscHistoryRepository";
 import {
   historyWindow,
@@ -36,6 +38,8 @@ const MAX_ROWS_PER_RUN = 60_000;
 // day's top pages and query x page pairs by clicks.
 const PAGE_ROWS_PER_DAY = 2_000;
 const QUERY_PAGE_ROWS_PER_DAY = 5_000;
+// Countries x devices for one day: about 250 x 3 at most.
+const SEGMENT_ROWS_PER_DAY = 2_000;
 // A run that has not finished after this long is treated as crashed.
 const RUN_LEASE_MS = 5 * 60_000;
 // The cron stops starting new projects after this long (daily crons get
@@ -46,6 +50,7 @@ type SyncRunResult =
   | {
       status: "synced";
       detailDays: number;
+      segmentDays: number;
       emptyDays: number;
       rowsWritten: number;
       remainingDays: number;
@@ -142,6 +147,50 @@ async function fetchDay(projectId: string, day: string) {
   return { pages, queryPages };
 }
 
+/** One day's rows per country and device, site-wide and per query x page.
+ *  GSC sends devices in upper case; they are stored in lower case. */
+async function fetchSegments(projectId: string, day: string) {
+  const segmentRows = await fetchRows(
+    projectId,
+    day,
+    ["country", "device"],
+    SEGMENT_ROWS_PER_DAY,
+  );
+  const querySegmentRows = await fetchRows(
+    projectId,
+    day,
+    ["query", "page", "country", "device"],
+    QUERY_PAGE_ROWS_PER_DAY,
+  );
+  const segments: SegmentDayRow[] = [];
+  for (const row of segmentRows) {
+    const [country, device] = row.keys ?? [];
+    if (!country || !device) continue;
+    segments.push({
+      country: country.toLowerCase(),
+      device: device.toLowerCase(),
+      clicks: row.clicks,
+      impressions: row.impressions,
+      position: row.position,
+    });
+  }
+  const querySegments: QueryPageSegmentDayRow[] = [];
+  for (const row of querySegmentRows) {
+    const [query, page, country, device] = row.keys ?? [];
+    if (!query || !page || !country || !device) continue;
+    querySegments.push({
+      query,
+      page,
+      country: country.toLowerCase(),
+      device: device.toLowerCase(),
+      clicks: row.clicks,
+      impressions: row.impressions,
+      position: row.position,
+    });
+  }
+  return { segments, querySegments };
+}
+
 /** A short, secret-free message for the status line. */
 function describeSyncError(error: unknown): string {
   if (error instanceof GscNotConnectedError) {
@@ -195,6 +244,7 @@ async function syncProject(
     for (const day of selection.detailDays) {
       if (rowsWritten >= MAX_ROWS_PER_RUN) break;
       const { pages, queryPages } = await fetchDay(projectId, day);
+      const { segments, querySegments } = await fetchSegments(projectId, day);
       const dayTotals = totals.get(day);
       if (!dayTotals) continue;
       await GscHistoryRepository.writeDay({
@@ -203,16 +253,48 @@ async function syncProject(
         totals: dayTotals,
         pages,
         queryPages,
+        segments,
+        querySegments,
       });
-      rowsWritten += pages.length + queryPages.length;
+      rowsWritten +=
+        pages.length +
+        queryPages.length +
+        segments.length +
+        querySegments.length;
       detailDays++;
     }
 
+    // Days stored before the country and device tables existed get those
+    // rows from the same budget, newest first.
+    const budget =
+      (options.maxDetailDays ?? MAX_DETAIL_DAYS_PER_RUN) - detailDays;
+    let segmentDays = 0;
+    if (budget > 0 && rowsWritten < MAX_ROWS_PER_RUN) {
+      const missing = await GscHistoryRepository.listDaysMissingSegments(
+        projectId,
+        budget,
+      );
+      for (const day of missing) {
+        if (rowsWritten >= MAX_ROWS_PER_RUN) break;
+        const { segments, querySegments } = await fetchSegments(projectId, day);
+        await GscHistoryRepository.writeSegments({
+          projectId,
+          date: day,
+          segments,
+          querySegments,
+        });
+        rowsWritten += segments.length + querySegments.length;
+        segmentDays++;
+      }
+    }
+
     // Count what is still missing from storage, now that this run wrote.
-    const remainingDays = planSync(
-      now,
-      await GscHistoryRepository.listStoredDates(projectId, plan.oldest),
-    ).missingCount;
+    const remainingDays =
+      planSync(
+        now,
+        await GscHistoryRepository.listStoredDates(projectId, plan.oldest),
+      ).missingCount +
+      (await GscHistoryRepository.countDaysMissingSegments(projectId));
     await GscHistoryRepository.finishSync(projectId, {
       ok: true,
       backfillDone: remainingDays === 0,
@@ -221,6 +303,7 @@ async function syncProject(
     return {
       status: "synced",
       detailDays,
+      segmentDays,
       emptyDays: selection.emptyDays.length,
       rowsWritten,
       remainingDays,

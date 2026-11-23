@@ -344,6 +344,13 @@
       "when": 1795413240965,
       "tag": "0048_fork_outreach_gsc",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "6",
+      "when": 1795420663513,
+      "tag": "0049_fork_gsc_segments",
+      "breakpoints": true
     }
   ]
 }

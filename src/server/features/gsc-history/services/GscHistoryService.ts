@@ -3,6 +3,7 @@ import { GscService } from "@/server/features/gsc/services/GscService";
 import {
   GscHistoryRepository,
   type Annotation,
+  type SegmentFilter,
 } from "@/server/features/gsc-history/repositories/GscHistoryRepository";
 import {
   buildCtrCurve,
@@ -47,6 +48,7 @@ const NEW_BASELINE_DAYS = 28;
 const NEW_PAGE_HISTORY_SKIP_DAYS = 7;
 const NEW_PAGE_LOOKBACK_DAYS = 90;
 const FIRST_SEEN_ANNOTATIONS = 10;
+const COUNTRY_LIMIT = 60;
 
 type SyncState = Awaited<ReturnType<typeof GscHistoryRepository.getSyncState>>;
 
@@ -58,12 +60,17 @@ function isRunning(state: SyncState, now: Date): boolean {
 }
 
 async function getStatus(projectId: string, now: Date = new Date()) {
-  const [connection, state, bounds, stored] = await Promise.all([
-    GscService.getConnection(projectId),
-    GscHistoryRepository.getSyncState(projectId),
-    GscHistoryRepository.getHistoryBounds(projectId),
-    GscHistoryRepository.listStoredDates(projectId, historyWindow(now).oldest),
-  ]);
+  const [connection, state, bounds, stored, segmentDaysMissing] =
+    await Promise.all([
+      GscService.getConnection(projectId),
+      GscHistoryRepository.getSyncState(projectId),
+      GscHistoryRepository.getHistoryBounds(projectId),
+      GscHistoryRepository.listStoredDates(
+        projectId,
+        historyWindow(now).oldest,
+      ),
+      GscHistoryRepository.countDaysMissingSegments(projectId),
+    ]);
   const missingDays = planSync(now, stored).missingCount;
   const running = isRunning(state, now);
   const recentError =
@@ -81,6 +88,8 @@ async function getStatus(projectId: string, now: Date = new Date()) {
     oldestDay: bounds.oldest,
     newestDay: bounds.newest,
     missingDays,
+    // Stored days still without country and device rows.
+    segmentDaysMissing,
     lastAttemptAt: state?.lastAttemptAt ?? null,
     lastSuccessAt: state?.lastSuccessAt ?? null,
     lastError: state?.lastError ?? null,
@@ -90,7 +99,7 @@ async function getStatus(projectId: string, now: Date = new Date()) {
       connection !== null &&
       !running &&
       !recentError &&
-      (stale || missingDays > 0),
+      (stale || missingDays > 0 || segmentDaysMissing > 0),
   };
 }
 
@@ -136,6 +145,71 @@ async function loadCannibalization(
     ]),
   );
   return rankCannibalization(candidates, flips);
+}
+
+type QueryPageAggregate = Awaited<
+  ReturnType<typeof GscHistoryRepository.aggregateQueryPages>
+>[number];
+
+/** Per-page sums from query x page rows (used under a country or device
+ *  filter, where only the segment query x page rows exist). */
+function pagesFrom(rows: QueryPageAggregate[]) {
+  const byPage = new Map<
+    string,
+    { clicks: number; impressions: number; weighted: number }
+  >();
+  for (const row of rows) {
+    const sums = byPage.get(row.page) ?? {
+      clicks: 0,
+      impressions: 0,
+      weighted: 0,
+    };
+    sums.clicks += row.clicks;
+    sums.impressions += row.impressions;
+    sums.weighted += row.position * row.impressions;
+    byPage.set(row.page, sums);
+  }
+  return [...byPage].map(([page, sums]) => ({
+    page,
+    clicks: sums.clicks,
+    impressions: sums.impressions,
+    position: sums.impressions > 0 ? sums.weighted / sums.impressions : 0,
+  }));
+}
+
+async function loadSegmentChanges(
+  projectId: string,
+  current: Range,
+  previous: Range,
+  segment: SegmentFilter,
+) {
+  const [curRows, prevRows] = await Promise.all([
+    GscHistoryRepository.aggregateQueryPagesForSegment(
+      projectId,
+      current,
+      DRIVER_ROWS_LIMIT,
+      segment,
+    ),
+    GscHistoryRepository.aggregateQueryPagesForSegment(
+      projectId,
+      previous,
+      DRIVER_ROWS_LIMIT,
+      segment,
+    ),
+  ]);
+  const { rising, falling } = buildPageChanges(
+    pagesFrom(curRows),
+    pagesFrom(prevRows),
+  );
+  const withDrivers = (rows: typeof rising, direction: "up" | "down") =>
+    rows.map((row) => ({
+      ...row,
+      drivers: topQueryDrivers(row.page, direction, curRows, prevRows),
+    }));
+  return {
+    rising: withDrivers(rising, "up"),
+    falling: withDrivers(falling, "down"),
+  };
 }
 
 async function loadChanges(projectId: string, current: Range, previous: Range) {
@@ -246,6 +320,8 @@ type InsightsOptions = {
   compare: "previous" | "year" | "none";
   page?: string;
   query?: string;
+  country?: string;
+  device?: string;
 };
 
 type DayPoint = {
@@ -273,10 +349,10 @@ function inRange<T extends { date: string }>(rows: T[], range: Range) {
 
 async function loadDays(
   projectId: string,
-  filter: { page?: string; query?: string },
+  filter: { page?: string; query?: string } & SegmentFilter,
   range: Range,
 ): Promise<DayPoint[]> {
-  if (filter.page || filter.query) {
+  if (filter.page || filter.query || filter.country || filter.device) {
     return GscHistoryRepository.listFilteredDays(projectId, filter, range);
   }
   return inRange(await GscHistoryRepository.listDailyTotals(projectId), range);
@@ -304,8 +380,14 @@ async function getInsights(
   const filter = {
     ...(options.page ? { page: options.page } : {}),
     ...(options.query ? { query: options.query } : {}),
+    ...(options.country ? { country: options.country } : {}),
+    ...(options.device ? { device: options.device } : {}),
   };
-  const filtered = Boolean(filter.page || filter.query);
+  const segment: SegmentFilter | null =
+    filter.country || filter.device
+      ? { country: filter.country, device: filter.device }
+      : null;
+  const filtered = Boolean(filter.page || filter.query || segment);
 
   const loadStart =
     previous && previous.start < current.start ? previous.start : current.start;
@@ -349,11 +431,30 @@ async function getInsights(
   const matches = (row: { page?: string | null; query?: string }) =>
     (!filter.page || row.page === filter.page) &&
     (!filter.query || row.query === filter.query);
-  const allQueryPages = await GscHistoryRepository.aggregateQueryPages(
-    projectId,
-    current,
-    QUERY_PAGE_AGGREGATE_LIMIT,
-  );
+  const [siteQueryPages, segmentQueryPages, countries] = await Promise.all([
+    GscHistoryRepository.aggregateQueryPages(
+      projectId,
+      current,
+      QUERY_PAGE_AGGREGATE_LIMIT,
+    ),
+    segment
+      ? GscHistoryRepository.aggregateQueryPagesForSegment(
+          projectId,
+          current,
+          QUERY_PAGE_AGGREGATE_LIMIT,
+          segment,
+        )
+      : Promise.resolve(null),
+    GscHistoryRepository.listCountries(projectId, current, COUNTRY_LIMIT),
+  ]);
+  // The rows the tables read: the country/device slice when one is chosen.
+  const allQueryPages = segmentQueryPages ?? siteQueryPages;
+  const segmentQueries = segmentQueryPages
+    ? new Set(segmentQueryPages.map((row) => row.query))
+    : null;
+  const segmentPages = segmentQueryPages
+    ? new Set(segmentQueryPages.map((row) => row.page))
+    : null;
   const queryPages = filtered ? allQueryPages.filter(matches) : allQueryPages;
   const siteTotals = filtered
     ? sumTotals(
@@ -362,7 +463,7 @@ async function getInsights(
     : totals;
   const minImpressions = minImpressionsFor(siteTotals.impressions, days);
   // The expected-CTR curve always comes from the whole site.
-  const curve = buildCtrCurve(allQueryPages, minImpressions);
+  const curve = buildCtrCurve(siteQueryPages, minImpressions);
   const hasBaseline = oldest <= addDays(current.start, -NEW_BASELINE_DAYS);
   const comparison = previous ?? {
     start: addDays(current.start, -days),
@@ -370,7 +471,9 @@ async function getInsights(
   };
 
   const [changes, cannibalization, newQueries, newPages] = await Promise.all([
-    loadChanges(projectId, current, comparison),
+    segment
+      ? loadSegmentChanges(projectId, current, comparison, segment)
+      : loadChanges(projectId, current, comparison),
     loadCannibalization(projectId, current, queryPages, minImpressions),
     hasBaseline
       ? GscHistoryRepository.listNewQueries(projectId, current, NEW_ITEMS_LIMIT)
@@ -416,13 +519,19 @@ async function getInsights(
       },
       newQueries: newQueries
         .map((row) => ({ ...row, page: bestPage.get(row.query)?.page ?? null }))
-        .filter(matches),
+        .filter(matches)
+        .filter((row) => !segmentQueries || segmentQueries.has(row.query)),
       nearPageOne: buildNearPageOne(queryPages, minImpressions, curve),
       ctrGaps: buildCtrGaps(queryPages, minImpressions, curve),
       cannibalization,
       newPages: filter.query
         ? []
-        : newPages.filter((row) => !filter.page || row.page === filter.page),
+        : newPages.filter(
+            (row) =>
+              (!filter.page || row.page === filter.page) &&
+              (!segmentPages || segmentPages.has(row.page)),
+          ),
+      countries,
       series,
       firstDataDay,
       annotations: await loadAnnotations(projectId, newPages),

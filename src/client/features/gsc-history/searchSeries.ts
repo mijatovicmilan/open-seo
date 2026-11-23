@@ -116,10 +116,12 @@ function add(
 export function chartStart(
   series: Insights["series"],
   firstDataDay: string | null,
+  granularity: "day" | "week" | "month",
 ) {
   const first = series[0]?.date;
   if (!first || !firstDataDay || firstDataDay <= first) return first ?? null;
-  const from = addDays(firstDataDay, -3);
+  // Start on a whole week or month so the first bucket is not cut short.
+  const from = bucketKey(addDays(firstDataDay, -3), granularity);
   return from > first ? from : first;
 }
 
@@ -143,6 +145,7 @@ export function buildChartPoints(input: {
       compareStart: string | null;
       partial: boolean;
       hasCompare: boolean;
+      days: number;
     }
   >();
   for (const day of days) {
@@ -153,7 +156,9 @@ export function buildChartPoints(input: {
       compareStart: null,
       partial: false,
       hasCompare: false,
+      days: 0,
     };
+    bucket.days += 1;
     add(bucket.current, day);
     if (day.compare) {
       add(bucket.compare, day.compare);
@@ -172,7 +177,20 @@ export function buildChartPoints(input: {
     const key = bucketKey(annotation.date, granularity);
     notesByKey.set(key, [...(notesByKey.get(key) ?? []), noteFor(annotation)]);
   }
-  return [...buckets.entries()].map(([key, bucket]) => {
+  const entries = [...buckets.entries()];
+  const fullDays = (key: string) => {
+    if (granularity === "day") return 1;
+    if (granularity === "week") return 7;
+    const date = utc(key);
+    return new Date(
+      Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0),
+    ).getUTCDate();
+  };
+  return entries.map(([key, bucket], index) => {
+    // The range can cut the first and last week or month short; such a
+    // bucket is lower only because it has fewer days.
+    const edge = index === 0 || index === entries.length - 1;
+    const short = edge && bucket.days < fullDays(key);
     const label =
       granularity === "day"
         ? fmt(key, {
@@ -211,7 +229,12 @@ export function buildChartPoints(input: {
               : undefined,
           }
         : {}),
-      partial: bucket.partial,
+      partial: bucket.partial || short,
+      ...(bucket.partial
+        ? { partialNote: "still reporting" }
+        : short
+          ? { partialNote: `${bucket.days} of ${fullDays(key)} days` }
+          : {}),
       ...(notesByKey.has(key) ? { notes: notesByKey.get(key) } : {}),
     };
   });

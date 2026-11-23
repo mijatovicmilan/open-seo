@@ -5,9 +5,11 @@ import {
   count,
   desc,
   eq,
+  gt,
   gte,
   inArray,
   isNotNull,
+  isNull,
   lte,
   max,
   min,
@@ -21,6 +23,8 @@ import {
   gscConnections,
   gscDailyPages,
   gscDailyQueryPages,
+  gscDailyQueryPageSegments,
+  gscDailySegments,
   gscDailyTotals,
   gscSyncState,
   outreachEvents,
@@ -39,11 +43,18 @@ export type DayMetrics = {
 };
 export type PageDayRow = DayMetrics & { page: string };
 export type QueryPageDayRow = DayMetrics & { query: string; page: string };
+export type SegmentDayRow = DayMetrics & { country: string; device: string };
+export type QueryPageSegmentDayRow = QueryPageDayRow & {
+  country: string;
+  device: string;
+};
+export type SegmentFilter = { country?: string; device?: string };
 
 // D1 allows 100 bound parameters per statement: 6 columns x 16 rows = 96,
 // 7 columns x 14 rows = 98.
 const ROWS_PER_INSERT_6 = 16;
 const ROWS_PER_INSERT_7 = 14;
+const ROWS_PER_INSERT_9 = 11;
 // Lists bound into IN (...) stay well below the same limit.
 const MAX_IN_LIST = 50;
 
@@ -64,10 +75,18 @@ function upsertTotals(
   rows: Array<DayMetrics & { date: string }>,
   syncedAt: string,
 ) {
-  return chunk(rows, ROWS_PER_INSERT_6).map((rowChunk) =>
+  // 7 columns per row now that the segments stamp is written too.
+  return chunk(rows, ROWS_PER_INSERT_7).map((rowChunk) =>
     tx
       .insert(gscDailyTotals)
-      .values(rowChunk.map((row) => ({ projectId, ...row, syncedAt })))
+      .values(
+        rowChunk.map((row) => ({
+          projectId,
+          ...row,
+          syncedAt,
+          segmentsSyncedAt: syncedAt,
+        })),
+      )
       .onConflictDoUpdate({
         target: [gscDailyTotals.projectId, gscDailyTotals.date],
         set: {
@@ -75,9 +94,111 @@ function upsertTotals(
           impressions: sql`excluded.impressions`,
           position: sql`excluded.position`,
           syncedAt: sql`excluded.synced_at`,
+          segmentsSyncedAt: sql`excluded.segments_synced_at`,
         },
       }),
   );
+}
+
+function replaceSegments(
+  tx: Tx,
+  projectId: string,
+  date: string,
+  segments: SegmentDayRow[],
+  querySegments: QueryPageSegmentDayRow[],
+) {
+  return [
+    tx
+      .delete(gscDailySegments)
+      .where(
+        and(
+          eq(gscDailySegments.projectId, projectId),
+          eq(gscDailySegments.date, date),
+        ),
+      ),
+    tx
+      .delete(gscDailyQueryPageSegments)
+      .where(
+        and(
+          eq(gscDailyQueryPageSegments.projectId, projectId),
+          eq(gscDailyQueryPageSegments.date, date),
+        ),
+      ),
+    ...chunk(segments, ROWS_PER_INSERT_7).map((rows) =>
+      tx
+        .insert(gscDailySegments)
+        .values(rows.map((row) => ({ projectId, date, ...row }))),
+    ),
+    ...chunk(querySegments, ROWS_PER_INSERT_9).map((rows) =>
+      tx
+        .insert(gscDailyQueryPageSegments)
+        .values(rows.map((row) => ({ projectId, date, ...row }))),
+    ),
+  ];
+}
+
+/** Store one day's country and device rows for a day already stored, and
+ *  stamp the day so the backfill moves on. */
+async function writeSegments(input: {
+  projectId: string;
+  date: string;
+  segments: SegmentDayRow[];
+  querySegments: QueryPageSegmentDayRow[];
+}): Promise<void> {
+  const { projectId, date } = input;
+  await runBatch((tx) => [
+    ...replaceSegments(
+      tx,
+      projectId,
+      date,
+      input.segments,
+      input.querySegments,
+    ),
+    tx
+      .update(gscDailyTotals)
+      .set({ segmentsSyncedAt: new Date().toISOString() })
+      .where(
+        and(
+          eq(gscDailyTotals.projectId, projectId),
+          eq(gscDailyTotals.date, date),
+        ),
+      ),
+  ]);
+}
+
+/** Stored days with impressions whose country and device rows are still
+ *  missing, newest first. */
+async function listDaysMissingSegments(
+  projectId: string,
+  limit: number,
+): Promise<string[]> {
+  const rows = await db
+    .select({ date: gscDailyTotals.date })
+    .from(gscDailyTotals)
+    .where(
+      and(
+        eq(gscDailyTotals.projectId, projectId),
+        gt(gscDailyTotals.impressions, 0),
+        isNull(gscDailyTotals.segmentsSyncedAt),
+      ),
+    )
+    .orderBy(desc(gscDailyTotals.date))
+    .limit(limit);
+  return rows.map((row) => row.date);
+}
+
+async function countDaysMissingSegments(projectId: string): Promise<number> {
+  const [row] = await db
+    .select({ value: count() })
+    .from(gscDailyTotals)
+    .where(
+      and(
+        eq(gscDailyTotals.projectId, projectId),
+        gt(gscDailyTotals.impressions, 0),
+        isNull(gscDailyTotals.segmentsSyncedAt),
+      ),
+    );
+  return num(row?.value);
 }
 
 /** Replace one day: pages and query x page rows are deleted and re-inserted,
@@ -89,10 +210,19 @@ async function writeDay(input: {
   totals: DayMetrics;
   pages: PageDayRow[];
   queryPages: QueryPageDayRow[];
+  segments: SegmentDayRow[];
+  querySegments: QueryPageSegmentDayRow[];
 }): Promise<void> {
   const { projectId, date } = input;
   const syncedAt = new Date().toISOString();
   await runBatch((tx) => [
+    ...replaceSegments(
+      tx,
+      projectId,
+      date,
+      input.segments,
+      input.querySegments,
+    ),
     tx
       .delete(gscDailyPages)
       .where(
@@ -152,6 +282,22 @@ async function writeEmptyDays(
           and(
             eq(gscDailyQueryPages.projectId, projectId),
             inArray(gscDailyQueryPages.date, dateChunk),
+          ),
+        ),
+      tx
+        .delete(gscDailySegments)
+        .where(
+          and(
+            eq(gscDailySegments.projectId, projectId),
+            inArray(gscDailySegments.date, dateChunk),
+          ),
+        ),
+      tx
+        .delete(gscDailyQueryPageSegments)
+        .where(
+          and(
+            eq(gscDailyQueryPageSegments.projectId, projectId),
+            inArray(gscDailyQueryPageSegments.date, dateChunk),
           ),
         ),
     ]),
@@ -299,12 +445,64 @@ type Range = { start: string; end: string };
  *  query x page table when a query is involved. */
 async function listFilteredDays(
   projectId: string,
-  filter: { page?: string; query?: string },
+  filter: { page?: string; query?: string } & SegmentFilter,
   range: Range,
 ): Promise<Array<AggregateRow & { date: string }>> {
-  if (filter.query) {
+  const segment = Boolean(filter.country || filter.device);
+  let rows: Array<{
+    date: string;
+    clicks: unknown;
+    impressions: unknown;
+    weighted: unknown;
+  }>;
+  if (segment && !filter.page && !filter.query) {
+    // Site totals for a country and/or device.
+    const t = gscDailySegments;
+    rows = await db
+      .select({
+        date: t.date,
+        clicks: sql`sum(${t.clicks})`,
+        impressions: sql`sum(${t.impressions})`,
+        weighted: sql`sum(${t.position} * ${t.impressions})`,
+      })
+      .from(t)
+      .where(
+        and(
+          eq(t.projectId, projectId),
+          filter.country ? eq(t.country, filter.country) : undefined,
+          filter.device ? eq(t.device, filter.device) : undefined,
+          gte(t.date, range.start),
+          lte(t.date, range.end),
+        ),
+      )
+      .groupBy(t.date)
+      .orderBy(asc(t.date));
+  } else if (segment) {
+    const t = gscDailyQueryPageSegments;
+    rows = await db
+      .select({
+        date: t.date,
+        clicks: sql`sum(${t.clicks})`,
+        impressions: sql`sum(${t.impressions})`,
+        weighted: sql`sum(${t.position} * ${t.impressions})`,
+      })
+      .from(t)
+      .where(
+        and(
+          eq(t.projectId, projectId),
+          filter.country ? eq(t.country, filter.country) : undefined,
+          filter.device ? eq(t.device, filter.device) : undefined,
+          filter.query ? eq(t.query, filter.query) : undefined,
+          filter.page ? eq(t.page, filter.page) : undefined,
+          gte(t.date, range.start),
+          lte(t.date, range.end),
+        ),
+      )
+      .groupBy(t.date)
+      .orderBy(asc(t.date));
+  } else if (filter.query) {
     const t = gscDailyQueryPages;
-    const rows = await db
+    rows = await db
       .select({
         date: t.date,
         clicks: sql`sum(${t.clicks})`,
@@ -316,35 +514,96 @@ async function listFilteredDays(
         and(
           eq(t.projectId, projectId),
           eq(t.query, filter.query),
-          ...(filter.page ? [eq(t.page, filter.page)] : []),
+          filter.page ? eq(t.page, filter.page) : undefined,
           gte(t.date, range.start),
           lte(t.date, range.end),
         ),
       )
       .groupBy(t.date)
       .orderBy(asc(t.date));
-    return rows.map((row) => ({ date: row.date, ...toAggregate(row) }));
+  } else {
+    const t = gscDailyPages;
+    rows = await db
+      .select({
+        date: t.date,
+        clicks: sql`sum(${t.clicks})`,
+        impressions: sql`sum(${t.impressions})`,
+        weighted: sql`sum(${t.position} * ${t.impressions})`,
+      })
+      .from(t)
+      .where(
+        and(
+          eq(t.projectId, projectId),
+          eq(t.page, filter.page ?? ""),
+          gte(t.date, range.start),
+          lte(t.date, range.end),
+        ),
+      )
+      .groupBy(t.date)
+      .orderBy(asc(t.date));
   }
-  const t = gscDailyPages;
+  return rows.map((row) => ({ date: row.date, ...toAggregate(row) }));
+}
+
+/** Query x page sums for a country and/or device, highest impressions
+ *  first: the tables' source under a segment filter. */
+async function aggregateQueryPagesForSegment(
+  projectId: string,
+  range: Range,
+  limit: number,
+  filter: SegmentFilter,
+): Promise<Array<AggregateRow & { query: string; page: string }>> {
+  const t = gscDailyQueryPageSegments;
+  const impressions = sql`sum(${t.impressions})`;
   const rows = await db
     .select({
-      date: t.date,
+      query: t.query,
+      page: t.page,
       clicks: sql`sum(${t.clicks})`,
-      impressions: sql`sum(${t.impressions})`,
+      impressions,
       weighted: sql`sum(${t.position} * ${t.impressions})`,
     })
     .from(t)
     .where(
       and(
         eq(t.projectId, projectId),
-        eq(t.page, filter.page ?? ""),
+        filter.country ? eq(t.country, filter.country) : undefined,
+        filter.device ? eq(t.device, filter.device) : undefined,
         gte(t.date, range.start),
         lte(t.date, range.end),
       ),
     )
-    .groupBy(t.date)
-    .orderBy(asc(t.date));
-  return rows.map((row) => ({ date: row.date, ...toAggregate(row) }));
+    .groupBy(t.query, t.page)
+    .orderBy(desc(impressions))
+    .limit(limit);
+  return rows.map((row) => ({
+    query: row.query,
+    page: row.page,
+    ...toAggregate(row),
+  }));
+}
+
+/** Countries with impressions in a range, most first, for the filter. */
+async function listCountries(projectId: string, range: Range, limit: number) {
+  const t = gscDailySegments;
+  const impressions = sql`sum(${t.impressions})`;
+  const rows = await db
+    .select({ country: t.country, impressions })
+    .from(t)
+    .where(
+      and(
+        eq(t.projectId, projectId),
+        gte(t.date, range.start),
+        lte(t.date, range.end),
+      ),
+    )
+    .groupBy(t.country)
+    .orderBy(desc(impressions))
+    .limit(limit);
+  return rows.map((row) => ({
+    country: row.country,
+    impressions: num(row.impressions),
+  }));
 }
 
 /** Per-page sums over a date range, highest impressions first. */
@@ -578,6 +837,11 @@ async function deleteAnnotation(
 
 export const GscHistoryRepository = {
   listFilteredDays,
+  aggregateQueryPagesForSegment,
+  listCountries,
+  writeSegments,
+  listDaysMissingSegments,
+  countDaysMissingSegments,
   writeDay,
   writeEmptyDays,
   listStoredDates,

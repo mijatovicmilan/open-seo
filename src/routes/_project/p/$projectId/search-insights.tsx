@@ -32,6 +32,8 @@ function SearchInsightsRoute() {
           end: next.range === "custom" ? next.end : undefined,
           page: next.page || undefined,
           query: next.query || undefined,
+          country: next.country || undefined,
+          device: next.device,
         };
       },
       replace: true,
@@ -48,6 +50,8 @@ function SearchInsightsRoute() {
         metric: search.metric ?? "clicks",
         page: search.page,
         query: search.query,
+        country: search.country,
+        device: search.device,
       }}
       onChange={onChange}
     />

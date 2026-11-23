@@ -134,6 +134,8 @@ export const {
   gscDailyTotals,
   gscDailyPages,
   gscDailyQueryPages,
+  gscDailySegments,
+  gscDailyQueryPageSegments,
   gscSyncState,
   gscAnnotations,
 } = schema;

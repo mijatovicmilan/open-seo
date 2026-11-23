@@ -37,6 +37,14 @@ export const searchInsightsPeriodSchema = z
   .union([z.literal(7), z.literal(28), z.literal(90)])
   .default(28);
 
+export const GSC_DEVICES = ["desktop", "mobile", "tablet"] as const;
+/** GSC country codes: ISO 3166-1 alpha-3, lower case ("usa", "srb"). */
+export const gscCountrySchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .regex(/^[a-z]{3}$/, "Use a three-letter country code such as usa");
+
 export const searchInsightsInputSchema = z.object({
   projectId: z.string().min(1),
   range: z.enum(SEARCH_INSIGHTS_RANGE_KEYS).default("28d"),
@@ -45,6 +53,8 @@ export const searchInsightsInputSchema = z.object({
   compare: z.enum(SEARCH_INSIGHTS_COMPARE).default("previous"),
   page: z.string().trim().min(1).max(2000).optional(),
   query: z.string().trim().min(1).max(500).optional(),
+  country: gscCountrySchema.optional(),
+  device: z.enum(GSC_DEVICES).optional(),
 });
 
 /** URL state of the Search Insights page. Granularity and metric only change
@@ -58,6 +68,8 @@ export const searchInsightsSearchSchema = z.object({
   metric: z.enum(["clicks", "impressions", "ctr", "position"]).optional(),
   page: z.string().max(2000).optional(),
   query: z.string().max(500).optional(),
+  country: z.string().max(3).optional(),
+  device: z.enum(GSC_DEVICES).optional(),
 });
 
 export const searchHistoryProjectInputSchema = z.object({

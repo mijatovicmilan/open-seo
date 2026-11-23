@@ -38,7 +38,11 @@ export type ChartPoint = {
   value: number | null;
   compare?: number | null;
   compareLabel?: string;
+  /** Drawn dashed: days Search Console is still reporting, or a bucket the
+   *  range only partly covers. */
   partial?: boolean;
+  /** Why it is dashed, for the tooltip ("still reporting", "3 of 7 days"). */
+  partialNote?: string;
   notes?: ChartNote[];
 };
 
@@ -96,7 +100,9 @@ function TooltipCard({
       <div className="mb-2 flex items-baseline justify-between gap-2">
         <span className="font-medium text-base-content">{point.label}</span>
         {point.partial ? (
-          <span className="text-base-content/50">still reporting</span>
+          <span className="text-base-content/50">
+            {point.partialNote ?? "still reporting"}
+          </span>
         ) : null}
       </div>
       <div className="space-y-1">
@@ -181,16 +187,20 @@ export function TimeSeriesChart({
     const finalTicks = metric.inverted
       ? [1, ...tickList.filter((t) => t > 1)]
       : tickList;
-    // The last settled point starts the dashed "still reporting" segment so
-    // the two lines join.
-    const firstPartial = points.findIndex((p) => p.partial);
-    const built: Row[] = points.map((p, index) => ({
-      ...p,
-      settled: firstPartial === -1 || index < firstPartial ? p.value : null,
-      reporting:
-        firstPartial !== -1 && index >= firstPartial - 1 ? p.value : null,
-      noteY: metric.inverted ? axisDomain[1] : 0,
-    }));
+    // Solid between complete points; dashed on any segment that touches a
+    // partial point (drawn underneath, so the two lines join).
+    const built: Row[] = points.map((p, index) => {
+      const near =
+        p.partial ||
+        Boolean(points[index - 1]?.partial) ||
+        Boolean(points[index + 1]?.partial);
+      return {
+        ...p,
+        settled: p.partial ? null : p.value,
+        reporting: near ? p.value : null,
+        noteY: metric.inverted ? axisDomain[1] : 0,
+      };
+    });
     return { rows: built, ticks: finalTicks, domain: axisDomain };
   }, [points, metric]);
 
@@ -380,22 +390,22 @@ export function TimeSeriesChart({
             ) : null}
             <Line
               type="linear"
-              dataKey="settled"
-              stroke={PRIMARY}
-              strokeWidth={2}
-              dot={showDots ? { r: 2, strokeWidth: 0, fill: PRIMARY } : false}
-              activeDot={{ r: 4, strokeWidth: 0, fill: PRIMARY }}
-              connectNulls={false}
-              isAnimationActive={false}
-            />
-            <Line
-              type="linear"
               dataKey="reporting"
               stroke={PRIMARY}
               strokeOpacity={0.55}
               strokeWidth={2}
               strokeDasharray="4 4"
               dot={false}
+              activeDot={{ r: 4, strokeWidth: 0, fill: PRIMARY }}
+              connectNulls={false}
+              isAnimationActive={false}
+            />
+            <Line
+              type="linear"
+              dataKey="settled"
+              stroke={PRIMARY}
+              strokeWidth={2}
+              dot={showDots ? { r: 2, strokeWidth: 0, fill: PRIMARY } : false}
               activeDot={{ r: 4, strokeWidth: 0, fill: PRIMARY }}
               connectNulls={false}
               isAnimationActive={false}

@@ -48,6 +48,8 @@ export type SearchInsightsState = {
   metric: MetricKey;
   page?: string;
   query?: string;
+  country?: string;
+  device?: "desktop" | "mobile" | "tablet";
 };
 
 export type SearchInsightsPatch = Partial<{
@@ -71,6 +73,8 @@ export function SearchInsightsPage({
     compare: state.compare,
     page: state.page || undefined,
     query: state.query || undefined,
+    country: state.country || undefined,
+    device: state.device,
   };
   const insightsQuery = useQuery({
     queryKey: ["searchInsights", projectId, request],
@@ -143,11 +147,17 @@ export function SearchInsightsPage({
                     oldest: status.oldestDay,
                     newest: status.newestDay,
                   }}
+                  country={state.country}
+                  device={state.device}
+                  countries={insights.countries}
+                  segmentsPending={status.segmentDaysMissing > 0}
                   onChange={onChange}
                 />
                 <FilterChips
                   page={state.page}
                   query={state.query}
+                  country={state.country}
+                  device={state.device}
                   onClear={(key) => onChange({ [key]: undefined })}
                 />
                 <InsightsFilterContext.Provider
@@ -191,7 +201,7 @@ function ChartPanel({
   granularity: "day" | "week" | "month";
 }) {
   const { period } = insights;
-  const from = chartStart(insights.series, insights.firstDataDay);
+  const from = chartStart(insights.series, insights.firstDataDay, granularity);
   const points = useMemo(
     () =>
       buildChartPoints({
@@ -382,9 +392,9 @@ function InsightsBody({
       </section>
 
       <p className="text-xs text-base-content/50">
-        Web search only, all countries and devices. Up to 5,000 query and page
-        pairs per day are stored (Google&apos;s top rows by clicks); clicks on
-        anonymized queries appear in page totals only.{" "}
+        Web search only. Up to 5,000 query and page pairs per day are stored,
+        also per country and device, (Google&apos;s top rows by clicks); clicks
+        on anonymized queries appear in page totals only.{" "}
         <Link
           to="/p/$projectId/search-performance"
           params={{ projectId }}

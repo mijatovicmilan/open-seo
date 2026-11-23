@@ -15,6 +15,8 @@ import {
 import { GscHistorySyncService } from "@/server/features/gsc-history/services/GscHistorySyncService";
 import {
   annotationFieldsSchema,
+  GSC_DEVICES,
+  gscCountrySchema,
   searchInsightsPeriodSchema,
 } from "@/types/schemas/gsc-history";
 
@@ -195,8 +197,11 @@ function insightsText(data: Data): string {
     `Period ${period.current.start}→${period.current.end}${period.previous ? ` vs ${period.previous.start}→${period.previous.end}` : ""}. ` +
     `Clicks ${totals.clicks}${prevTotals ? ` (prev ${prevTotals.clicks})` : ""}, impressions ${totals.impressions}${prevTotals ? ` (prev ${prevTotals.impressions})` : ""}, ` +
     `CTR ${pct(totals.ctr)}, position ${pos(totals.position)}. Rows count from ${data.minImpressions} impressions; expected CTR source: ${data.ctrCurve.source}.`;
+  const filters = Object.entries(data.filter)
+    .map(([key, value]) => `${key} ${value}`)
+    .join(", ");
   return [
-    header,
+    filters ? `${header}\nFiltered to ${filters}.` : header,
     section("Rising pages", data.changes.rising, CHANGE_COLUMNS, "None."),
     section("Falling pages", data.changes.falling, CHANGE_COLUMNS, "None."),
     section(
@@ -229,6 +234,26 @@ const insightsInputSchema = {
   days: searchInsightsPeriodSchema.describe(
     "Period length in days: 7, 28 (default) or 90, compared with the same length before it.",
   ),
+  page: z
+    .string()
+    .url()
+    .max(2000)
+    .optional()
+    .describe(
+      "Limit everything to one page (full URL as Search Console reports it).",
+    ),
+  query: z
+    .string()
+    .min(1)
+    .max(500)
+    .optional()
+    .describe("Limit everything to one query."),
+  country: gscCountrySchema
+    .optional()
+    .describe(
+      "Limit to one country: ISO 3166-1 alpha-3 code in lower case, e.g. usa, gbr, srb.",
+    ),
+  device: z.enum(GSC_DEVICES).optional().describe("Limit to one device."),
 } as const;
 
 export const getSearchInsightsTool = {
@@ -253,7 +278,15 @@ export const getSearchInsightsTool = {
     async (args: z.infer<z.ZodObject<typeof insightsInputSchema>>, context) => {
       const { status, data } = await GscHistoryService.getInsights(
         args.projectId,
-        { range: "preset", presetDays: args.days, compare: "previous" },
+        {
+          range: "preset",
+          presetDays: args.days,
+          compare: "previous",
+          page: args.page,
+          query: args.query,
+          country: args.country,
+          device: args.device,
+        },
       );
       const meta = buildProjectMeta(
         context,
@@ -268,7 +301,7 @@ export const getSearchInsightsTool = {
         });
       }
       // The chart series and annotations stay out of the agent's context.
-      const insights = omit(data, ["series", "annotations"]);
+      const insights = omit(data, ["series", "annotations", "countries"]);
       return mcpResponse({
         text: `${insightsText(data)}\n\n${statusLine(status)}`,
         meta,

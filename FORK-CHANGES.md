@@ -32,8 +32,9 @@ Our own files:
 - `src/routes/_project/p/$projectId/outreach.tsx`,
   `src/routes/_project/p/$projectId/search-insights.tsx`
 - `scripts/outreach-import-d1.ts`
-- Migrations `drizzle/0048_fork_outreach_gsc.sql` and
-  `drizzle-pg/0026_fork_outreach_gsc.sql` (with their snapshots)
+- Migrations `drizzle/0048_fork_outreach_gsc.sql`, `drizzle/0049_fork_gsc_segments.sql`
+  and `drizzle-pg/0026_fork_outreach_gsc.sql`, `drizzle-pg/0027_fork_gsc_segments.sql`
+  (with their snapshots)
 
 ## Intentional edits to upstream files
 
@@ -50,8 +51,8 @@ Our own files:
 
 ## Migrations and upstream merges
 
-Our migration is numbered after upstream's last one at fork time (D1 0048,
-Postgres 0026). D1 (`wrangler d1 migrations apply`) tracks applied files by
+Our migrations are numbered after upstream's last one at fork time (D1 0048
+and 0049, Postgres 0026 and 0027). D1 (`wrangler d1 migrations apply`) tracks applied files by
 name, so a later upstream file with the same number but a different name
 still applies. If upstream adds 0048/0026:
 

@@ -24,6 +24,9 @@ import {
 } from "./Ga4ReportEnhancements";
 import { normalizeGa4Response } from "./Ga4ReportNormalization";
 import { ga4DateInTimeZone, shiftGa4Date } from "./Ga4Dates";
+// Fork addition (FORK-CHANGES.md): PostHog as an analytics source.
+import { getActivePosthogSource } from "@/server/features/posthog/services/posthogSource";
+import { PosthogReportingService } from "@/server/features/posthog/services/PosthogReportingService";
 
 export type Ga4ReportInput = {
   projectId: string;
@@ -106,7 +109,7 @@ export function resolveGa4DateRange(
   };
 }
 
-function normalizeLimit(value: number | undefined): number {
+export function normalizeLimit(value: number | undefined): number {
   const limit = value ?? DEFAULT_LIMIT;
   if (!Number.isInteger(limit) || limit < 1 || limit > MAX_LIMIT) {
     throw new Ga4ReportError(
@@ -117,7 +120,7 @@ function normalizeLimit(value: number | undefined): number {
   return limit;
 }
 
-function normalizeOffset(value: number | undefined): number {
+export function normalizeOffset(value: number | undefined): number {
   const offset = value ?? 0;
   if (!Number.isInteger(offset) || offset < 0) {
     throw new Ga4ReportError(
@@ -238,6 +241,9 @@ async function resolveReportPage(input: {
 }
 
 async function runReport(input: Ga4ReportInput, opts: { now?: Date } = {}) {
+  // Fork addition (FORK-CHANGES.md): PostHog projects read PostHog.
+  const posthog = await getActivePosthogSource(input.projectId);
+  if (posthog) return PosthogReportingService.runReport(input, posthog, opts);
   const connection = await Ga4ConnectionRepository.getByProjectId(
     input.projectId,
   );

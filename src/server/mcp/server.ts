@@ -119,6 +119,11 @@ import {
   rescheduleOutreachEmailTool,
   setOutreachQueuedTool,
 } from "@/server/mcp/tools/outreach-schedule-tools";
+// Fork addition (FORK-CHANGES.md): Search Console, outreach and PostHog joins.
+import {
+  getOutreachLinkTrafficTool,
+  getSearchSignupsTool,
+} from "@/server/mcp/tools/posthog-join-tools";
 
 type ToolSchema = z.ZodType | z.ZodRawShape;
 
@@ -260,6 +265,9 @@ export function createOpenSeoMcpServer(authProps: McpProps) {
   register(getGoogleAnalyticsEcommercePerformanceTool);
   register(getGoogleAnalyticsSiteSearchTool);
   register(getGoogleAnalyticsAudienceBreakdownTool);
+  // Fork addition (FORK-CHANGES.md): Search Console, outreach and PostHog joins.
+  register(getSearchSignupsTool);
+  register(getOutreachLinkTrafficTool);
   register(runSiteAuditTool);
   register(listSiteAuditsTool);
   register(deleteSiteAuditTool);

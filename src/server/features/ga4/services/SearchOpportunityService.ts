@@ -7,6 +7,8 @@ import {
 import { Ga4ReportError } from "@/server/lib/ga4Errors";
 import { Ga4ConnectionRepository } from "@/server/features/ga4/repositories/Ga4ConnectionRepository";
 import { ga4DateInTimeZone, shiftGa4Date } from "./Ga4Dates";
+// Fork addition (FORK-CHANGES.md): PostHog as an analytics source.
+import { getActivePosthogSource } from "@/server/features/posthog/services/posthogSource";
 
 type SearchOpportunityInput = {
   projectId: string;
@@ -108,11 +110,15 @@ async function getOpportunities(
       "limit must be an integer from 1 to 100.",
     );
   }
-  const [ga4Connection, gscConnection] = await Promise.all([
+  const [ga4Connection, gscConnection, posthog] = await Promise.all([
     Ga4ConnectionRepository.getByProjectId(input.projectId),
     GscService.getConnection(input.projectId),
+    getActivePosthogSource(input.projectId),
   ]);
-  if (!ga4Connection) {
+  // Fork addition (FORK-CHANGES.md): a PostHog project needs no GA4 link.
+  const analyticsTimeZone =
+    posthog?.timeZone ?? ga4Connection?.propertyTimeZone;
+  if (!analyticsTimeZone) {
     throw new Ga4ReportError(
       "ga4_not_connected",
       "Google Analytics is not connected for this project.",
@@ -121,11 +127,7 @@ async function getOpportunities(
   if (!gscConnection) throw new GscNotConnectedError(input.projectId);
 
   const now = opts.now ?? new Date();
-  const dates = resolveCombinedDates(
-    input,
-    ga4Connection.propertyTimeZone,
-    now,
-  );
+  const dates = resolveCombinedDates(input, analyticsTimeZone, now);
   const gsc = await GscService.getPerformance({
     projectId: input.projectId,
     dimensions: ["page"],
@@ -249,6 +251,7 @@ async function getOpportunities(
       searchConsoleSiteUrl: gsc.siteUrl,
       googleAnalyticsPropertyId: ga4.source.propertyId,
       googleAnalyticsPropertyDisplayName: ga4.source.propertyDisplayName,
+      analyticsProvider: ga4.source.provider,
     },
     request: {
       dateRange: dates,

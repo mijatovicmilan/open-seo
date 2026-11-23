@@ -6,6 +6,8 @@ import {
 import { createFileRoute } from "@tanstack/react-router";
 import { SearchConsoleConnectionCard } from "@/client/features/gsc/SearchConsoleConnectionCard";
 import { GoogleAnalyticsConnectionCard } from "@/client/features/ga4/GoogleAnalyticsConnectionCard";
+// Fork addition (FORK-CHANGES.md): Google Analytics or PostHog per project.
+import { AnalyticsSourceSection } from "@/client/features/posthog/AnalyticsSourceSection";
 
 export const Route = createFileRoute(
   "/_project/p/$projectId/settings/integrations",
@@ -33,14 +35,11 @@ function ProjectIntegrationsRoute() {
       </section>
 
       <section id="google-analytics" className="scroll-mt-6 space-y-3">
-        <GoogleAnalyticsConnectionCard
-          projectId={projectId}
-          heading={
-            <h2 className="text-sm font-medium text-base-content/50">
-              Analytics
-            </h2>
-          }
-        />
+        {/* Fork addition (FORK-CHANGES.md): the source picker wraps the
+            GA4 card; the section heading moved into it. */}
+        <AnalyticsSourceSection projectId={projectId}>
+          <GoogleAnalyticsConnectionCard projectId={projectId} />
+        </AnalyticsSourceSection>
       </section>
     </div>
   );

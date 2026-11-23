@@ -2,8 +2,14 @@ import { Ga4ConnectionRepository } from "@/server/features/ga4/repositories/Ga4C
 import { createGa4AdminClient } from "@/server/lib/ga4Client";
 import { Ga4ReportError } from "@/server/lib/ga4Errors";
 import { mapGa4ReportError } from "@/server/features/ga4/services/Ga4ReportingService";
+// Fork addition (FORK-CHANGES.md): PostHog as an analytics source.
+import { getActivePosthogSource } from "@/server/features/posthog/services/posthogSource";
+import { PosthogReportingService } from "@/server/features/posthog/services/PosthogReportingService";
 
 async function getMeasurementHealth(projectId: string) {
+  // Fork addition (FORK-CHANGES.md): PostHog projects read PostHog.
+  const posthog = await getActivePosthogSource(projectId);
+  if (posthog) return PosthogReportingService.getMeasurementHealth(posthog);
   const connection = await Ga4ConnectionRepository.getByProjectId(projectId);
   if (!connection) {
     throw new Ga4ReportError(

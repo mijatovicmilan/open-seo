@@ -6,6 +6,8 @@ import { AuditRepository } from "@/server/features/audit/repositories/AuditRepos
 import { getIssueTypePageCountsForAudit } from "@/server/features/audit/repositories/auditSummaryQueries";
 import { BacklinkSnapshotRepository } from "@/server/features/dashboard/repositories/BacklinkSnapshotRepository";
 import { Ga4ConnectionRepository } from "@/server/features/ga4/repositories/Ga4ConnectionRepository";
+// Fork addition (FORK-CHANGES.md): PostHog as an analytics source.
+import { getActivePosthogSource } from "@/server/features/posthog/services/posthogSource";
 import { GscConnectionRepository } from "@/server/features/gsc/repositories/GscConnectionRepository";
 import { RankTrackingRepository } from "@/server/features/rank-tracking/repositories/RankTrackingRepository";
 import { getLatestResults } from "@/server/features/rank-tracking/services/rankTrackingResults";
@@ -96,6 +98,7 @@ async function getActivation(input: {
     projectCount,
     hasTeammate,
     dismissed,
+    posthog,
   ] = await Promise.all([
     Ga4ConnectionRepository.getByProjectId(input.projectId),
     GscConnectionRepository.getByProjectId(input.projectId),
@@ -104,6 +107,7 @@ async function getActivation(input: {
     ProjectRepository.countProjects(input.organizationId),
     ActivationRepository.hasTeammate(input.organizationId),
     ActivationRepository.getDismissedSteps(input.userId, input.projectId),
+    getActivePosthogSource(input.projectId),
   ]);
 
   return {
@@ -112,8 +116,11 @@ async function getActivation(input: {
     hasTeammate,
     dismissedSteps: dismissed.map((row) => row.step),
     ga4: {
-      connected: ga4 !== null,
-      propertyDisplayName: ga4?.propertyDisplayName ?? null,
+      // Fork addition (FORK-CHANGES.md): a PostHog source counts as connected.
+      connected: ga4 !== null || posthog !== null,
+      propertyDisplayName: posthog
+        ? `PostHog project ${posthog.posthogProjectId}`
+        : (ga4?.propertyDisplayName ?? null),
       cardDismissedAt: projectActivation?.ga4CardDismissedAt ?? null,
     },
     gsc: { connected: gsc !== null, siteUrl: gsc?.siteUrl ?? null },

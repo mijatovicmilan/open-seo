@@ -8,6 +8,9 @@ import { normalizeGa4Response } from "./Ga4ReportNormalization";
 import { comparisonValue, previousPeriod } from "./Ga4ReportEnhancements";
 import { Ga4ReportError } from "@/server/lib/ga4Errors";
 import { mapGa4ReportError, resolveGa4DateRange } from "./Ga4ReportingService";
+// Fork addition (FORK-CHANGES.md): PostHog as an analytics source.
+import { getActivePosthogSource } from "@/server/features/posthog/services/posthogSource";
+import { PosthogReportingService } from "@/server/features/posthog/services/PosthogReportingService";
 
 type Ga4OrganicOverviewInput = {
   projectId: string;
@@ -31,7 +34,7 @@ function metricComparison(
   );
 }
 
-function keyEventDiagnostics(
+export function keyEventDiagnostics(
   current: Record<string, string | number | null> | null,
   previous: Record<string, string | number | null> | null,
   hasLimitedData: boolean,
@@ -66,6 +69,11 @@ async function getOrganicOverview(
   input: Ga4OrganicOverviewInput,
   opts: { now?: Date } = {},
 ) {
+  // Fork addition (FORK-CHANGES.md): PostHog projects read PostHog.
+  const posthog = await getActivePosthogSource(input.projectId);
+  if (posthog) {
+    return PosthogReportingService.getOrganicOverview(input, posthog, opts);
+  }
   const connection = await Ga4ConnectionRepository.getByProjectId(
     input.projectId,
   );

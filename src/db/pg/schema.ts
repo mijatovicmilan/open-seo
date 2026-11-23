@@ -12,3 +12,4 @@ export * from "./telemetry.schema";
 // Fork additions (FORK-CHANGES.md).
 export * from "./outreach.schema";
 export * from "./gsc-history.schema";
+export * from "./analytics-source.schema";

@@ -85,7 +85,8 @@ const faint = (color: string) =>
  *  allowed for rates), always starting at 0 and reaching at least `max`. */
 export function niceTicks(max: number, integer: boolean): number[] {
   if (!Number.isFinite(max) || max <= 0) return [0, 1];
-  const rough = max / 4;
+  // Aim for about five steps (Plausible keeps up to five whole ticks).
+  const rough = max / 5;
   const power = 10 ** Math.floor(Math.log10(rough));
   const multipliers = integer ? [1, 2, 5, 10] : [1, 2, 2.5, 5, 10];
   const found =
@@ -124,6 +125,52 @@ function axisFor(points: ChartPoint[], series: ChartSeries) {
 
 type Row = ChartPoint & Record<string, unknown>;
 
+/** The change against the comparison, as Plausible's tooltip shows it: a
+ *  plain difference for small counts (2 → 5 is +3, not +150%), a percentage
+ *  otherwise; position counts places, and fewer places is better. */
+function ChangeCell({
+  metric,
+  value,
+  prior,
+}: {
+  metric: ChartMetric;
+  value: number | null | undefined;
+  prior: number | null | undefined;
+}) {
+  if (
+    value === null ||
+    value === undefined ||
+    prior === null ||
+    prior === undefined
+  ) {
+    return <td className="py-0.5 pl-2 text-right text-base-content/30">—</td>;
+  }
+  const diff = value - prior;
+  let text: string;
+  if (metric.inverted) {
+    text = `${diff < 0 ? "+" : diff > 0 ? "−" : ""}${Math.abs(diff).toFixed(1)}`;
+  } else if (metric.percent) {
+    text = `${diff >= 0 ? "+" : "−"}${Math.abs(diff * 100).toFixed(1)} pt`;
+  } else if (prior < 20 || prior === 0) {
+    text = `${diff > 0 ? "+" : diff < 0 ? "−" : ""}${Math.abs(diff).toLocaleString("en-US")}`;
+  } else {
+    const pct = (diff / prior) * 100;
+    text = `${pct >= 0 ? "+" : "−"}${Math.abs(pct).toFixed(0)}%`;
+  }
+  const better = metric.inverted ? diff < 0 : diff > 0;
+  const tone =
+    Math.abs(diff) < 1e-9
+      ? "text-base-content/40"
+      : better
+        ? "text-success"
+        : "text-error";
+  return (
+    <td className={`py-0.5 pl-2 text-right tabular-nums ${tone}`}>
+      {Math.abs(diff) < 1e-9 ? "0" : text}
+    </td>
+  );
+}
+
 function TooltipCard({
   point,
   series,
@@ -134,12 +181,12 @@ function TooltipCard({
   const notes = point.notes ?? [];
   const hasCompare = Boolean(point.compare);
   return (
-    <div className="w-64 rounded-lg border border-base-300 bg-base-100 p-3 text-xs shadow-lg">
+    <div className="w-72 max-w-[calc(100vw-32px)] rounded-lg border border-base-300 bg-base-100 p-3 text-xs shadow-lg">
       <div className="mb-2 flex items-baseline justify-between gap-2">
         <span className="font-medium text-base-content">{point.label}</span>
         {point.partial ? (
           <span className="text-base-content/50">
-            {point.partialNote ?? "still reporting"}
+            {point.partialNote ?? "partial data"}
           </span>
         ) : null}
       </div>
@@ -155,6 +202,7 @@ function TooltipCard({
               >
                 {point.compareLabel ?? "Before"}
               </th>
+              <th className="pb-1 pl-2 text-right font-normal">Change</th>
             </tr>
           </thead>
         ) : null}
@@ -184,6 +232,9 @@ function TooltipCard({
                       ? "—"
                       : s.metric.format(prior)}
                   </td>
+                ) : null}
+                {hasCompare ? (
+                  <ChangeCell metric={s.metric} value={value} prior={prior} />
                 ) : null}
               </tr>
             );

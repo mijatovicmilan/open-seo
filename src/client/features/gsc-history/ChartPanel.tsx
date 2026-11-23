@@ -95,9 +95,12 @@ export function ChartPanel({
             </span>
           ) : null}
           {hasPartial ? (
-            <span className="inline-flex items-center gap-1.5">
+            <span
+              className="inline-flex items-center gap-1.5"
+              title="Search Console is still adding data for these days (fresh data), so they are lower than they will end up."
+            >
               <span className="w-4 border-t-2 border-dotted border-base-content/30" />
-              Still reporting
+              Partial data
             </span>
           ) : null}
           {period.compareMissing || (period.previous && !comparable) ? (

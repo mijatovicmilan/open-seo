@@ -24,7 +24,9 @@ export const METRICS: Record<
     name: "Clicks",
     integer: true,
     format: count,
-    minTop: 5,
+    // Small floors (Plausible-style whole ticks above them): one click is
+    // a quarter of the height, five impressions half of it.
+    minTop: 4,
     color: "var(--color-primary)",
   },
   impressions: {
@@ -32,7 +34,7 @@ export const METRICS: Record<
     name: "Impressions",
     integer: true,
     format: count,
-    minTop: 50,
+    minTop: 10,
     color: "var(--color-warning)",
   },
   ctr: {
@@ -41,7 +43,7 @@ export const METRICS: Record<
     integer: false,
     percent: true,
     format: (value) => `${(value * 100).toFixed(value >= 0.1 ? 0 : 1)}%`,
-    minTop: 0.05,
+    minTop: 0.02,
     color: "var(--color-success)",
   },
   position: {
@@ -289,7 +291,7 @@ export function buildChartPoints(input: {
         : {}),
       partial: bucket.partial || short,
       ...(bucket.partial
-        ? { partialNote: "still reporting" }
+        ? { partialNote: "partial data (fresh)" }
         : short
           ? { partialNote: `${bucket.days} of ${fullDays(key)} days` }
           : {}),

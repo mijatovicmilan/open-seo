@@ -168,6 +168,7 @@ export function SearchInsightsPage({
                     metrics={state.metrics}
                     granularity={resolvedGranularity}
                     onMetrics={(metrics) => onChange({ metrics })}
+                    onShowDays={() => onChange({ gran: "day" })}
                   />
                 </InsightsFilterContext.Provider>
               </>
@@ -190,12 +191,14 @@ function InsightsBody({
   metrics,
   granularity,
   onMetrics,
+  onShowDays,
 }: {
   projectId: string;
   insights: Insights;
   metrics: MetricKey[];
   granularity: "day" | "week" | "month";
   onMetrics: (metrics: MetricKey[]) => void;
+  onShowDays: () => void;
 }) {
   const { period, changes } = insights;
   const curveNote =
@@ -220,6 +223,7 @@ function InsightsBody({
         insights={insights}
         metrics={metrics}
         granularity={granularity}
+        onShowDays={onShowDays}
       />
 
       <p className="text-xs text-base-content/50">

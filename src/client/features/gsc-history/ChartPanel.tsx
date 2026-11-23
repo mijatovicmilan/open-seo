@@ -21,6 +21,35 @@ import type { Insights } from "@/client/features/gsc-history/types";
 // The Search Insights chart card: legend, notes (add from the chart or
 // "+ Note", list behind "Notes (N)") and the chart itself.
 
+function addDay(day: string, days: number) {
+  const date = new Date(`${day}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function daysBetween(start: string, end: string) {
+  return Math.round(
+    (Date.parse(`${end}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`)) /
+      86_400_000,
+  );
+}
+
+function fmt(day: string, options: Intl.DateTimeFormatOptions) {
+  return new Date(`${day}T00:00:00Z`).toLocaleDateString("en-US", {
+    ...options,
+    timeZone: "UTC",
+  });
+}
+
+/** "Nov 21–22" or "Nov 30 – Dec 1". */
+function shortRange(start: string, end: string) {
+  if (start === end) return fmt(start, { month: "short", day: "numeric" });
+  if (start.slice(0, 7) === end.slice(0, 7)) {
+    return `${fmt(start, { month: "short", day: "numeric" })}–${fmt(end, { day: "numeric" })}`;
+  }
+  return `${fmt(start, { month: "short", day: "numeric" })} – ${fmt(end, { month: "short", day: "numeric" })}`;
+}
+
 export function periodText(range: { start: string; end: string }) {
   return `${formatDay(range.start)} – ${formatDay(range.end)}`;
 }
@@ -30,11 +59,14 @@ export function ChartPanel({
   insights,
   metrics,
   granularity,
+  onShowDays,
 }: {
   projectId: string;
   insights: Insights;
   metrics: MetricKey[];
   granularity: "day" | "week" | "month";
+  /** Switch to daily points when weeks or months are too few for a line. */
+  onShowDays: () => void;
 }) {
   const { period } = insights;
   // A comparison period without a single impression draws nothing useful.
@@ -80,38 +112,55 @@ export function ChartPanel({
     (note) => note.kind !== "first_seen",
   ).length;
   const hasPartial = points.some((point) => point.partial);
+  // The legend names what the chart draws: from its first day (a young
+  // site's chart starts on its first day with data) to the last complete
+  // day; fresh days after it are listed as partial.
+  const first = insights.firstDataDay;
+  const shownStart =
+    first && first > period.current.start ? first : period.current.start;
+  const shift = daysBetween(period.current.start, shownStart);
+  const fresh =
+    period.chartEnd > period.current.end
+      ? { start: addDay(period.current.end, 1), end: period.chartEnd }
+      : null;
   const noData = !insights.firstDataDay;
   return (
     <section className="rounded-xl border border-base-300 bg-base-100 p-4">
-      <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-base-content/60">
+      <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-2">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 text-xs leading-6 text-base-content/60 [&>span]:whitespace-nowrap">
           <span className="inline-flex items-center gap-1.5">
             <span className="h-0.5 w-4 rounded bg-base-content/70" />
-            {periodText(period.current)}
+            {periodText({ start: shownStart, end: period.current.end })}
           </span>
-          {comparable && period.previous ? (
+          {comparable && period.previous && !noData ? (
             <span className="inline-flex items-center gap-1.5">
               <span className="h-0.5 w-4 rounded bg-base-content/25" />
-              {periodText(period.previous)}
+              {periodText({
+                start: addDay(period.previous.start, shift),
+                end: period.previous.end,
+              })}
             </span>
           ) : null}
-          {hasPartial ? (
+          {hasPartial && !noData ? (
             <span
               className="inline-flex items-center gap-1.5"
               title="Search Console is still adding data for these days (fresh data), so they are lower than they will end up."
             >
               <span className="w-4 border-t-2 border-dotted border-base-content/30" />
-              Partial data
+              {fresh
+                ? `Partial data, ${shortRange(fresh.start, fresh.end)}`
+                : "Partial data"}
             </span>
           ) : null}
-          {period.compareMissing || (period.previous && !comparable) ? (
+          {!noData &&
+          (period.compareMissing || (period.previous && !comparable)) ? (
             <span>No data in the comparison period</span>
           ) : null}
           {trimmed && insights.firstDataDay ? (
-            <span>No data before {formatDay(insights.firstDataDay)}</span>
+            <span>First data: {formatDay(insights.firstDataDay)}</span>
           ) : null}
         </div>
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="-ml-2 flex shrink-0 items-center gap-1 sm:ml-0">
           {noteCount > 0 ? (
             <button
               type="button"
@@ -145,7 +194,23 @@ export function ChartPanel({
       </div>
       {noData ? (
         <div className="flex h-60 items-center justify-center text-sm text-base-content/50">
-          No impressions in this period.
+          {Object.values(insights.filter).some(Boolean)
+            ? "No impressions with these filters in this period."
+            : "No impressions in this period."}
+        </div>
+      ) : granularity !== "day" && points.length < 3 ? (
+        <div className="flex h-60 flex-col items-center justify-center gap-2 text-sm text-base-content/50">
+          <span>
+            {points.length === 1 ? "One" : "Two"} {granularity}
+            {points.length === 1 ? "" : "s"} of data so far, too few for a line.
+          </span>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm text-base-content/70"
+            onClick={onShowDays}
+          >
+            Show by day
+          </button>
         </div>
       ) : (
         <TimeSeriesChart

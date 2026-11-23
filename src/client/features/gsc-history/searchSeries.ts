@@ -178,8 +178,9 @@ export function chartStart(
 ) {
   const first = series[0]?.date;
   if (!first || !firstDataDay || firstDataDay <= first) return first ?? null;
-  // Start on a whole week or month so the first bucket is not cut short.
-  const from = bucketKey(addDays(firstDataDay, -3), granularity);
+  // A young site's chart starts on its first day with data (the week or
+  // month holding it), not on empty days before it.
+  const from = bucketKey(firstDataDay, granularity);
   return from > first ? from : first;
 }
 

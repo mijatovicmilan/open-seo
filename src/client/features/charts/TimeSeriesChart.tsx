@@ -32,11 +32,11 @@ import { useChartWidth } from "@/client/features/rank-tracking/RankTrackingTrend
 // to); further metrics are drawn to their own hidden scale. Counts get
 // whole-number round ticks and position runs top to bottom. Segments are
 // straight between real values; days still being reported (or a bucket the
-// range cuts short) stand apart, faint; the comparison period is a faint
-// solid line in the same colour. Notes are small neutral markers under the baseline,
-// merged with a count when close, with a guide line on hover. The tooltip
-// always shows every selected metric's real value. Days still being
-// reported are a faint dotted line that never joins the last complete day.
+// range cuts short) are a faint dotted line that carries on from the
+// complete day next to them; the comparison period is a faint solid line in
+// the same colour. Notes are small neutral markers under the baseline,
+// merged with a count when close. The tooltip always shows every selected
+// metric's real value.
 
 export type ChartNote = {
   kind: string;
@@ -97,6 +97,9 @@ const NOTE = "color-mix(in oklab, var(--color-base-content) 55%, transparent)";
 const AXIS = "color-mix(in oklab, var(--color-base-content) 55%, transparent)";
 const faint = (color: string) =>
   `color-mix(in oklab, ${color} 35%, transparent)`;
+/** Fresh days: lighter than the line, but clear in both themes. */
+const fresh = (color: string) =>
+  `color-mix(in oklab, ${color} 60%, transparent)`;
 
 /** Round numbers for an axis: about four steps of 1, 2 or 5 × 10^n (2.5 is
  *  allowed for rates), always starting at 0 and reaching at least `max`. */
@@ -201,17 +204,44 @@ function NoteMarker({
 
 /** Markers closer than ~16px merge into one with a count; clicking one
  *  pins a tooltip listing all of them. */
+/** Dots for the dotted segment: only on the incomplete days, so the
+ *  complete day it starts from keeps its own dot. */
+function partialDot(points: ChartPoint[], fill: string) {
+  return function PartialDot(props: {
+    cx?: number;
+    cy?: number;
+    index?: number;
+  }) {
+    const point = points[props.index ?? -1];
+    if (!point?.partial || props.cy === undefined) {
+      return <g key={`p-${props.index}`} />;
+    }
+    return (
+      <circle
+        key={`p-${props.index}`}
+        cx={props.cx}
+        cy={props.cy}
+        r={2.5}
+        fill={fill}
+      />
+    );
+  };
+}
+
 /** Per series: the complete points (solid line), the incomplete ones (a
  *  separate faint line) and the comparison. */
 function toRows(points: ChartPoint[], series: ChartSeries[]): Row[] {
-  return points.map((p) => {
+  return points.map((p, index) => {
     const row: Row = { ...p };
+    // As in Search Console, the faint dotted segment carries on from the
+    // complete day next to it, so the line has no gap.
+    const nextToPartial =
+      Boolean(points[index - 1]?.partial) ||
+      Boolean(points[index + 1]?.partial);
     for (const s of series) {
       const value = p.values[s.key] ?? null;
       row[`${s.key}__solid`] = p.partial ? null : value;
-      // Incomplete days stand apart: faint, never joined to the last
-      // complete day, so a half-reported day does not read as a drop.
-      row[`${s.key}__partial`] = p.partial ? value : null;
+      row[`${s.key}__partial`] = p.partial || nextToPartial ? value : null;
       row[`${s.key}__compare`] = p.compare?.[s.key] ?? null;
     }
     return row;
@@ -524,11 +554,11 @@ export function TimeSeriesChart({
                 yAxisId={s.key}
                 type="linear"
                 dataKey={`${s.key}__partial`}
-                stroke={faint(s.color)}
+                stroke={fresh(s.color)}
                 strokeWidth={2}
                 strokeDasharray="2 4"
-                dot={{ r: 2.5, strokeWidth: 0, fill: faint(s.color) }}
-                activeDot={{ r: 4, strokeWidth: 0, fill: faint(s.color) }}
+                dot={partialDot(points, fresh(s.color))}
+                activeDot={{ r: 4, strokeWidth: 0, fill: fresh(s.color) }}
                 connectNulls={false}
                 isAnimationActive={false}
               />

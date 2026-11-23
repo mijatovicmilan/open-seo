@@ -9,6 +9,7 @@ import { requireProjectContext } from "@/serverFunctions/middleware";
 import {
   createAnnotationInputSchema,
   deleteAnnotationInputSchema,
+  updateAnnotationInputSchema,
   searchHistoryProjectInputSchema,
   searchInsightsInputSchema,
   SEARCH_INSIGHTS_RANGES,
@@ -62,6 +63,22 @@ export const addSearchAnnotation = createServerFn({ method: "POST" })
       url: data.url,
     }),
   );
+
+export const updateSearchAnnotation = createServerFn({ method: "POST" })
+  .middleware(requireProjectContext)
+  .validator(updateAnnotationInputSchema)
+  .handler(async ({ data, context }) => {
+    const updated = await GscHistoryService.updateAnnotation({
+      projectId: context.projectId,
+      annotationId: data.annotationId,
+      date: data.date,
+      kind: data.kind,
+      label: data.label,
+      url: data.url,
+    });
+    if (!updated) throw new AppError("NOT_FOUND", "Annotation not found.");
+    return { updated };
+  });
 
 export const deleteSearchAnnotation = createServerFn({ method: "POST" })
   .middleware(requireProjectContext)

@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- the shared chart, its axes, markers and tooltip (fork feature) */
-import { useMemo, useState } from "react";
+import { type SyntheticEvent, useMemo, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -223,11 +223,14 @@ export function TimeSeriesChart({
   series,
   kind = "line",
   height = 240,
+  onPointClick,
 }: {
   points: ChartPoint[];
   series: ChartSeries[];
   kind?: "line" | "bar";
   height?: number;
+  /** Clicking a day (e.g. to add a note there), with where it was clicked. */
+  onPointClick?: (key: string, at: { x: number; y: number }) => void;
 }) {
   const { containerRef, width } = useChartWidth();
   const [activeKey, setActiveKey] = useState<string | null>(null);
@@ -410,6 +413,21 @@ export function TimeSeriesChart({
       typeof state.activeLabel === "string" ? state.activeLabel : null;
     if (label !== activeKey) setActiveKey(label);
   };
+  const onClick = (
+    state: { activeLabel?: string | number },
+    event: SyntheticEvent,
+  ) => {
+    const label =
+      typeof state.activeLabel === "string" ? state.activeLabel : null;
+    if (!label || !onPointClick) return;
+    const native = event.nativeEvent;
+    onPointClick(
+      label,
+      native instanceof MouseEvent
+        ? { x: native.clientX, y: native.clientY }
+        : { x: window.innerWidth / 2, y: window.innerHeight / 3 },
+    );
+  };
   const margin = {
     top: 8,
     right: axes.length > 1 ? 0 : 8,
@@ -418,7 +436,12 @@ export function TimeSeriesChart({
   };
 
   return (
-    <div ref={containerRef} className="w-full min-w-0" style={{ height }}>
+    <div
+      ref={containerRef}
+      // recharts focuses its surface on click; the app shows no ring there.
+      className="w-full min-w-0 [&_*:focus]:outline-none"
+      style={{ height }}
+    >
       {width > 0 ? (
         kind === "bar" ? (
           <BarChart
@@ -451,6 +474,8 @@ export function TimeSeriesChart({
             margin={margin}
             onMouseMove={onMove}
             onMouseLeave={() => setActiveKey(null)}
+            onClick={onClick}
+            style={onPointClick ? { cursor: "pointer" } : undefined}
           >
             {chartParts}
             {hasCompare

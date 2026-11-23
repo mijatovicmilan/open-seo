@@ -1,244 +1,325 @@
-import { useForm } from "@tanstack/react-form";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { Loader2, Pencil, Trash2, X } from "lucide-react";
 import { reverse } from "remeda";
 import { toast } from "sonner";
-import { z } from "zod";
-import { getStandardErrorMessage } from "@/client/lib/error-messages";
-import { getFieldError } from "@/client/lib/forms";
+import { SegmentGroup } from "@/client/features/charts/ChoiceMenu";
 import {
   ANNOTATION_STYLES,
   formatDay,
 } from "@/client/features/gsc-history/annotationStyles";
 import type { Insights } from "@/client/features/gsc-history/types";
+import { getStandardErrorMessage } from "@/client/lib/error-messages";
 import {
   addSearchAnnotation,
   deleteSearchAnnotation,
+  updateSearchAnnotation,
 } from "@/serverFunctions/gscHistory";
-import { GSC_ANNOTATION_KINDS } from "@/types/schemas/gsc-history";
+import {
+  GSC_ANNOTATION_KINDS,
+  type GscAnnotationKind,
+} from "@/types/schemas/gsc-history";
 
-const formSchema = z.object({
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a date."),
-  kind: z.enum(GSC_ANNOTATION_KINDS),
-  label: z.string().trim().min(1, "Say what happened.").max(200),
-  url: z
-    .string()
-    .trim()
-    .refine((value) => value === "" || URL.canParse(value), "Use a full URL."),
-});
+// Chart notes (fork feature): added from the chart itself (click a day, or
+// "+ Note"), edited and deleted in a compact list. The editor is a small
+// popover in fixed position, so no card clips it.
 
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
+export type NoteDraft = {
+  id?: string;
+  date: string;
+  kind: GscAnnotationKind;
+  label: string;
+  url: string;
+};
+
+export type NoteAnchor = { x: number; y: number };
+
+const KIND_ITEMS = GSC_ANNOTATION_KINDS.map((kind) => ({
+  value: kind,
+  label: ANNOTATION_STYLES[kind].label,
+}));
+
+const POPOVER_WIDTH = 320;
+
+/** Notes people add; outreach links and first-seen pages are derived. */
+function isManual(kind: string): kind is GscAnnotationKind {
+  return GSC_ANNOTATION_KINDS.some((item) => item === kind);
 }
 
-export function AnnotationsPanel({
+export function NoteEditor({
+  projectId,
+  draft,
+  anchor,
+  onClose,
+}: {
+  projectId: string;
+  draft: NoteDraft;
+  anchor: NoteAnchor;
+  onClose: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const [value, setValue] = useState(draft);
+  const [error, setError] = useState<string | null>(null);
+  const ref = useRef<HTMLFormElement | null>(null);
+
+  useEffect(() => {
+    const outside = (event: MouseEvent) => {
+      if (event.target instanceof Node && ref.current?.contains(event.target)) {
+        return;
+      }
+      onClose();
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    // Deferred so the click that opened the editor does not close it.
+    const timer = window.setTimeout(
+      () => document.addEventListener("mousedown", outside),
+      0,
+    );
+    document.addEventListener("keydown", onKey);
+    return () => {
+      window.clearTimeout(timer);
+      document.removeEventListener("mousedown", outside);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [onClose]);
+
+  const save = useMutation({
+    mutationFn: async (note: NoteDraft) => {
+      const fields = {
+        projectId,
+        date: note.date,
+        kind: note.kind,
+        label: note.label.trim(),
+        url: note.url.trim() || undefined,
+      };
+      if (note.id) {
+        await updateSearchAnnotation({
+          data: { ...fields, annotationId: note.id },
+        });
+      } else {
+        await addSearchAnnotation({ data: fields });
+      }
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ["searchInsights", projectId],
+      });
+      onClose();
+    },
+    onError: (cause) =>
+      toast.error(getStandardErrorMessage(cause, "Could not save the note")),
+  });
+
+  const left = Math.max(
+    8,
+    Math.min(
+      anchor.x - POPOVER_WIDTH / 2,
+      window.innerWidth - POPOVER_WIDTH - 8,
+    ),
+  );
+  const top = Math.max(8, Math.min(anchor.y + 8, window.innerHeight - 300));
+
+  return createPortal(
+    <form
+      ref={ref}
+      className="fixed z-[1000] max-w-[calc(100vw-16px)] space-y-3 rounded-lg border border-base-300 bg-base-100 p-3 shadow-2xl"
+      style={{ left, top, width: POPOVER_WIDTH }}
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (!value.label.trim()) {
+          setError("Say what happened.");
+          return;
+        }
+        if (value.url.trim() && !URL.canParse(value.url.trim())) {
+          setError("Use a full link, starting with https://");
+          return;
+        }
+        save.mutate(value);
+      }}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm font-medium">
+          {value.id ? "Edit note" : "Add a note"}
+        </span>
+        <button
+          type="button"
+          className="btn btn-ghost btn-xs btn-square"
+          aria-label="Close"
+          onClick={onClose}
+        >
+          <X className="size-3.5" />
+        </button>
+      </div>
+      <input
+        type="date"
+        aria-label="Date"
+        className="input input-bordered h-9 w-full text-sm"
+        value={value.date}
+        onChange={(event) =>
+          setValue((current) => ({ ...current, date: event.target.value }))
+        }
+      />
+      <SegmentGroup
+        label="Kind"
+        items={KIND_ITEMS}
+        value={value.kind}
+        onChange={(kind) => setValue((current) => ({ ...current, kind }))}
+      />
+      <input
+        autoFocus
+        type="text"
+        aria-label="What happened"
+        placeholder="What happened"
+        maxLength={200}
+        className="input input-bordered h-9 w-full text-sm"
+        value={value.label}
+        onChange={(event) => {
+          setError(null);
+          setValue((current) => ({ ...current, label: event.target.value }));
+        }}
+      />
+      <input
+        type="url"
+        aria-label="Link (optional)"
+        placeholder="Link (optional)"
+        className="input input-bordered h-9 w-full text-sm"
+        value={value.url}
+        onChange={(event) => {
+          setError(null);
+          setValue((current) => ({ ...current, url: event.target.value }));
+        }}
+      />
+      {error ? <p className="text-xs text-error">{error}</p> : null}
+      <div className="flex justify-end gap-2">
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm"
+          onClick={onClose}
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          className="btn btn-primary btn-sm"
+          disabled={save.isPending}
+        >
+          {save.isPending ? (
+            <Loader2 className="size-3.5 animate-spin" />
+          ) : null}
+          Save
+        </button>
+      </div>
+    </form>,
+    document.body,
+  );
+}
+
+/** Notes people added and links Outreach found, newest first. */
+export function NotesList({
   projectId,
   annotations,
+  onEdit,
 }: {
   projectId: string;
   annotations: Insights["annotations"];
+  onEdit: (draft: NoteDraft, anchor: NoteAnchor) => void;
 }) {
   const queryClient = useQueryClient();
-  const invalidate = () =>
-    queryClient.invalidateQueries({ queryKey: ["searchInsights", projectId] });
-
-  const addMutation = useMutation({
-    mutationFn: (values: z.infer<typeof formSchema>) =>
-      addSearchAnnotation({
-        data: {
-          projectId,
-          date: values.date,
-          kind: values.kind,
-          label: values.label,
-          url: values.url === "" ? undefined : values.url,
-        },
-      }),
-    onSuccess: () => {
-      form.reset();
-      void invalidate();
-    },
-    onError: (error) =>
-      toast.error(getStandardErrorMessage(error, "Could not add the note")),
-  });
-
-  const deleteMutation = useMutation({
+  const remove = useMutation({
     mutationFn: (annotationId: string) =>
       deleteSearchAnnotation({ data: { projectId, annotationId } }),
-    onSuccess: () => void invalidate(),
-    onError: (error) =>
-      toast.error(getStandardErrorMessage(error, "Could not delete the note")),
+    onSuccess: () =>
+      void queryClient.invalidateQueries({
+        queryKey: ["searchInsights", projectId],
+      }),
+    onError: (cause) =>
+      toast.error(getStandardErrorMessage(cause, "Could not delete the note")),
   });
-
-  const form = useForm({
-    defaultValues: {
-      date: today(),
-      kind: "deploy" as (typeof GSC_ANNOTATION_KINDS)[number],
-      label: "",
-      url: "",
-    },
-    validators: { onSubmit: formSchema },
-    onSubmit: ({ value }) => addMutation.mutate(value),
-  });
-
-  // Newest first; derived first-seen pages are already listed under New pages.
+  // First-seen pages are listed under New pages already.
   const listed = reverse(annotations.filter((a) => a.kind !== "first_seen"));
-
+  if (listed.length === 0) return null;
   return (
-    <div className="space-y-3">
-      <form
-        className="flex flex-wrap items-start gap-2"
-        onSubmit={(event) => {
-          event.preventDefault();
-          void form.handleSubmit();
-        }}
-      >
-        <form.Field name="date">
-          {(field) => (
-            <input
-              type="date"
-              aria-label="Date"
-              className="input input-bordered input-sm w-36"
-              value={field.state.value}
-              onChange={(event) => field.handleChange(event.target.value)}
+    <ul className="divide-y divide-base-300">
+      {listed.map((note, index) => {
+        const kind = note.kind;
+        return (
+          <li
+            key={note.id ?? `${kind}-${note.date}-${index}`}
+            className="flex items-center gap-3 py-1.5 text-sm"
+          >
+            <span className="w-24 shrink-0 text-xs tabular-nums text-base-content/50">
+              {formatDay(note.date)}
+            </span>
+            <span
+              className="size-1.5 shrink-0 rounded-full"
+              style={{ backgroundColor: ANNOTATION_STYLES[kind].color }}
+              aria-hidden
             />
-          )}
-        </form.Field>
-        <form.Field name="kind">
-          {(field) => (
-            <select
-              aria-label="Kind"
-              className="select select-bordered select-sm w-28"
-              value={field.state.value}
-              onChange={(event) => {
-                const kind = GSC_ANNOTATION_KINDS.find(
-                  (k) => k === event.target.value,
-                );
-                if (kind) field.handleChange(kind);
-              }}
+            <span className="hidden w-24 shrink-0 text-xs text-base-content/60 sm:inline">
+              {ANNOTATION_STYLES[kind].label}
+            </span>
+            <span
+              className="min-w-0 flex-1 truncate"
+              title={note.url ?? undefined}
             >
-              {GSC_ANNOTATION_KINDS.map((kind) => (
-                <option key={kind} value={kind}>
-                  {ANNOTATION_STYLES[kind].label}
-                </option>
-              ))}
-            </select>
-          )}
-        </form.Field>
-        <form.Field name="label">
-          {(field) => (
-            <div className="min-w-48 flex-1">
-              <input
-                type="text"
-                aria-label="What happened"
-                placeholder="What happened, e.g. New pricing page live"
-                className="input input-bordered input-sm w-full"
-                value={field.state.value}
-                onChange={(event) => field.handleChange(event.target.value)}
-              />
-              <FieldError errors={field.state.meta.errors} />
-            </div>
-          )}
-        </form.Field>
-        <form.Field name="url">
-          {(field) => (
-            <div className="min-w-40 flex-1">
-              <input
-                type="url"
-                aria-label="URL (optional)"
-                placeholder="URL (optional)"
-                className="input input-bordered input-sm w-full"
-                value={field.state.value}
-                onChange={(event) => field.handleChange(event.target.value)}
-              />
-              <FieldError errors={field.state.meta.errors} />
-            </div>
-          )}
-        </form.Field>
-        <button
-          type="submit"
-          className="btn btn-sm btn-primary gap-1"
-          disabled={addMutation.isPending}
-        >
-          {addMutation.isPending ? (
-            <Loader2 className="size-3.5 animate-spin" />
-          ) : (
-            <Plus className="size-3.5" />
-          )}
-          Add note
-        </button>
-      </form>
-
-      {listed.length === 0 ? (
-        <p className="text-sm text-base-content/50">
-          No notes yet. Add deploys, new pages and links you earned so changes
-          in the chart can be traced to a cause.
-        </p>
-      ) : (
-        <ol>
-          {listed.map((annotation, index) => (
-            <li
-              key={
-                annotation.id ??
-                `${annotation.kind}-${annotation.date}-${index}`
-              }
-              className="grid grid-cols-[5.5rem_1fr_auto] items-start gap-x-3 py-1"
-            >
-              <span className="whitespace-nowrap pt-0.5 text-xs tabular-nums text-base-content/40">
-                {formatDay(annotation.date)}
-              </span>
-              <div className="relative min-w-0 border-l border-base-300 pl-4">
-                <span
-                  className="absolute -left-[3.5px] top-2 size-1.5 rounded-full"
-                  style={{
-                    backgroundColor: ANNOTATION_STYLES[annotation.kind].color,
-                  }}
-                  aria-hidden
-                />
-                <div className="truncate text-sm">
-                  {annotation.url ? (
-                    <a
-                      href={annotation.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="link link-hover"
-                      title={annotation.url}
-                    >
-                      {annotation.label}
-                    </a>
-                  ) : (
-                    annotation.label
-                  )}
-                </div>
-                <div className="text-xs text-base-content/50">
-                  {ANNOTATION_STYLES[annotation.kind].label}
-                </div>
-              </div>
-              {annotation.id ? (
+              {note.url ? (
+                <a
+                  href={note.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="link link-hover"
+                >
+                  {note.label}
+                </a>
+              ) : (
+                note.label
+              )}
+            </span>
+            {note.id && isManual(kind) ? (
+              <span className="flex shrink-0 items-center">
                 <button
                   type="button"
-                  className="btn btn-ghost btn-xs btn-square text-base-content/40 hover:text-error"
+                  className="btn btn-ghost btn-xs btn-square text-base-content/50"
+                  aria-label="Edit note"
+                  onClick={(event) => {
+                    const rect = event.currentTarget.getBoundingClientRect();
+                    onEdit(
+                      {
+                        id: note.id ?? undefined,
+                        date: note.date,
+                        kind,
+                        label: note.label,
+                        url: note.url ?? "",
+                      },
+                      { x: rect.left, y: rect.bottom },
+                    );
+                  }}
+                >
+                  <Pencil className="size-3.5" />
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-xs btn-square text-base-content/50 hover:text-error"
                   aria-label="Delete note"
-                  disabled={deleteMutation.isPending}
+                  disabled={remove.isPending}
                   onClick={() => {
-                    if (annotation.id) deleteMutation.mutate(annotation.id);
+                    if (note.id) remove.mutate(note.id);
                   }}
                 >
                   <Trash2 className="size-3.5" />
                 </button>
-              ) : (
-                <span className="w-6" />
-              )}
-            </li>
-          ))}
-        </ol>
-      )}
-    </div>
+              </span>
+            ) : (
+              <span className="w-16 shrink-0 text-right text-xs text-base-content/40">
+                Outreach
+              </span>
+            )}
+          </li>
+        );
+      })}
+    </ul>
   );
-}
-
-function FieldError({ errors }: { errors: unknown[] }) {
-  const message = getFieldError(errors);
-  return message ? (
-    <p className="mt-0.5 text-xs text-error">{message}</p>
-  ) : null;
 }

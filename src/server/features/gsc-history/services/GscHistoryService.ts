@@ -564,6 +564,26 @@ async function addAnnotation(input: {
   });
 }
 
+async function updateAnnotation(input: {
+  projectId: string;
+  annotationId: string;
+  date: string;
+  kind: GscAnnotationKind;
+  label: string;
+  url?: string;
+}): Promise<boolean> {
+  return GscHistoryRepository.updateAnnotation(
+    input.projectId,
+    input.annotationId,
+    {
+      date: input.date,
+      kind: input.kind,
+      label: input.label,
+      url: input.url ?? null,
+    },
+  );
+}
+
 async function deleteAnnotation(
   projectId: string,
   annotationId: string,
@@ -576,5 +596,6 @@ export const GscHistoryService = {
   getInsights,
   listAnnotations,
   addAnnotation,
+  updateAnnotation,
   deleteAnnotation,
 };

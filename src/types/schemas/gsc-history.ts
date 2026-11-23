@@ -89,6 +89,12 @@ export const createAnnotationInputSchema = z.object({
   ...annotationFieldsSchema,
 });
 
+export const updateAnnotationInputSchema = z.object({
+  projectId: z.string().min(1),
+  annotationId: z.string().min(1),
+  ...annotationFieldsSchema,
+});
+
 export const deleteAnnotationInputSchema = z.object({
   projectId: z.string().min(1),
   annotationId: z.string().min(1),

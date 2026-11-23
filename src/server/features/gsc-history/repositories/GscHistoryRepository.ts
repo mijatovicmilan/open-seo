@@ -822,6 +822,21 @@ async function insertAnnotation(
   return row;
 }
 
+async function updateAnnotation(
+  projectId: string,
+  id: string,
+  values: Pick<Annotation, "date" | "kind" | "label" | "url">,
+): Promise<boolean> {
+  const rows = await db
+    .update(gscAnnotations)
+    .set(values)
+    .where(
+      and(eq(gscAnnotations.projectId, projectId), eq(gscAnnotations.id, id)),
+    )
+    .returning({ id: gscAnnotations.id });
+  return rows.length > 0;
+}
+
 async function deleteAnnotation(
   projectId: string,
   id: string,
@@ -836,6 +851,7 @@ async function deleteAnnotation(
 }
 
 export const GscHistoryRepository = {
+  updateAnnotation,
   listFilteredDays,
   aggregateQueryPagesForSegment,
   listCountries,

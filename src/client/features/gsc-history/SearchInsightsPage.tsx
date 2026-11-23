@@ -1,22 +1,18 @@
-import { useMemo } from "react";
 import { Link } from "@tanstack/react-router";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
-import { TimeSeriesChart } from "@/client/features/charts/TimeSeriesChart";
+import { ArrowRight, Info, Loader2 } from "lucide-react";
 import { SearchConsoleConnectionCard } from "@/client/features/gsc/SearchConsoleConnectionCard";
-import { AnnotationsPanel } from "@/client/features/gsc-history/AnnotationsPanel";
-import { formatDay } from "@/client/features/gsc-history/annotationStyles";
+import {
+  ChartPanel,
+  periodText,
+} from "@/client/features/gsc-history/ChartPanel";
 import {
   FilterChips,
   InsightsControls,
 } from "@/client/features/gsc-history/InsightsControls";
 import { MetricCards } from "@/client/features/gsc-history/MetricCards";
 import {
-  buildChartPoints,
-  chartStart,
   type Granularity,
-  METRIC_KEYS,
-  METRICS,
   type MetricKey,
   resolveGranularity,
 } from "@/client/features/gsc-history/searchSeries";
@@ -188,91 +184,6 @@ export function SearchInsightsPage({
   );
 }
 
-function periodText(range: { start: string; end: string }) {
-  return `${formatDay(range.start)} – ${formatDay(range.end)}`;
-}
-
-function ChartPanel({
-  insights,
-  metrics,
-  granularity,
-}: {
-  insights: Insights;
-  metrics: MetricKey[];
-  granularity: "day" | "week" | "month";
-}) {
-  const { period } = insights;
-  // A comparison period without a single impression draws nothing useful.
-  const comparable =
-    Boolean(period.previous) && (insights.prevTotals?.impressions ?? 0) > 0;
-  const from = chartStart(insights.series, insights.firstDataDay, granularity);
-  const points = useMemo(
-    () =>
-      buildChartPoints({
-        series: insights.series,
-        // Filtered to one page, "new page" markers for other pages are noise.
-        annotations: insights.annotations.filter(
-          (note) =>
-            note.kind !== "first_seen" ||
-            (!insights.filter.page && !insights.filter.query) ||
-            note.url === insights.filter.page,
-        ),
-        granularity,
-        from,
-        hasCompare: comparable,
-        firstDataDay: insights.firstDataDay,
-      }),
-    [insights, granularity, from, comparable],
-  );
-  const series = useMemo(
-    () =>
-      METRIC_KEYS.filter((key) => metrics.includes(key)).map((key) => ({
-        key,
-        metric: METRICS[key],
-        color: METRICS[key].color,
-      })),
-    [metrics],
-  );
-  const trimmed = from && insights.series[0] && from > insights.series[0].date;
-  const hasPartial = points.some((point) => point.partial);
-  const noData = !insights.firstDataDay;
-  return (
-    <section className="rounded-xl border border-base-300 bg-base-100 p-4">
-      <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-base-content/60">
-        <span className="inline-flex items-center gap-1.5">
-          <span className="h-0.5 w-4 rounded bg-base-content/70" />
-          {periodText(period.current)}
-        </span>
-        {comparable && period.previous ? (
-          <span className="inline-flex items-center gap-1.5">
-            <span className="h-0.5 w-4 rounded bg-base-content/25" />
-            {periodText(period.previous)}
-          </span>
-        ) : null}
-        {hasPartial ? (
-          <span className="inline-flex items-center gap-1.5">
-            <span className="w-4 border-t-2 border-dotted border-base-content/30" />
-            Still reporting
-          </span>
-        ) : null}
-        {period.compareMissing || (period.previous && !comparable) ? (
-          <span>No data in the comparison period</span>
-        ) : null}
-        {trimmed && insights.firstDataDay ? (
-          <span>No data before {formatDay(insights.firstDataDay)}</span>
-        ) : null}
-      </div>
-      {noData ? (
-        <div className="flex h-60 items-center justify-center text-sm text-base-content/50">
-          No impressions in this period.
-        </div>
-      ) : (
-        <TimeSeriesChart points={points} series={series} />
-      )}
-    </section>
-  );
-}
-
 function InsightsBody({
   projectId,
   insights,
@@ -305,6 +216,7 @@ function InsightsBody({
       />
 
       <ChartPanel
+        projectId={projectId}
         insights={insights}
         metrics={metrics}
         granularity={granularity}
@@ -386,30 +298,24 @@ function InsightsBody({
         <NewPagesTable rows={insights.newPages} />
       </InsightSection>
 
-      <section className="rounded-xl border border-base-300 bg-base-100 p-4">
-        <h2 className="font-semibold">Notes on the chart</h2>
-        <p className="mb-3 mt-0.5 text-sm text-base-content/60">
-          Deploys, pages and links you add here, links found by Outreach, and
-          first impressions of new pages show as lines on the chart.
-        </p>
-        <AnnotationsPanel
-          projectId={projectId}
-          annotations={insights.annotations}
-        />
-      </section>
-
-      <p className="text-xs text-base-content/50">
-        Web search only. Up to 5,000 query and page pairs per day are stored,
-        also per country and device, (Google&apos;s top rows by clicks); clicks
-        on anonymized queries appear in page totals only.{" "}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-base-content/50">
+        <span className="inline-flex items-center gap-1">
+          Stored daily from Search Console (web search).
+          <span
+            className="tooltip tooltip-top inline-flex"
+            data-tip="Up to 5,000 query and page pairs a day are kept, also per country and device (Google's top rows by clicks). Clicks on anonymized queries count in page totals only."
+          >
+            <Info className="size-3.5" aria-label="About this data" />
+          </span>
+        </span>
         <Link
           to="/p/$projectId/search-performance"
           params={{ projectId }}
-          className="link link-hover"
+          className="btn btn-ghost btn-xs gap-1 text-base-content/60"
         >
-          Live GSC view
+          Live GSC view <ArrowRight className="size-3" />
         </Link>
-      </p>
+      </div>
     </>
   );
 }

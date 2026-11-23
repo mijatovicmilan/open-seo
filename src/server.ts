@@ -28,6 +28,11 @@ import { sweepDubReferredOrganizations } from "@/server/referrals/dub";
 import { maybeSendSelfHostHeartbeat } from "@/server/lib/self-host-telemetry";
 import { handleGdprStorageErasure } from "@/server/gdpr/storage-erasure";
 import { GDPR_STORAGE_ERASURE_PATH } from "@/shared/gdpr-erasure";
+import {
+  handleInternalCron,
+  INTERNAL_CRON_PATH,
+} from "@/server/features/internal-cron/internalCron";
+import { OutreachScheduler } from "@/server/features/outreach/services/OutreachScheduler";
 
 const startHandler = createStartHandler(defaultStreamHandler);
 
@@ -150,6 +155,14 @@ function handleFetch(
     return handleGdprStorageErasure(publicRequest, env);
   }
 
+  // Fork addition (FORK-CHANGES.md): the scheduled jobs for local Docker,
+  // where Cloudflare's cron triggers never fire. 404 without its secret.
+  if (pathname === INTERNAL_CRON_PATH) {
+    return handleInternalCron(publicRequest, env, CRONS, (cron) =>
+      runScheduled(cron, env),
+    );
+  }
+
   if (pathname.startsWith("/agents/")) {
     return routeChatAgents(publicRequest, env);
   }
@@ -186,6 +199,65 @@ export { SamChatAgent } from "./server/features/sam/SamChatAgent";
 // Daily OAuth KV garbage collection; must match a trigger in wrangler.jsonc.
 const MCP_OAUTH_PURGE_CRON = "17 3 * * *";
 
+// Every 5 minutes, and the daily one; must match wrangler.jsonc.
+const CRONS = ["*/5 * * * *", MCP_OAUTH_PURGE_CRON] as const;
+
+async function runScheduled(cron: string, env: Env) {
+  if (cron === MCP_OAUTH_PURGE_CRON) {
+    // Only hosted mode runs the OAuth provider (and has OAUTH_KV bound).
+    if (isHostedAuthMode(getAuthMode(env.AUTH_MODE))) {
+      const result = await openSeoOAuthProvider.purgeExpiredData(
+        env as OpenSeoOAuthEnv,
+      );
+      console.log("[mcp-oauth] purged expired OAuth data", result);
+      if (!result.done) {
+        // The sweep only advances past live records via deletions; a
+        // persistent incomplete scan means the keyspace outgrew the batch.
+        console.warn("[mcp-oauth] purge did not cover the full keyspace");
+      }
+
+      // Daily referral-sale sweep: catches paid Autumn invoices the
+      // billing.updated webhook path misses (renewals, one-time top-ups).
+      try {
+        await sweepDubReferredOrganizations();
+      } catch (err) {
+        console.error("[cron] Dub referral sale sweep failed:", err);
+      }
+    }
+    // Fork addition (FORK-CHANGES.md): daily Search Console history sync.
+    try {
+      await withPgClient(() =>
+        GscHistorySyncService.syncAllConnectedProjects(),
+      );
+    } catch (err) {
+      console.error("[cron] Search Console history sync failed:", err);
+    }
+    return;
+  }
+
+  // Watchdog first: reconcile audits stuck in "running" whose workflow died
+  // without reaching mark-failed (OOM/CPU kills, expired instances). Runs
+  // before the rank loop so a slow tick can't delay or starve it. Its
+  // failure is held until after the rank checks so it can't suppress them,
+  // then rethrown so the invocation still reports as failed.
+  let watchdogError: unknown;
+  try {
+    await withPgClient(() => reconcileStaleAudits());
+  } catch (err) {
+    watchdogError = err;
+    console.error("[cron] Stale-audit reconcile failed:", err);
+  }
+  // Fork addition (FORK-CHANGES.md): send due scheduled outreach emails.
+  try {
+    await withPgClient(() => OutreachScheduler.tick());
+  } catch (err) {
+    console.error("[cron] Outreach scheduler failed:", err);
+  }
+  // Scope a per-request Postgres client for the cron run (no-op in D1 mode).
+  await withPgClient(() => runScheduledRankChecks(env));
+  if (watchdogError) throw watchdogError;
+}
+
 export default {
   fetch,
   async scheduled(
@@ -193,52 +265,6 @@ export default {
     env: Env,
     _ctx: ExecutionContext,
   ) {
-    if (controller.cron === MCP_OAUTH_PURGE_CRON) {
-      // Only hosted mode runs the OAuth provider (and has OAUTH_KV bound).
-      if (isHostedAuthMode(getAuthMode(env.AUTH_MODE))) {
-        const result = await openSeoOAuthProvider.purgeExpiredData(
-          env as OpenSeoOAuthEnv,
-        );
-        console.log("[mcp-oauth] purged expired OAuth data", result);
-        if (!result.done) {
-          // The sweep only advances past live records via deletions; a
-          // persistent incomplete scan means the keyspace outgrew the batch.
-          console.warn("[mcp-oauth] purge did not cover the full keyspace");
-        }
-
-        // Daily referral-sale sweep: catches paid Autumn invoices the
-        // billing.updated webhook path misses (renewals, one-time top-ups).
-        try {
-          await sweepDubReferredOrganizations();
-        } catch (err) {
-          console.error("[cron] Dub referral sale sweep failed:", err);
-        }
-      }
-      // Fork addition (FORK-CHANGES.md): daily Search Console history sync.
-      try {
-        await withPgClient(() =>
-          GscHistorySyncService.syncAllConnectedProjects(),
-        );
-      } catch (err) {
-        console.error("[cron] Search Console history sync failed:", err);
-      }
-      return;
-    }
-
-    // Watchdog first: reconcile audits stuck in "running" whose workflow died
-    // without reaching mark-failed (OOM/CPU kills, expired instances). Runs
-    // before the rank loop so a slow tick can't delay or starve it. Its
-    // failure is held until after the rank checks so it can't suppress them,
-    // then rethrown so the invocation still reports as failed.
-    let watchdogError: unknown;
-    try {
-      await withPgClient(() => reconcileStaleAudits());
-    } catch (err) {
-      watchdogError = err;
-      console.error("[cron] Stale-audit reconcile failed:", err);
-    }
-    // Scope a per-request Postgres client for the cron run (no-op in D1 mode).
-    await withPgClient(() => runScheduledRankChecks(env));
-    if (watchdogError) throw watchdogError;
+    await runScheduled(controller.cron, env);
   },
 };

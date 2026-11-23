@@ -32,6 +32,7 @@ import {
 } from "@/server/features/outreach/outreachDomain";
 import {
   buildOutreachMail,
+  isLogTransport,
   mailProblem,
   outreachMessageId,
   sendOutreachMail,
@@ -45,6 +46,7 @@ import {
   type OutreachLoaded,
   OutreachRepository,
 } from "@/server/features/outreach/repositories/OutreachRepository";
+import { isScheduleTime, parseScheduleDays } from "@/shared/outreachSchedule";
 import { AppError } from "@/server/lib/errors";
 import {
   countOutreach,
@@ -117,6 +119,14 @@ function configFrom(row: SettingsRow): OutreachConfig {
     weeklyMin: row.weeklyMin,
     weeklyMax: row.weeklyMax,
     followUpDays: row.followUpDays,
+    schedulePaused: row.schedulePaused === 1,
+    scheduleTimeZone: isValidTimeZone(row.scheduleTimeZone)
+      ? row.scheduleTimeZone
+      : "America/New_York",
+    scheduleDays: parseScheduleDays(row.scheduleDays),
+    scheduleTime: isScheduleTime(row.scheduleTime) ? row.scheduleTime : "09:00",
+    scheduleWindowMinutes: row.scheduleWindowMinutes,
+    schedulerCheckedAt: row.schedulerCheckedAt,
   };
 }
 
@@ -167,6 +177,10 @@ type OutreachSettingsInput = {
   weeklyMin: number;
   weeklyMax: number;
   followUpDays: number;
+  scheduleTimeZone: string;
+  scheduleDays: number[];
+  scheduleTime: string;
+  scheduleWindowMinutes: number;
 };
 
 async function updateSettings(
@@ -174,16 +188,28 @@ async function updateSettings(
   input: Partial<OutreachSettingsInput>,
 ) {
   await getConfig(project);
-  if (input.timeZone !== undefined && !isValidTimeZone(input.timeZone)) {
-    throw new OutreachError("VALIDATION_ERROR", "Unknown time zone.");
+  for (const zone of [input.timeZone, input.scheduleTimeZone]) {
+    if (zone !== undefined && !isValidTimeZone(zone)) {
+      throw new OutreachError(
+        "VALIDATION_ERROR",
+        `Unknown time zone: ${zone}.`,
+      );
+    }
+  }
+  if (input.scheduleTime !== undefined && !isScheduleTime(input.scheduleTime)) {
+    throw new OutreachError("VALIDATION_ERROR", "Use a time like 09:00.");
   }
   if (input.siteUrl) {
     if (!outreachDomain(input.siteUrl)) {
       throw new OutreachError("VALIDATION_ERROR", "The site URL is not valid.");
     }
   }
+  const { scheduleDays, ...rest } = input;
   const values = {
-    ...input,
+    ...rest,
+    ...(scheduleDays !== undefined
+      ? { scheduleDays: parseScheduleDays(scheduleDays.join(" ")).join(" ") }
+      : {}),
     ...(input.linkDomains !== undefined
       ? { linkDomains: parseLinkDomains(input.linkDomains).join(" ") }
       : {}),
@@ -215,6 +241,9 @@ async function testMail(project: ProjectRef) {
       "UPSTREAM_UNAVAILABLE",
       `Mail login failed: ${reason}.`,
     );
+  }
+  if (isLogTransport()) {
+    return "Log transport (OUTREACH_MAIL_TRANSPORT=log): no mail server is used and nothing is ever sent.";
   }
   return `Logged in to ${config.smtpHost} as the outreach mailbox; nothing was sent.`;
 }
@@ -635,6 +664,8 @@ async function markSent(
     messageId: string | null;
     actor: OutreachActor;
     now: string;
+    /** Added to the history line ("by the schedule"). */
+    via?: string;
   },
 ) {
   const { kind } = input.message;
@@ -672,7 +703,9 @@ async function markSent(
       event(
         { projectId: project.id, prospectId: input.prospectId },
         eventType,
-        input.message.subject,
+        input.via
+          ? `${input.message.subject} · ${input.via}`
+          : input.message.subject,
         input.actor,
         input.now,
       ),
@@ -685,7 +718,12 @@ async function markSent(
 // and changes nothing.
 async function send(
   project: ProjectRef,
-  input: { number: number; channel: OutreachSendChannel },
+  input: {
+    number: number;
+    channel: OutreachSendChannel;
+    /** Set when the scheduler sends it (history says so). */
+    via?: string;
+  },
 ) {
   const { prospect, prospectId, loaded, message, config, now } =
     await loadForSend(project, input.number, input.channel);
@@ -695,6 +733,7 @@ async function send(
     approvedHash: prospect.hash,
     actor: "owner" as const,
     now,
+    via: input.via,
   };
   if (input.channel === "form") {
     await markSent(project, { ...base, messageId: null });

@@ -26,6 +26,12 @@ const config: OutreachConfig = {
   weeklyMin: 10,
   weeklyMax: 20,
   followUpDays: 7,
+  schedulePaused: true,
+  scheduleTimeZone: "America/New_York",
+  scheduleDays: [1, 2, 3, 4, 5],
+  scheduleTime: "09:00",
+  scheduleWindowMinutes: 120,
+  schedulerCheckedAt: null,
 };
 
 const row = (overrides: Partial<ProspectRow> = {}): ProspectRow => ({
@@ -80,6 +86,9 @@ const message = (overrides: Partial<MessageRow> = {}): MessageRow => ({
   messageId: null,
   receivedAt: null,
   inReplyToId: null,
+  scheduledFor: null,
+  scheduleManual: 0,
+  scheduleNote: null,
   createdAt: "2026-11-01T00:00:00.000Z",
   ...overrides,
 });

@@ -180,6 +180,14 @@ export type OutreachProspect = {
     state: OutreachApprovalState;
     approvedAt: string | null;
   } | null;
+  // The pending email's place in the send schedule: when it is due (null
+  // while not placed), whether the owner picked the day or took it out of
+  // the queue, and why the scheduler last passed it over.
+  schedule: {
+    at: string | null;
+    manual: boolean;
+    note: string | null;
+  } | null;
   history: OutreachHistoryEntry[];
 };
 
@@ -278,6 +286,12 @@ export type OutreachSettingsView = {
   weeklyMin: number;
   weeklyMax: number;
   followUpDays: number;
+  schedulePaused: boolean;
+  scheduleTimeZone: string;
+  scheduleDays: number[];
+  scheduleTime: string;
+  scheduleWindowMinutes: number;
+  schedulerCheckedAt: string | null;
   mailReady: boolean;
   // Why sending from the app is off, when it is.
   mailProblem: string | null;
@@ -431,6 +445,7 @@ export function outreachStatusTone(
 export const OUTREACH_TAB_VALUES = [
   "overview",
   "prospects",
+  "scheduled",
   "replies",
   "links",
   "settings",
@@ -440,6 +455,7 @@ export type OutreachTab = (typeof OUTREACH_TAB_VALUES)[number];
 export const OUTREACH_TABS: Array<{ value: OutreachTab; label: string }> = [
   { value: "overview", label: "Overview" },
   { value: "prospects", label: "Prospects" },
+  { value: "scheduled", label: "Scheduled" },
   { value: "replies", label: "Replies" },
   { value: "links", label: "Links" },
   { value: "settings", label: "Settings" },
@@ -688,3 +704,53 @@ export function outreachTimeline(
   }
   return items;
 }
+
+// ---- Scheduled sending (fork feature) ----------------------------------------
+
+export type OutreachScheduleItem = {
+  number: number;
+  prospect: string;
+  domain: string;
+  faviconVersion: string;
+  subject: string;
+  kind: OutreachMessageKind | null;
+  /** When it is due (UTC ISO). */
+  at: string;
+  /** The owner picked the day. */
+  manual: boolean;
+};
+
+export type OutreachScheduleWaiting = {
+  number: number;
+  prospect: string;
+  domain: string;
+  faviconVersion: string;
+  subject: string;
+  kind: OutreachMessageKind | null;
+  /** Why it is not in the queue. */
+  reason: string;
+  /** The owner took it out of the queue (it can go back in). */
+  held: boolean;
+};
+
+export type OutreachScheduleView = {
+  paused: boolean;
+  timeZone: string;
+  days: number[];
+  time: string;
+  windowMinutes: number;
+  /** The zone the daily and weekly limits count days in. */
+  limitsTimeZone: string;
+  dailyMax: number;
+  weeklyMax: number;
+  /** The scheduler's last run, and whether it is overdue (over 15 minutes). */
+  checkedAt: string | null;
+  stale: boolean;
+  /** The next sending windows (UTC ISO). */
+  nextSlots: Array<{ start: string; end: string; date: string }>;
+  queue: OutreachScheduleItem[];
+  waiting: OutreachScheduleWaiting[];
+  /** The first window with emails in it. */
+  nextSend: { at: string; count: number } | null;
+  readAt: string;
+};

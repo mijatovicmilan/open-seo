@@ -43,6 +43,23 @@ export const outreachSettings = pgTable("outreach_settings", {
   weeklyMin: integer("weekly_min").notNull().default(10),
   weeklyMax: integer("weekly_max").notNull().default(20),
   followUpDays: integer("follow_up_days").notNull().default(7),
+  // Scheduled sending: approved emails go out on these weekdays at this
+  // time in the recipients' zone, inside a window after it; a missed window
+  // moves to the next sending day. Paused until the owner resumes it.
+  schedulePaused: integer("schedule_paused").notNull().default(1),
+  scheduleTimeZone: text("schedule_time_zone")
+    .notNull()
+    .default("America/New_York"),
+  // ISO weekdays, Monday = 1 ("1 2 3 4 5").
+  scheduleDays: text("schedule_days").notNull().default("1 2 3 4 5"),
+  scheduleTime: text("schedule_time").notNull().default("09:00"),
+  scheduleWindowMinutes: integer("schedule_window_minutes")
+    .notNull()
+    .default(120),
+  // The scheduler's last run for this project, and a short lock so two
+  // runs never work the queue at once.
+  schedulerCheckedAt: text("scheduler_checked_at"),
+  schedulerLockUntil: text("scheduler_lock_until"),
   createdAt: text("created_at").notNull().default(isoNow),
   updatedAt: text("updated_at").notNull().default(isoNow),
 });
@@ -176,6 +193,12 @@ export const outreachMessages = pgTable(
     // reply-in: their Date header, and which of our sends it answers.
     receivedAt: text("received_at"),
     inReplyToId: integer("in_reply_to_id"),
+    // Scheduled sending: when this approved email is due (UTC), whether the
+    // owner picked the day (the planner then leaves it), and why the last
+    // scheduled attempt did not send.
+    scheduledFor: text("scheduled_for"),
+    scheduleManual: integer("schedule_manual").notNull().default(0),
+    scheduleNote: text("schedule_note"),
     createdAt: text("created_at").notNull().default(isoNow),
   },
   (table) => [

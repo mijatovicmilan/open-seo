@@ -42,6 +42,13 @@ export type OutreachConfig = {
   weeklyMin: number;
   weeklyMax: number;
   followUpDays: number;
+  // Scheduled sending (see outreachSchedule.ts).
+  schedulePaused: boolean;
+  scheduleTimeZone: string;
+  scheduleDays: number[];
+  scheduleTime: string;
+  scheduleWindowMinutes: number;
+  schedulerCheckedAt: string | null;
 };
 
 export function parseLinkDomains(value: string) {
@@ -124,6 +131,9 @@ export type MessageRow = {
   messageId: string | null;
   receivedAt: string | null;
   inReplyToId: number | null;
+  scheduledFor: string | null;
+  scheduleManual: number;
+  scheduleNote: string | null;
   createdAt: string;
 };
 
@@ -669,6 +679,16 @@ function problemsFor(contact: OutreachContact, subject: string, body: string) {
   return problems;
 }
 
+function scheduleOf(pending: MessageRow | null) {
+  return pending
+    ? {
+        at: pending.scheduledFor,
+        manual: pending.scheduleManual === 1,
+        note: pending.scheduleNote,
+      }
+    : null;
+}
+
 function approvalStateFor(
   status: OutreachStatus,
   pending: MessageRow | null,
@@ -877,6 +897,7 @@ export function buildOutreachProspect(input: {
     approval: approvalState
       ? { state: approvalState, approvedAt: day(pending?.approvedAt) || null }
       : null,
+    schedule: scheduleOf(pending),
     history: historyFrom(ordered),
   };
 }

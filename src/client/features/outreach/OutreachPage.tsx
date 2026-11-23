@@ -8,6 +8,10 @@ import {
   TimeSeriesChart,
 } from "@/client/features/charts/TimeSeriesChart";
 import { SegmentGroup } from "@/client/features/charts/ChoiceMenu";
+import {
+  ScheduledTab,
+  ScheduleStrip,
+} from "@/client/features/outreach/OutreachSchedule";
 import { OutreachProspectPanel } from "@/client/features/outreach/OutreachProspectPanel";
 import { OutreachSettingsForm } from "@/client/features/outreach/OutreachSettingsForm";
 import {
@@ -189,6 +193,7 @@ export function OutreachPage({
 
         {tab === "overview" ? (
           <Overview
+            projectId={projectId}
             data={data}
             favicons={favicons}
             onProspect={onProspect}
@@ -200,6 +205,13 @@ export function OutreachPage({
             favicons={favicons}
             angles={data}
             onProspect={onProspect}
+          />
+        ) : tab === "scheduled" ? (
+          <ScheduledTab
+            projectId={projectId}
+            favicons={favicons}
+            onProspect={onProspect}
+            onSettings={() => onTab("settings")}
           />
         ) : tab === "replies" ? (
           <Panel
@@ -294,11 +306,13 @@ const OWNER_BUTTON: Partial<
 };
 
 function Overview({
+  projectId,
   data,
   favicons,
   onProspect,
   onTab,
 }: {
+  projectId: string;
   data: OutreachSnapshot;
   favicons: Record<number, string>;
   onProspect: (number: number) => void;
@@ -331,6 +345,8 @@ function Overview({
           </button>
         </div>
       ) : null}
+
+      <ScheduleStrip projectId={projectId} onOpen={() => onTab("scheduled")} />
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-5">
         <Stat label="Contacted" value={formatNumber(analytics.contacted)} />

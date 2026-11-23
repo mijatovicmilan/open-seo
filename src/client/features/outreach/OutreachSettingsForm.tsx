@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { outreachQueryKey } from "@/client/features/outreach/outreachUi";
+import { outreachScheduleKey } from "@/client/features/outreach/OutreachSchedule";
+import { ScheduleSection } from "@/client/features/outreach/OutreachScheduleSettings";
 import {
   testOutreachMail,
   updateOutreachSettings,
@@ -11,12 +13,13 @@ import type { OutreachSettingsView } from "@/shared/outreach";
 // The project's outreach identity and pacing. SMTP credentials are never
 // entered here: the server reads them from its environment.
 
-type FormState = Omit<
+export type OutreachSettingsFormState = Omit<
   OutreachSettingsView,
   "linkDomains" | "mailReady" | "mailProblem"
 > & {
   linkDomains: string;
 };
+type FormState = OutreachSettingsFormState;
 
 export function OutreachSettingsForm({
   projectId,
@@ -64,9 +67,14 @@ export function OutreachSettingsForm({
         return;
       }
       toast.success("Outreach settings saved");
-      await queryClient.invalidateQueries({
-        queryKey: outreachQueryKey(projectId),
-      });
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: outreachQueryKey(projectId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: outreachScheduleKey(projectId),
+        }),
+      ]);
     } catch {
       toast.error("Could not save the settings.");
     } finally {
@@ -208,6 +216,12 @@ export function OutreachSettingsForm({
           first emails, follow-ups and replies.
         </p>
       </section>
+
+      <ScheduleSection
+        form={form}
+        checkedAt={settings.schedulerCheckedAt}
+        onChange={(values) => setForm((current) => ({ ...current, ...values }))}
+      />
 
       <div className="flex flex-wrap gap-2">
         <button

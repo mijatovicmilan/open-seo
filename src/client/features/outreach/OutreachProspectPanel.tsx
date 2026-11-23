@@ -5,6 +5,7 @@ import {
   ExternalLink,
   Link2,
   Pencil,
+  CalendarClock,
   Send,
   Undo2,
   X,
@@ -17,6 +18,7 @@ import {
   useProspectMutation,
 } from "@/client/features/outreach/outreachUi";
 import { OutreachTimeline } from "@/client/features/outreach/OutreachTimeline";
+import { bothTimes } from "@/client/features/outreach/scheduleTime";
 import {
   approveOutreach,
   checkOutreachLink,
@@ -470,7 +472,32 @@ function EmailSection({
           ) : null}
         </div>
       ) : null}
+      {pending && !editing ? (
+        <ScheduleLine prospect={prospect} settings={settings} />
+      ) : null}
     </section>
+  );
+}
+
+/** Where an approved email stands in the send schedule. */
+function ScheduleLine({
+  prospect,
+  settings,
+}: {
+  prospect: OutreachProspect;
+  settings: OutreachSettingsView;
+}) {
+  const schedule = prospect.schedule;
+  if (prospect.status !== "approved" || !schedule) return null;
+  return (
+    <p className="flex items-start gap-2 text-sm text-base-content/70">
+      <CalendarClock className="mt-0.5 size-4 shrink-0 text-base-content/50" />
+      <span>
+        {schedule.at
+          ? `Scheduled: ${bothTimes(schedule.at, settings.scheduleTimeZone)}${settings.schedulePaused ? " (sending is paused)" : ""}.`
+          : `Not in the send queue${schedule.note ? `: ${schedule.note}` : "."}`}
+      </span>
+    </p>
   );
 }
 

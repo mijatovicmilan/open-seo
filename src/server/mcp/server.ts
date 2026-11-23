@@ -113,6 +113,12 @@ import {
   setOutreachStatusTool,
   updateOutreachSettingsTool,
 } from "@/server/mcp/tools/outreach-tools";
+import {
+  getOutreachScheduleTool,
+  pauseOutreachScheduleTool,
+  rescheduleOutreachEmailTool,
+  setOutreachQueuedTool,
+} from "@/server/mcp/tools/outreach-schedule-tools";
 
 type ToolSchema = z.ZodType | z.ZodRawShape;
 
@@ -284,6 +290,10 @@ export function createOpenSeoMcpServer(authProps: McpProps) {
   register(checkOutreachLinkTool);
   register(setOutreachStatusTool);
   register(updateOutreachSettingsTool);
+  register(getOutreachScheduleTool);
+  register(rescheduleOutreachEmailTool);
+  register(setOutreachQueuedTool);
+  register(pauseOutreachScheduleTool);
 
   return server;
 }

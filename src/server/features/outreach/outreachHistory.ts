@@ -87,6 +87,12 @@ const FIXED: Record<string, { label: string; detail: boolean }> = {
   declined: { label: "Declined", detail: true },
   dropped: { label: "Dropped", detail: true },
   reopened: { label: "Reopened", detail: false },
+  // Scheduled sending.
+  scheduled: { label: "Scheduled", detail: true },
+  rescheduled: { label: "Moved to another day", detail: true },
+  unscheduled: { label: "Out of the send queue", detail: true },
+  queued: { label: "Back in the send queue", detail: false },
+  "send skipped": { label: "Scheduled send skipped", detail: true },
 };
 
 function describeDrafted(detail: string): Described {

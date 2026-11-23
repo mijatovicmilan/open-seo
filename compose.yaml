@@ -35,5 +35,40 @@ services:
       - "127.0.0.1:${PORT:-3001}:${PORT:-3001}"
     volumes:
       - open_seo_data:/app/.wrangler
+  # Fork addition (FORK-CHANGES.md): `vite preview` never fires Cloudflare's
+  # cron triggers, so this calls the app's internal cron endpoint every 5
+  # minutes (outreach sending, rank checks) and once a day the daily job
+  # (Search Console sync). Idle until OPENSEO_CRON_SECRET is set in .env.
+  scheduler:
+    image: curlimages/curl:8.11.1
+    restart: unless-stopped
+    depends_on:
+      - open-seo
+    env_file:
+      - .env
+    environment:
+      - APP_PORT=${PORT:-3001}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        if [ -z "$$OPENSEO_CRON_SECRET" ]; then
+          echo "OPENSEO_CRON_SECRET is not set; the scheduler stays idle."
+          while true; do sleep 3600; done
+        fi
+        url="http://open-seo:$$APP_PORT/api/internal/cron"
+        call() {
+          curl -fsS -m 240 -o /dev/null -X POST -H "Host: localhost" \
+            -H "Authorization: Bearer $$OPENSEO_CRON_SECRET" "$$url$$1"
+        }
+        daily=""
+        sleep 30
+        while true; do
+          call "" || echo "$$(date -u +%FT%TZ) scheduler call failed"
+          today=$$(date -u +%F)
+          if [ "$$daily" != "$$today" ]; then
+            call "?cron=17%203%20*%20*%20*" && daily=$$today
+          fi
+          sleep 300
+        done
 volumes:
   open_seo_data:

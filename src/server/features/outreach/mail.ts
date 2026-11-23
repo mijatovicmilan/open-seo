@@ -35,6 +35,12 @@ function credentialsFor(key: string): MailCredentials | null {
   return user && password ? { user, password } : null;
 }
 
+/** OUTREACH_MAIL_TRANSPORT=log: nothing goes out; each send is only logged
+ *  (recipient and Message-ID). For checking the scheduler without sending. */
+export function isLogTransport() {
+  return envValue("OUTREACH_MAIL_TRANSPORT") === "log";
+}
+
 // Why the app cannot send for this project right now, or null when it can.
 export function mailProblem(config: OutreachConfig): string | null {
   if (!config.senderEmail || !EMAIL.test(config.senderEmail)) {
@@ -44,7 +50,7 @@ export function mailProblem(config: OutreachConfig): string | null {
   if (!config.signature) return "Set the signature in outreach settings.";
   if (!config.smtpHost) return "Set the SMTP host in outreach settings.";
   if (!config.mailEnvKey) return "Set the mail env key in outreach settings.";
-  if (!credentialsFor(config.mailEnvKey)) {
+  if (!isLogTransport() && !credentialsFor(config.mailEnvKey)) {
     const names = mailEnvNames(config.mailEnvKey);
     return `The server has no ${names.user} and ${names.password} values.`;
   }
@@ -220,6 +226,11 @@ export async function sendOutreachMail(input: {
   to: string;
   raw: string;
 }) {
+  if (isLogTransport()) {
+    const id = /^Message-ID: (.+)$/mu.exec(input.raw)?.[1] ?? "";
+    console.log(`[outreach] log transport, not sent: to ${input.to} ${id}`);
+    return;
+  }
   await withSmtpSession(input.config, async ({ command, write, expect }) => {
     await command(`MAIL FROM:<${input.config.senderEmail}>`);
     await expect("sender", [250]);
@@ -238,5 +249,6 @@ export async function sendOutreachMail(input: {
 // Logs in and out again without sending anything, so the owner can check
 // the settings and the server's credentials.
 export async function testMailConnection(config: OutreachConfig) {
+  if (isLogTransport()) return;
   await withSmtpSession(config, async () => undefined);
 }

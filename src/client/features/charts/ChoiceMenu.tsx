@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  type ReactNode,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { createPortal } from "react-dom";
 import { Check, ChevronDown, Search } from "lucide-react";
 
@@ -125,6 +131,16 @@ export function ChoiceMenu<T extends string>({
       window.removeEventListener("resize", close);
     };
   }, [open]);
+
+  // A wide menu near the right edge moves left to stay inside the window.
+  useLayoutEffect(() => {
+    const width = menuRef.current?.offsetWidth;
+    if (!open || !width) return;
+    const room = window.innerWidth - 8 - width;
+    if (position.left > room) {
+      setPosition((current) => ({ ...current, left: Math.max(8, room) }));
+    }
+  }, [open, position.left]);
 
   const choose = (next: T) => {
     onChange(next);

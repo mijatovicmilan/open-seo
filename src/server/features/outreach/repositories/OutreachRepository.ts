@@ -17,6 +17,7 @@ import {
   outreachMessages,
   outreachProspects,
   outreachSettings,
+  projects,
 } from "@/db/schema";
 import { runBatch } from "@/db/runBatch";
 import type {
@@ -84,6 +85,9 @@ const messageColumns = {
   messageId: outreachMessages.messageId,
   receivedAt: outreachMessages.receivedAt,
   inReplyToId: outreachMessages.inReplyToId,
+  scheduledFor: outreachMessages.scheduledFor,
+  scheduleManual: outreachMessages.scheduleManual,
+  scheduleNote: outreachMessages.scheduleNote,
   createdAt: outreachMessages.createdAt,
 };
 
@@ -472,6 +476,75 @@ async function markMessageSent(
   return rows.length > 0;
 }
 
+// ---- Scheduled sending ------------------------------------------------------
+
+/** Every project with outreach settings and the project's domain. */
+async function listOutreachProjects() {
+  return db
+    .select({ id: outreachSettings.projectId, domain: projects.domain })
+    .from(outreachSettings)
+    .innerJoin(projects, eq(projects.id, outreachSettings.projectId));
+}
+
+/** Takes the project's scheduler lock until `until`, unless another run
+ *  holds it. True when taken. */
+async function takeSchedulerLock(
+  projectId: string,
+  now: string,
+  until: string,
+) {
+  const rows = await db
+    .update(outreachSettings)
+    .set({ schedulerLockUntil: until, schedulerCheckedAt: now })
+    .where(
+      and(
+        eq(outreachSettings.projectId, projectId),
+        sql`(${outreachSettings.schedulerLockUntil} IS NULL OR ${outreachSettings.schedulerLockUntil} < ${now})`,
+      ),
+    )
+    .returning({ id: outreachSettings.projectId });
+  return rows.length > 0;
+}
+
+async function releaseSchedulerLock(projectId: string, until: string) {
+  await db
+    .update(outreachSettings)
+    .set({ schedulerLockUntil: null })
+    .where(
+      and(
+        eq(outreachSettings.projectId, projectId),
+        eq(outreachSettings.schedulerLockUntil, until),
+      ),
+    );
+}
+
+/** Sets an unsent email's place in the schedule. Refused once it is sent or
+ *  claimed by a send. */
+async function setMessageSchedule(
+  projectId: string,
+  messageRowId: number,
+  values: {
+    scheduledFor: string | null;
+    scheduleManual?: number;
+    scheduleNote?: string | null;
+  },
+  options: { evenIfClaimed?: boolean } = {},
+) {
+  const rows = await db
+    .update(outreachMessages)
+    .set(values)
+    .where(
+      and(
+        eq(outreachMessages.projectId, projectId),
+        eq(outreachMessages.id, messageRowId),
+        isNull(outreachMessages.sentAt),
+        ...(options.evenIfClaimed ? [] : [isNull(outreachMessages.messageId)]),
+      ),
+    )
+    .returning({ id: outreachMessages.id });
+  return rows.length > 0;
+}
+
 async function prospectCount(projectId: string) {
   const [row] = await db
     .select({ value: sql<number>`count(*)` })
@@ -518,5 +591,9 @@ export const OutreachRepository = {
   updateUnsentMessage,
   markMessageSent,
   prospectCount,
+  listOutreachProjects,
+  takeSchedulerLock,
+  releaseSchedulerLock,
+  setMessageSchedule,
   prospectIdsByNumber,
 } as const;

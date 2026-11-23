@@ -48,12 +48,14 @@ export function useProspectMutation<Vars>(
   });
 }
 
-const STATUS_CLASSES = {
-  healthy: "badge-success",
-  degraded: "badge-warning",
-  attention: "badge-info",
-  down: "badge-error",
-  unknown: "badge-ghost",
+// Status reads as quiet text with a coloured dot; colour carries meaning only
+// (green done, amber needs a decision, blue waiting, red closed against us).
+const STATUS_DOTS = {
+  healthy: "bg-success",
+  degraded: "bg-warning",
+  attention: "bg-info",
+  down: "bg-error",
+  unknown: "bg-base-content/30",
 } as const;
 
 export function StatusBadge({
@@ -62,27 +64,29 @@ export function StatusBadge({
   prospect: Pick<OutreachProspect, "status" | "approval">;
 }) {
   return (
-    <span
-      className={`badge badge-sm whitespace-nowrap ${STATUS_CLASSES[outreachStatusTone(prospect)]}`}
-    >
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs text-base-content/70">
+      <span
+        className={`size-1.5 shrink-0 rounded-full ${STATUS_DOTS[outreachStatusTone(prospect)]}`}
+        aria-hidden
+      />
       {outreachStatusLabel(prospect.status)}
     </span>
   );
 }
 
-const SCORE_CLASSES = {
-  top: "badge-success",
-  good: "badge-success badge-outline",
-  warn: "badge-warning",
-  low: "badge-error badge-outline",
-  none: "badge-ghost",
+const SCORE_TEXT = {
+  top: "text-success",
+  good: "text-success",
+  warn: "text-warning",
+  low: "text-error",
+  none: "text-base-content/50",
 } as const;
 
 export function ScorePill({ prospect }: { prospect: OutreachProspect }) {
   const percent = outreachScorePercent(prospect.score);
   return (
     <span
-      className={`badge badge-sm tabular-nums ${SCORE_CLASSES[outreachScoreTone(percent)]}`}
+      className={`badge badge-sm border-0 bg-base-300 tabular-nums ${SCORE_TEXT[outreachScoreTone(percent)]}`}
       title={
         prospect.score
           ? `${prospect.score.total ?? "?"}/10, ${prospect.score.band ?? "incomplete"}`
@@ -94,30 +98,22 @@ export function ScorePill({ prospect }: { prospect: OutreachProspect }) {
   );
 }
 
-const ACTION_CLASSES = {
-  accent: "badge-primary",
-  good: "badge-success",
-  warn: "badge-warning",
-  info: "badge-info",
-  neutral: "badge-ghost",
-  muted: "badge-ghost opacity-60",
-} as const;
-
+// The next step as text: the owner's steps in the primary colour, the
+// agent's muted with an "Agent" prefix, finished ones faint.
 export function ActionPill({ prospect }: { prospect: OutreachProspect }) {
   const { action } = prospect;
+  if (action.who === "owner") {
+    return (
+      <span className="whitespace-nowrap text-xs font-medium text-primary">
+        {action.label}
+      </span>
+    );
+  }
   return (
     <span
-      className={`badge badge-sm whitespace-nowrap ${ACTION_CLASSES[action.tone]}`}
-      title={
-        action.who === "owner"
-          ? "Your step"
-          : action.who === "agent"
-            ? "The agent's step"
-            : undefined
-      }
+      className={`whitespace-nowrap text-xs ${action.who === "agent" ? "text-base-content/60" : "text-base-content/40"}`}
     >
-      {action.label}
-      {action.who === "agent" ? " · agent" : ""}
+      {action.who === "agent" ? `Agent · ${action.label}` : action.label}
     </span>
   );
 }

@@ -106,7 +106,7 @@ export function OutreachSettingsForm({
       <span className="label-text mb-1 text-sm font-medium">{label}</span>
       <input
         type="number"
-        className="input input-sm input-bordered w-28"
+        className="input input-sm input-bordered w-full"
         value={form[key]}
         onChange={(event) =>
           setForm((current) => ({
@@ -119,16 +119,20 @@ export function OutreachSettingsForm({
   );
 
   return (
-    <div className="max-w-2xl space-y-6">
-      <div
-        className={`alert ${settings.mailReady ? "alert-success" : "alert-info"} py-2 text-sm`}
-      >
-        {settings.mailReady
-          ? "Sending from the app is ready."
-          : `Sending from the app is off: ${settings.mailProblem} Prospects, drafts and approvals still work.`}
+    <div className="max-w-3xl space-y-4">
+      <div className="flex items-start gap-2 rounded-lg border border-base-300 bg-base-200/50 px-4 py-3 text-sm">
+        <span
+          className={`mt-1.5 size-1.5 shrink-0 rounded-full ${settings.mailReady ? "bg-success" : "bg-base-content/30"}`}
+          aria-hidden
+        />
+        <span className="text-base-content/80">
+          {settings.mailReady
+            ? "Sending from the app is ready."
+            : `Sending from the app is off. ${settings.mailProblem ?? ""} Prospects, drafts and approvals still work.`}
+        </span>
       </div>
 
-      <section className="space-y-3">
+      <section className="space-y-3 rounded-xl border border-base-300 bg-base-100 p-4">
         <h3 className="font-semibold">Site</h3>
         {text(
           "siteUrl",
@@ -144,7 +148,7 @@ export function OutreachSettingsForm({
         )}
       </section>
 
-      <section className="space-y-3">
+      <section className="space-y-3 rounded-xl border border-base-300 bg-base-100 p-4">
         <h3 className="font-semibold">Sender</h3>
         {text(
           "senderName",
@@ -170,7 +174,7 @@ export function OutreachSettingsForm({
             Pen name, brand and site, one per line. Added under every email.
           </span>
         </label>
-        <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+        <div className="grid gap-3 sm:grid-cols-[1fr_7rem]">
           {text("smtpHost", "SMTP host (SSL)", undefined, "smtp.zoho.com")}
           {number("smtpPort", "Port")}
         </div>
@@ -184,7 +188,7 @@ export function OutreachSettingsForm({
         )}
       </section>
 
-      <section className="space-y-3">
+      <section className="space-y-3 rounded-xl border border-base-300 bg-base-100 p-4">
         <h3 className="font-semibold">Pace</h3>
         {text(
           "timeZone",
@@ -192,7 +196,7 @@ export function OutreachSettingsForm({
           "Days and weeks (from Monday) are counted here.",
           "Europe/Belgrade",
         )}
-        <div className="flex flex-wrap gap-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           {number("dailyMin", "Per day, min")}
           {number("dailyMax", "Per day, max")}
           {number("weeklyMin", "Per week, min")}

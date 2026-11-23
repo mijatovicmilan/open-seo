@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- the prospect slide-over and its sections (fork feature) */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { reverse } from "remeda";
 import {
   CheckCircle2,
@@ -11,7 +11,6 @@ import {
   X,
 } from "lucide-react";
 import {
-  ActionPill,
   Favicon,
   formatDateTime,
   formatNumber,
@@ -28,7 +27,6 @@ import {
   undoOutreachApproval,
 } from "@/serverFunctions/outreach";
 import {
-  OUTREACH_ATTENTION_LABELS,
   OUTREACH_STATUS_MOVE_LABELS,
   type OutreachAngle,
   type OutreachLimits,
@@ -59,9 +57,16 @@ export function OutreachProspectPanel({
   onClose: () => void;
 }) {
   const angle = angles.find((item) => item.key === prospect.angle);
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !event.defaultPrevented) onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
   return (
     <div
-      className="fixed inset-0 z-40 flex justify-end bg-black/30"
+      className="fixed inset-0 z-50 flex justify-end bg-black/50"
       onClick={onClose}
     >
       <aside
@@ -78,15 +83,18 @@ export function OutreachProspectPanel({
                 {prospect.prospect}
               </h2>
             </div>
-            <div className="flex flex-wrap items-center gap-2 text-sm">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
               <StatusBadge prospect={prospect} />
-              <ActionPill prospect={prospect} />
-              <span className="text-base-content/70">{prospect.nextStep}</span>
-              {prospect.attention ? (
-                <span className="badge badge-sm badge-warning badge-outline">
-                  {OUTREACH_ATTENTION_LABELS[prospect.attention]}
-                </span>
-              ) : null}
+              <span className="text-base-content/40">·</span>
+              <span
+                className={
+                  prospect.action.who === "owner"
+                    ? "font-medium text-primary"
+                    : "text-base-content/70"
+                }
+              >
+                {prospect.nextStep}
+              </span>
             </div>
           </div>
           <button
@@ -107,10 +115,10 @@ export function OutreachProspectPanel({
           />
 
           <section className="space-y-2">
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-base-content/60">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-base-content/60">
               Prospect
             </h3>
-            <dl className="grid grid-cols-[8rem_1fr] gap-x-3 gap-y-1.5 text-sm">
+            <dl className="grid grid-cols-[6rem_1fr] sm:grid-cols-[8rem_1fr] gap-x-3 gap-y-1.5 text-sm">
               <dt className="text-base-content/60">Their page</dt>
               <dd className="min-w-0">
                 <a
@@ -192,7 +200,7 @@ export function OutreachProspectPanel({
           <MovesSection projectId={projectId} prospect={prospect} />
 
           <section className="space-y-2">
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-base-content/60">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-base-content/60">
               History
             </h3>
             <ol className="space-y-1.5 text-sm">
@@ -303,10 +311,12 @@ function EmailSection({
   return (
     <section className="space-y-3">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-base-content/60">
-          {pending
-            ? `Email to approve (${prospect.messageKind ?? "first"})`
-            : `Last sent (${prospect.messageSentAt})`}
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-base-content/60">
+          {!pending
+            ? `Last sent (${prospect.messageSentAt})`
+            : prospect.approval?.state === "valid"
+              ? `Approved ${prospect.messageKind ?? "first"} email`
+              : `${prospect.messageKind ?? "first"} email to approve`}
         </h3>
         {pending && !editing ? (
           <button
@@ -406,19 +416,10 @@ function EmailSection({
               <CheckCircle2 className="size-4" /> Approve this exact email
             </button>
           ) : null}
-          {prospect.canUndo ? (
-            <button
-              className="btn btn-ghost btn-sm"
-              disabled={busy}
-              onClick={() => undo.mutate(undefined)}
-            >
-              <Undo2 className="size-4" /> Undo approval
-            </button>
-          ) : null}
           {prospect.status === "approved" ? (
             channel === "form" ? (
               <button
-                className="btn btn-success btn-sm"
+                className="btn btn-primary btn-sm"
                 disabled={busy || Boolean(blocker)}
                 onClick={() => {
                   if (
@@ -434,7 +435,7 @@ function EmailSection({
               </button>
             ) : (
               <button
-                className="btn btn-success btn-sm"
+                className="btn btn-primary btn-sm"
                 disabled={busy || Boolean(blocker) || mailOff}
                 onClick={() => {
                   if (
@@ -455,6 +456,15 @@ function EmailSection({
               </button>
             )
           ) : null}
+          {prospect.canUndo ? (
+            <button
+              className="btn btn-ghost btn-sm"
+              disabled={busy}
+              onClick={() => undo.mutate(undefined)}
+            >
+              <Undo2 className="size-4" /> Undo approval
+            </button>
+          ) : null}
           {prospect.status === "approved" && (blocker || mailOff) ? (
             <span className="text-sm text-base-content/70">
               {blocker ??
@@ -471,7 +481,7 @@ function ScoreSection({ prospect }: { prospect: OutreachProspect }) {
   return (
     <section className="space-y-2">
       <div className="flex items-center gap-2">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-base-content/60">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-base-content/60">
           Score
         </h3>
         <ScorePill prospect={prospect} />
@@ -484,12 +494,17 @@ function ScoreSection({ prospect }: { prospect: OutreachProspect }) {
       {prospect.score ? (
         <ul className="space-y-1 text-sm">
           {prospect.score.parts.map((part) => (
-            <li key={part.key} className="grid grid-cols-[9rem_3rem_1fr] gap-2">
+            <li
+              key={part.key}
+              className="grid grid-cols-[1fr_auto] gap-x-2 sm:grid-cols-[9rem_3rem_1fr]"
+            >
               <span className="text-base-content/70">{part.label}</span>
               <span className="tabular-nums">
                 {part.value ?? "?"}/{part.max}
               </span>
-              <span className="text-base-content/70">{part.reason}</span>
+              <span className="col-span-2 text-xs text-base-content/60 sm:col-span-1 sm:text-sm">
+                {part.reason}
+              </span>
             </li>
           ))}
         </ul>
@@ -528,7 +543,7 @@ function LinkSection({
   if (!contacted) return null;
   return (
     <section className="space-y-2">
-      <h3 className="text-sm font-semibold uppercase tracking-wide text-base-content/60">
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-base-content/60">
         Link
       </h3>
       <div className="flex flex-wrap items-center gap-3 text-sm">
@@ -545,10 +560,12 @@ function LinkSection({
           <span className="text-base-content/60">No link found yet.</span>
         )}
         {prospect.rel ? (
-          <span className="badge badge-sm">{prospect.rel}</span>
+          <span className="badge badge-xs border-0 bg-base-300 text-base-content/70">
+            {prospect.rel}
+          </span>
         ) : null}
         {prospect.linkLost ? (
-          <span className="badge badge-sm badge-error">Lost</span>
+          <span className="text-xs text-error">Lost</span>
         ) : null}
         <span className="text-base-content/60">
           Checked {prospect.linkCheckedAt || "never"}
@@ -587,14 +604,14 @@ function MovesSection({
   if (!prospect.statusMoves.length) return null;
   return (
     <section className="space-y-2">
-      <h3 className="text-sm font-semibold uppercase tracking-wide text-base-content/60">
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-base-content/60">
         Status
       </h3>
       <div className="flex flex-wrap gap-2">
         {prospect.statusMoves.map((item) => (
           <button
             key={item}
-            className={`btn btn-sm ${item === "keep" ? "btn-warning" : "btn-ghost"}`}
+            className="btn btn-ghost btn-sm"
             disabled={move.isPending}
             onClick={() => {
               if (item === "drop") {

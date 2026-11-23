@@ -24,7 +24,7 @@ function PageCell({ url }: { url: string | null }) {
       target="_blank"
       rel="noopener noreferrer"
       title={url}
-      className="link link-hover block max-w-[22rem] truncate"
+      className="link link-hover block max-w-[12rem] 2xl:max-w-[22rem] truncate"
     >
       {label}
     </a>
@@ -84,14 +84,14 @@ export function ChangesTable({
 }) {
   const Icon = direction === "up" ? ArrowUpRight : ArrowDownRight;
   return (
-    <table className="table table-sm">
+    <table className="table table-zebra table-sm">
       <thead>
         <tr>
           <th>Page</th>
           <th className="text-right">Clicks</th>
           <th className="text-right">Change</th>
           <th className="text-right">Impr. change</th>
-          <th>Driven by</th>
+          <th className="hidden xl:table-cell">Driven by</th>
         </tr>
       </thead>
       <tbody>
@@ -114,7 +114,7 @@ export function ChangesTable({
             <td className="text-right tabular-nums">
               <Delta current={row.impressions} previous={row.prevImpressions} />
             </td>
-            <td className="text-xs text-base-content/70">
+            <td className="hidden max-w-xs text-xs text-base-content/70 xl:table-cell">
               {row.drivers.length === 0
                 ? "—"
                 : row.drivers.map((driver) => (
@@ -155,7 +155,7 @@ export function ChangesTable({
 
 export function NewQueriesTable({ rows }: { rows: Insights["newQueries"] }) {
   return (
-    <table className="table table-sm">
+    <table className="table table-zebra table-sm">
       <thead>
         <tr>
           <th>Query</th>
@@ -169,7 +169,9 @@ export function NewQueriesTable({ rows }: { rows: Insights["newQueries"] }) {
       <tbody>
         {rows.map((row) => (
           <tr key={row.query}>
-            <td className="max-w-[18rem] truncate">{row.query}</td>
+            <td className="max-w-[10rem] truncate 2xl:max-w-[18rem]">
+              {row.query}
+            </td>
             <td>
               <PageCell url={row.page} />
             </td>
@@ -192,7 +194,7 @@ export function NewQueriesTable({ rows }: { rows: Insights["newQueries"] }) {
 
 export function NearPageOneTable({ rows }: { rows: Insights["nearPageOne"] }) {
   return (
-    <table className="table table-sm">
+    <table className="table table-zebra table-sm">
       <thead>
         <tr>
           <th>Query</th>
@@ -206,7 +208,9 @@ export function NearPageOneTable({ rows }: { rows: Insights["nearPageOne"] }) {
       <tbody>
         {rows.map((row) => (
           <tr key={row.query}>
-            <td className="max-w-[18rem] truncate">{row.query}</td>
+            <td className="max-w-[10rem] truncate 2xl:max-w-[18rem]">
+              {row.query}
+            </td>
             <td>
               <PageCell url={row.page} />
             </td>
@@ -231,7 +235,7 @@ export function NearPageOneTable({ rows }: { rows: Insights["nearPageOne"] }) {
 
 export function CtrGapTable({ rows }: { rows: Insights["ctrGaps"] }) {
   return (
-    <table className="table table-sm">
+    <table className="table table-zebra table-sm">
       <thead>
         <tr>
           <th>Query</th>
@@ -245,7 +249,9 @@ export function CtrGapTable({ rows }: { rows: Insights["ctrGaps"] }) {
       <tbody>
         {rows.map((row) => (
           <tr key={`${row.query}::${row.page}`}>
-            <td className="max-w-[18rem] truncate">{row.query}</td>
+            <td className="max-w-[10rem] truncate 2xl:max-w-[18rem]">
+              {row.query}
+            </td>
             <td>
               <PageCell url={row.page} />
             </td>
@@ -272,7 +278,7 @@ export function CannibalizationTable({
   rows: Insights["cannibalization"];
 }) {
   return (
-    <table className="table table-sm">
+    <table className="table table-zebra table-sm">
       <thead>
         <tr>
           <th>Query</th>
@@ -284,7 +290,9 @@ export function CannibalizationTable({
       <tbody>
         {rows.map((row) => (
           <tr key={row.query}>
-            <td className="max-w-[16rem] truncate">{row.query}</td>
+            <td className="max-w-[10rem] truncate 2xl:max-w-[16rem]">
+              {row.query}
+            </td>
             <td className="text-right tabular-nums">
               {formatCount(row.impressions)}
             </td>
@@ -337,7 +345,7 @@ function Sparkline({ values }: { values: number[] }) {
 
 export function NewPagesTable({ rows }: { rows: Insights["newPages"] }) {
   return (
-    <table className="table table-sm">
+    <table className="table table-zebra table-sm">
       <thead>
         <tr>
           <th>Page</th>

@@ -37,8 +37,14 @@ function TotalCell({
   );
 }
 
+// On tiny numbers a percentage misleads (3 to 39 impressions is "+1200%"),
+// so under 20 the change is shown as a plain difference.
 function percentChange(current: number, previous: number): string | null {
   if (previous <= 0) return null;
+  if (previous < 20 && Number.isInteger(previous)) {
+    const diff = current - previous;
+    return diff === 0 ? null : `${diff > 0 ? "+" : ""}${diff}`;
+  }
   const change = ((current - previous) / previous) * 100;
   return `${change >= 0 ? "+" : ""}${change.toFixed(1)}%`;
 }

@@ -1,7 +1,7 @@
 /* eslint-disable max-lines -- the outreach screen and its tabs (fork feature) */
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowDown, ArrowUp, Settings2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Loader2, Search, Settings2 } from "lucide-react";
 import { OutreachProspectPanel } from "@/client/features/outreach/OutreachProspectPanel";
 import { OutreachSettingsForm } from "@/client/features/outreach/OutreachSettingsForm";
 import {
@@ -37,6 +37,46 @@ import {
   type OutreachTab,
 } from "@/shared/outreach";
 
+// Panels follow the Search Performance page: a bordered card with a header
+// row, tables inside their own horizontal scroll so the page never scrolls
+// sideways.
+function Panel({
+  title,
+  meta,
+  actions,
+  children,
+}: {
+  title?: ReactNode;
+  meta?: ReactNode;
+  actions?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <section className="min-w-0 overflow-hidden rounded-xl border border-base-300 bg-base-100">
+      {title || actions ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-base-300 px-4 py-3">
+          <div className="min-w-0">
+            {title ? <h2 className="font-semibold">{title}</h2> : null}
+            {meta ? (
+              <p className="text-xs text-base-content/60">{meta}</p>
+            ) : null}
+          </div>
+          {actions}
+        </div>
+      ) : null}
+      {children}
+    </section>
+  );
+}
+
+function EmptyState({ children }: { children: ReactNode }) {
+  return (
+    <p className="px-4 py-8 text-center text-sm text-base-content/60">
+      {children}
+    </p>
+  );
+}
+
 export function OutreachPage({
   projectId,
   tab,
@@ -65,19 +105,21 @@ export function OutreachPage({
 
   if (snapshotQuery.isPending) {
     return (
-      <div className="flex justify-center py-16">
-        <span className="loading loading-spinner loading-md" />
+      <div className="flex items-center justify-center gap-2 py-16 text-sm text-base-content/60">
+        <Loader2 className="size-4 animate-spin" /> Loading outreach…
       </div>
     );
   }
   if (snapshotQuery.isError) {
     return (
       <div className="px-4 py-6 md:px-6">
-        <div className="alert alert-error text-sm">
-          {getStandardErrorMessage(
-            snapshotQuery.error,
-            "Failed to load outreach",
-          )}
+        <div className="alert alert-error">
+          <span className="text-sm">
+            {getStandardErrorMessage(
+              snapshotQuery.error,
+              "Failed to load outreach",
+            )}
+          </span>
         </div>
       </div>
     );
@@ -86,52 +128,57 @@ export function OutreachPage({
   const data = snapshotQuery.data;
   const selected = data.prospects.find((p) => p.number === prospectNumber);
   const { limits, settings } = data;
+  const replies = outreachReplyQueue(data.prospects);
 
   return (
     <div className="overflow-auto px-4 py-4 pb-24 md:px-6 md:py-6 md:pb-8">
       <div className="mx-auto max-w-7xl space-y-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
             <h1 className="text-2xl font-semibold">Outreach</h1>
             <p className="text-sm text-base-content/70">
               Earned links for {settings.siteUrl || "this project"}: prospects,
               emails you approve, replies and verified links.
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2 text-sm">
-            <span
-              className="badge badge-ghost gap-1 tabular-nums"
-              title={limits.timeZoneLabel}
-            >
-              Today {limits.sentToday}/{limits.dailyMax}
+          <p
+            className="shrink-0 text-sm text-base-content/60 sm:mt-1 sm:text-right"
+            title={`Days and weeks in ${limits.timeZoneLabel}`}
+          >
+            Sent today{" "}
+            <span className="font-medium tabular-nums text-base-content">
+              {limits.sentToday}/{limits.dailyMax}
+            </span>{" "}
+            · this week{" "}
+            <span className="font-medium tabular-nums text-base-content">
+              {limits.sentWeek}/{limits.weeklyMax}
             </span>
-            <span
-              className="badge badge-ghost gap-1 tabular-nums"
-              title={`Week from ${limits.weekStart}`}
-            >
-              Week {limits.sentWeek}/{limits.weeklyMax}
-            </span>
-            <span className="text-base-content/60">{limits.timeZoneLabel}</span>
-          </div>
+          </p>
         </div>
 
-        <div role="tablist" className="tabs tabs-border">
-          {OUTREACH_TABS.map((item) => (
-            <button
-              key={item.value}
-              role="tab"
-              className={`tab ${tab === item.value ? "tab-active" : ""}`}
-              onClick={() => onTab(item.value)}
-            >
-              {item.label}
-              {item.value === "replies" &&
-              outreachReplyQueue(data.prospects).length ? (
-                <span className="badge badge-xs badge-info ml-1.5">
-                  {outreachReplyQueue(data.prospects).length}
-                </span>
-              ) : null}
-            </button>
-          ))}
+        <div className="overflow-x-auto">
+          <div
+            role="tablist"
+            className="tabs tabs-border tabs-sm w-max sm:tabs-md"
+          >
+            {OUTREACH_TABS.map((item) => (
+              <button
+                key={item.value}
+                type="button"
+                role="tab"
+                aria-selected={tab === item.value}
+                className={`tab gap-1.5 ${tab === item.value ? "tab-active" : ""}`}
+                onClick={() => onTab(item.value)}
+              >
+                {item.label}
+                {item.value === "replies" && replies.length ? (
+                  <span className="badge badge-xs badge-primary border-0 text-primary-content">
+                    {replies.length}
+                  </span>
+                ) : null}
+              </button>
+            ))}
+          </div>
         </div>
 
         {tab === "overview" ? (
@@ -149,51 +196,64 @@ export function OutreachPage({
             onProspect={onProspect}
           />
         ) : tab === "replies" ? (
-          <ProspectList
-            prospects={outreachReplyQueue(data.prospects)}
-            favicons={favicons}
-            empty="No replies waiting for an answer."
-            detail={(p) => (
-              <>
-                <span className="text-base-content/60">{p.replyAt}: </span>
-                {p.replySummary}
-              </>
-            )}
-            onProspect={onProspect}
-          />
+          <Panel
+            title="Replies to answer"
+            meta="The agent drafts each answer; you approve it like any other email."
+          >
+            <ProspectList
+              prospects={replies}
+              favicons={favicons}
+              empty="No replies waiting for an answer."
+              detail={(p) => (
+                <>
+                  <span className="text-base-content/50">{p.replyAt} · </span>
+                  {p.replySummary}
+                </>
+              )}
+              onProspect={onProspect}
+            />
+          </Panel>
         ) : tab === "links" ? (
-          <ProspectList
-            prospects={[
-              ...outreachLinks(data.prospects),
-              ...data.prospects.filter(
-                (p) => p.linkLost && p.status !== "linked",
-              ),
-            ]}
-            favicons={favicons}
-            empty="No links yet."
-            detail={(p) => (
-              <>
-                <a
-                  className="link break-all"
-                  href={p.linkUrl}
-                  target="_blank"
-                  rel="noreferrer noopener"
-                >
-                  {p.linkUrl || p.theirPage}
-                </a>
-                {p.rel ? (
-                  <span className="badge badge-sm ml-2">{p.rel}</span>
-                ) : null}
-                {p.linkLost ? (
-                  <span className="badge badge-sm badge-error ml-2">Lost</span>
-                ) : null}
-                <span className="ml-2 text-base-content/60">
-                  checked {p.linkCheckedAt || "never"}
+          <Panel
+            title="Links"
+            meta="Links found on prospects' pages, and any that disappeared since."
+          >
+            <ProspectList
+              prospects={[
+                ...outreachLinks(data.prospects),
+                ...data.prospects.filter(
+                  (p) => p.linkLost && p.status !== "linked",
+                ),
+              ]}
+              favicons={favicons}
+              empty="No links yet. A link check marks a prospect linked when it finds one."
+              detail={(p) => (
+                <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                  <a
+                    className="link link-hover min-w-0 truncate"
+                    href={p.linkUrl || p.theirPage}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    {p.linkUrl || p.theirPage}
+                  </a>
+                  {p.rel ? (
+                    <span className="badge badge-xs border-0 bg-base-300 text-base-content/70">
+                      {p.rel}
+                    </span>
+                  ) : null}
+                  {p.linkLost ? (
+                    <span className="text-xs text-error">Lost</span>
+                  ) : null}
+                  <span className="text-xs text-base-content/50">
+                    checked {p.linkCheckedAt || "never"}
+                  </span>
                 </span>
-              </>
-            )}
-            onProspect={onProspect}
-          />
+              )}
+              onProspect={onProspect}
+            />
+          </Panel>
         ) : (
           <OutreachSettingsForm
             key={data.readAt}
@@ -219,6 +279,14 @@ export function OutreachPage({
   );
 }
 
+const OWNER_BUTTON: Partial<
+  Record<NonNullable<OutreachProspect["attention"]>, string>
+> = {
+  approval: "Review",
+  reapprove: "Review",
+  "low-score": "Decide",
+};
+
 function Overview({
   data,
   favicons,
@@ -231,73 +299,39 @@ function Overview({
   onTab: (tab: OutreachTab) => void;
 }) {
   const attention = outreachAttention(data.prospects);
+  const yours = attention.filter((p) => p.action.who === "owner").length;
   const { analytics, settings } = data;
   const setupMissing = !settings.siteUrl || settings.linkDomains.length === 0;
-  const replyRate = analytics.contacted
-    ? Math.round((analytics.replied / analytics.contacted) * 100)
-    : null;
-  const linkRate = analytics.contacted
-    ? Math.round((analytics.linksWon / analytics.contacted) * 100)
-    : null;
-  const maxDay = Math.max(1, ...analytics.sentPerDay.map((d) => d.value));
+  const rate = (value: number) =>
+    analytics.contacted
+      ? `${Math.round((value / analytics.contacted) * 100)}% of contacted`
+      : undefined;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {setupMissing || !settings.mailReady ? (
-        <div className="alert alert-info flex flex-wrap justify-between py-2 text-sm">
-          <span>
+        <div className="flex flex-col gap-2 rounded-lg border border-base-300 bg-base-200/50 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+          <span className="text-base-content/80">
             {setupMissing
               ? "Set the site and link domains so link checks know what to look for."
-              : `Sending from the app is off: ${settings.mailProblem}`}
+              : `Sending from the app is off. ${settings.mailProblem ?? ""} Drafts and approvals still work.`}
           </span>
           <button
-            className="btn btn-ghost btn-xs"
+            type="button"
+            className="btn btn-ghost btn-sm gap-1.5 self-start sm:self-auto"
             onClick={() => onTab("settings")}
           >
-            <Settings2 className="size-3" /> Settings
+            <Settings2 className="size-4" /> Settings
           </button>
         </div>
       ) : null}
 
-      <section className="space-y-2">
-        <h2 className="font-semibold">Needs you</h2>
-        {attention.length === 0 ? (
-          <p className="rounded-box border border-base-300 p-4 text-sm text-base-content/70">
-            Nothing waits on you right now.
-          </p>
-        ) : (
-          <ul className="divide-y divide-base-300 rounded-box border border-base-300">
-            {attention.map((p) => (
-              <li key={p.number}>
-                <button
-                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-base-200"
-                  onClick={() => onProspect(p.number)}
-                >
-                  <Favicon src={favicons[p.number]} domain={p.domain} />
-                  <span className="min-w-0 flex-1 truncate">
-                    <span className="text-base-content/50">#{p.number}</span>{" "}
-                    {p.prospect}
-                    <span className="ml-2 text-base-content/60">
-                      {p.subject}
-                    </span>
-                  </span>
-                  <span className="badge badge-sm badge-warning badge-outline hidden whitespace-nowrap sm:inline-flex">
-                    {p.attention ? OUTREACH_ATTENTION_LABELS[p.attention] : ""}
-                  </span>
-                  <ActionPill prospect={p} />
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section className="grid grid-cols-2 gap-3 md:grid-cols-5">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-5">
         <Stat label="Contacted" value={formatNumber(analytics.contacted)} />
         <Stat
           label="Replied"
           value={formatNumber(analytics.replied)}
-          hint={replyRate === null ? undefined : `${replyRate}% of contacted`}
+          hint={rate(analytics.replied)}
         />
         <Stat
           label="Median reply"
@@ -312,42 +346,73 @@ function Overview({
         <Stat
           label="Links won"
           value={formatNumber(analytics.linksWon)}
-          hint={linkRate === null ? undefined : `${linkRate}% of contacted`}
+          hint={rate(analytics.linksWon)}
         />
         <Stat label="Links lost" value={formatNumber(analytics.linksLost)} />
-      </section>
+      </div>
 
-      <section className="space-y-2">
-        <h2 className="font-semibold">
-          Sent per day (14 days, {analytics.timeZoneLabel})
-        </h2>
-        <div className="flex h-24 items-end gap-1 rounded-box border border-base-300 p-3">
-          {analytics.sentPerDay.map((day) => (
-            <div
-              key={day.date}
-              className="flex flex-1 flex-col items-center gap-1"
-              title={`${day.date}: ${day.value}`}
-            >
-              <div
-                className="w-full rounded-sm bg-primary/70"
-                style={{ height: `${(day.value / maxDay) * 56}px` }}
-              />
-              <span className="text-[10px] text-base-content/50">
-                {day.date.slice(8)}
-              </span>
-            </div>
-          ))}
-        </div>
-        <p className="text-xs text-base-content/60">
-          Reply rates for link outreach average 1 to 5 percent. Compare angles
-          after 50 to 100 sends, not one batch.
-        </p>
-      </section>
+      <Panel
+        title="Needs attention"
+        meta={
+          attention.length
+            ? `${yours} waiting on you, ${attention.length - yours} on the agent`
+            : undefined
+        }
+      >
+        {attention.length === 0 ? (
+          <EmptyState>Nothing waits on you or the agent right now.</EmptyState>
+        ) : (
+          <ul className="divide-y divide-base-300">
+            {attention.map((p) => {
+              const button = p.attention ? OWNER_BUTTON[p.attention] : null;
+              return (
+                <li
+                  key={p.number}
+                  className="flex cursor-pointer items-center gap-3 px-4 py-2.5 hover:bg-base-200/60"
+                  onClick={() => onProspect(p.number)}
+                >
+                  <Favicon src={favicons[p.number]} domain={p.domain} />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm">
+                      <span className="text-base-content/50">#{p.number}</span>{" "}
+                      {p.prospect}
+                    </div>
+                    <div className="truncate text-xs text-base-content/60">
+                      {p.attention
+                        ? OUTREACH_ATTENTION_LABELS[p.attention]
+                        : ""}
+                      {p.subject ? ` · ${p.subject}` : ""}
+                    </div>
+                  </div>
+                  {button && p.action.who === "owner" ? (
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-xs shrink-0 text-primary"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onProspect(p.number);
+                      }}
+                    >
+                      {button}
+                    </button>
+                  ) : (
+                    <span className="shrink-0">
+                      <ActionPill prospect={p} />
+                    </span>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </Panel>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Breakdown title="By angle" rows={analytics.byAngle} />
-        <Breakdown title="By score band" rows={analytics.byBand} />
-        <Breakdown title="By our page" rows={analytics.byOurPage} />
+      <div className="grid gap-4 xl:grid-cols-[2fr_3fr]">
+        <SentChart
+          data={analytics.sentPerDay}
+          timeZone={analytics.timeZoneLabel}
+        />
+        <Results analytics={analytics} />
       </div>
     </div>
   );
@@ -363,57 +428,151 @@ function Stat({
   hint?: string;
 }) {
   return (
-    <div className="rounded-box border border-base-300 p-3">
-      <div className="text-xs uppercase tracking-wide text-base-content/60">
+    <div className="min-w-0 rounded-lg border border-base-300 bg-base-100 p-3 sm:p-4">
+      <div className="truncate text-xs uppercase tracking-wide text-base-content/60">
         {label}
       </div>
-      <div className="text-2xl font-semibold tabular-nums">{value}</div>
-      {hint ? <div className="text-xs text-base-content/60">{hint}</div> : null}
+      <div className="mt-1 text-xl font-semibold tabular-nums sm:text-2xl">
+        {value}
+      </div>
+      {hint ? (
+        <div className="truncate text-xs text-base-content/60">{hint}</div>
+      ) : null}
     </div>
   );
 }
 
-function Breakdown({
-  title,
-  rows,
+function SentChart({
+  data,
+  timeZone,
 }: {
-  title: string;
-  rows: OutreachBreakdownRow[];
+  data: Array<{ date: string; value: number }>;
+  timeZone: string;
 }) {
+  const max = Math.max(1, ...data.map((day) => day.value));
+  const total = data.reduce((sum, day) => sum + day.value, 0);
   return (
-    <section className="rounded-box border border-base-300">
-      <h3 className="border-b border-base-300 px-3 py-2 text-sm font-semibold">
-        {title}
-      </h3>
+    <Panel
+      title="Emails sent"
+      meta={`${total} in the last 14 days · first emails and follow-ups · ${timeZone}`}
+    >
+      <div className="px-4 pb-3 pt-4">
+        <div className="flex h-28 items-end gap-1 border-b border-base-300">
+          {data.map((day) => (
+            <div
+              key={day.date}
+              className="flex h-full min-w-0 flex-1 flex-col items-center justify-end"
+              title={`${day.date}: ${day.value} sent`}
+            >
+              {day.value > 0 ? (
+                <>
+                  <span className="mb-0.5 text-[10px] tabular-nums text-base-content/60">
+                    {day.value}
+                  </span>
+                  <div
+                    className="w-full max-w-3 rounded-t-sm bg-primary/80"
+                    style={{
+                      height: `${Math.max(8, (day.value / max) * 80)}%`,
+                    }}
+                  />
+                </>
+              ) : null}
+            </div>
+          ))}
+        </div>
+        <div className="mt-1 flex gap-1">
+          {data.map((day, index) => (
+            <span
+              key={day.date}
+              className={`min-w-0 flex-1 text-center text-[10px] tabular-nums text-base-content/50 ${index % 2 ? "max-sm:invisible" : ""}`}
+            >
+              {Number(day.date.slice(8))}
+            </span>
+          ))}
+        </div>
+        <p className="mt-3 text-xs text-base-content/60">
+          Link outreach replies average 1 to 5 percent. Compare angles after 50
+          to 100 sends, not one batch.
+        </p>
+      </div>
+    </Panel>
+  );
+}
+
+const RESULT_VIEWS = [
+  { value: "angle", label: "Angle" },
+  { value: "band", label: "Score band" },
+  { value: "page", label: "Our page" },
+] as const;
+
+function Results({ analytics }: { analytics: OutreachSnapshot["analytics"] }) {
+  const [view, setView] =
+    useState<(typeof RESULT_VIEWS)[number]["value"]>("angle");
+  const rows: OutreachBreakdownRow[] =
+    view === "angle"
+      ? analytics.byAngle
+      : view === "band"
+        ? analytics.byBand
+        : analytics.byOurPage;
+  return (
+    <Panel
+      title="Results"
+      actions={
+        <div role="tablist" className="tabs tabs-border tabs-sm w-fit">
+          {RESULT_VIEWS.map((item) => (
+            <button
+              key={item.value}
+              type="button"
+              role="tab"
+              aria-selected={view === item.value}
+              className={`tab ${view === item.value ? "tab-active" : ""}`}
+              onClick={() => setView(item.value)}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      }
+    >
       {rows.length === 0 ? (
-        <p className="px-3 py-3 text-sm text-base-content/60">No data yet.</p>
+        <EmptyState>No prospects yet.</EmptyState>
       ) : (
-        <table className="table table-sm">
-          <thead>
-            <tr>
-              <th />
-              <th className="text-right">Prospects</th>
-              <th className="text-right">Sent</th>
-              <th className="text-right">Replied</th>
-              <th className="text-right">Linked</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.label}>
-                <td className="max-w-40 truncate" title={row.label}>
-                  {row.label}
-                </td>
-                <td className="text-right tabular-nums">{row.prospects}</td>
-                <td className="text-right tabular-nums">{row.sent}</td>
-                <td className="text-right tabular-nums">{row.replied}</td>
-                <td className="text-right tabular-nums">{row.linked}</td>
+        <div className="overflow-x-auto">
+          <table className="table table-sm">
+            <thead>
+              <tr>
+                <th className="w-full">
+                  {RESULT_VIEWS.find((item) => item.value === view)?.label}
+                </th>
+                <th className="px-2 text-right" title="Prospects">
+                  Total
+                </th>
+                <th className="px-2 text-right">Sent</th>
+                <th className="px-2 text-right">Replied</th>
+                <th className="px-2 text-right">Linked</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.label}>
+                  <td className="min-w-28 max-w-0 truncate" title={row.label}>
+                    {row.label}
+                  </td>
+                  <td className="px-2 text-right tabular-nums">
+                    {row.prospects}
+                  </td>
+                  <td className="px-2 text-right tabular-nums">{row.sent}</td>
+                  <td className="px-2 text-right tabular-nums">
+                    {row.replied}
+                  </td>
+                  <td className="px-2 text-right tabular-nums">{row.linked}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
-    </section>
+    </Panel>
   );
 }
 
@@ -422,16 +581,28 @@ const SORTABLE: Array<{
   label: string;
   className?: string;
 }> = [
-  { key: "number", label: "#" },
+  { key: "number", label: "#", className: "hidden w-10 sm:table-cell" },
   { key: "site", label: "Prospect" },
-  { key: "theirPage", label: "Their page" },
-  { key: "ourPage", label: "Our page" },
-  { key: "angle", label: "Angle" },
+  { key: "theirPage", label: "Their page", className: "hidden xl:table-cell" },
+  { key: "ourPage", label: "Our page", className: "hidden 2xl:table-cell" },
+  { key: "angle", label: "Angle", className: "hidden lg:table-cell" },
   { key: "score", label: "Score", className: "text-right" },
-  { key: "authority", label: "Auth.", className: "text-right" },
-  { key: "traffic", label: "Traffic", className: "text-right" },
+  {
+    key: "authority",
+    label: "Auth.",
+    className: "hidden text-right 2xl:table-cell",
+  },
+  {
+    key: "traffic",
+    label: "Traffic",
+    className: "hidden text-right 2xl:table-cell",
+  },
   { key: "status", label: "Status" },
-  { key: "lastAction", label: "Last action" },
+  {
+    key: "lastAction",
+    label: "Last action",
+    className: "hidden 2xl:table-cell",
+  },
 ];
 
 function ProspectsTable({
@@ -450,10 +621,7 @@ function ProspectsTable({
   const [sort, setSort] = useState<{
     key: OutreachSortKey;
     direction: "asc" | "desc";
-  }>({
-    key: "default",
-    direction: "desc",
-  });
+  }>({ key: "default", direction: "desc" });
   const counts = outreachFilterCounts(prospects);
   const angleLabel = new Map(
     angles.angles.map((angle) => [angle.key, angle.label]),
@@ -469,42 +637,57 @@ function ProspectsTable({
   );
 
   return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="join">
+    <Panel
+      title={
+        <div
+          role="tablist"
+          className="tabs tabs-border tabs-sm w-fit sm:tabs-md"
+        >
           {OUTREACH_FILTERS.map((item) => (
             <button
               key={item.value}
-              className={`btn join-item btn-sm ${filter === item.value ? "btn-active" : ""}`}
+              type="button"
+              role="tab"
+              aria-selected={filter === item.value}
+              className={`tab gap-1.5 ${filter === item.value ? "tab-active" : ""}`}
               onClick={() => setFilter(item.value)}
             >
               {item.label}
-              <span className="text-base-content/60">{counts[item.value]}</span>
+              <span className="text-xs tabular-nums text-base-content/50">
+                {counts[item.value]}
+              </span>
             </button>
           ))}
         </div>
-        <input
-          className="input input-sm input-bordered w-64"
-          placeholder="Search site, page, contact, subject"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-        />
-      </div>
+      }
+      actions={
+        <label className="input input-sm input-bordered flex w-full items-center gap-2 sm:w-64">
+          <Search className="size-4 text-base-content/50" />
+          <input
+            className="min-w-0 grow"
+            placeholder="Search site, page, contact"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+        </label>
+      }
+    >
       {rows.length === 0 ? (
-        <p className="rounded-box border border-base-300 p-6 text-center text-sm text-base-content/70">
+        <EmptyState>
           {prospects.length === 0
             ? "No prospects yet. Ask your agent to find some with the link-outreach skill (add_outreach_prospect)."
             : "No prospects match."}
-        </p>
+        </EmptyState>
       ) : (
-        <div className="overflow-x-auto rounded-box border border-base-300">
-          <table className="table table-sm">
+        <div className="overflow-x-auto">
+          <table className="table table-zebra table-sm">
             <thead>
               <tr>
                 {SORTABLE.map((column) => (
                   <th key={column.key} className={column.className}>
                     <button
-                      className="inline-flex items-center gap-1"
+                      type="button"
+                      className="inline-flex items-center gap-1 whitespace-nowrap"
                       onClick={() =>
                         setSort((current) => ({
                           key: column.key,
@@ -527,20 +710,20 @@ function ProspectsTable({
                     </button>
                   </th>
                 ))}
-                <th>Next</th>
+                <th className="hidden sm:table-cell">Next</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((p) => (
                 <tr
                   key={p.number}
-                  className="cursor-pointer hover:bg-base-200"
+                  className="cursor-pointer"
                   onClick={() => onProspect(p.number)}
                 >
-                  <td className="tabular-nums text-base-content/60">
+                  <td className="hidden tabular-nums text-base-content/50 sm:table-cell">
                     {p.number}
                   </td>
-                  <td className="max-w-56">
+                  <td className="max-w-44 sm:max-w-72">
                     <div className="flex items-center gap-2">
                       <Favicon src={favicons[p.number]} domain={p.domain} />
                       <span className="truncate" title={p.prospect}>
@@ -548,33 +731,39 @@ function ProspectsTable({
                       </span>
                     </div>
                   </td>
-                  <td className="max-w-64 truncate" title={p.theirPage}>
+                  <td
+                    className="hidden max-w-64 truncate xl:table-cell"
+                    title={p.theirPage}
+                  >
                     {p.theirPageTitle}
                   </td>
-                  <td className="max-w-48 truncate" title={p.ourPage}>
+                  <td
+                    className="hidden max-w-48 truncate 2xl:table-cell"
+                    title={p.ourPage}
+                  >
                     {p.ourPage}
                   </td>
-                  <td className="whitespace-nowrap">
+                  <td className="hidden whitespace-nowrap text-base-content/70 lg:table-cell">
                     {p.angle ? (angleLabel.get(p.angle) ?? p.angle) : "—"}
                   </td>
                   <td className="text-right">
                     <ScorePill prospect={p} />
                   </td>
-                  <td className="text-right tabular-nums">
+                  <td className="hidden text-right tabular-nums 2xl:table-cell">
                     {formatNumber(p.metrics?.authority)}
                   </td>
-                  <td className="text-right tabular-nums">
+                  <td className="hidden text-right tabular-nums 2xl:table-cell">
                     {formatNumber(p.metrics?.traffic)}
                   </td>
                   <td>
                     <StatusBadge prospect={p} />
                   </td>
-                  <td className="whitespace-nowrap text-base-content/70">
+                  <td className="hidden whitespace-nowrap text-xs text-base-content/60 2xl:table-cell">
                     {p.lastAction
                       ? `${p.lastAction.label}, ${formatDateTime(p.lastAction.at)}`
                       : "—"}
                   </td>
-                  <td>
+                  <td className="hidden sm:table-cell">
                     <ActionPill prospect={p} />
                   </td>
                 </tr>
@@ -583,7 +772,7 @@ function ProspectsTable({
           </table>
         </div>
       )}
-    </div>
+    </Panel>
   );
 }
 
@@ -597,32 +786,35 @@ function ProspectList({
   prospects: OutreachProspect[];
   favicons: Record<number, string>;
   empty: string;
-  detail: (prospect: OutreachProspect) => React.ReactNode;
+  detail: (prospect: OutreachProspect) => ReactNode;
   onProspect: (number: number) => void;
 }) {
-  if (prospects.length === 0) {
-    return (
-      <p className="rounded-box border border-base-300 p-6 text-center text-sm text-base-content/70">
-        {empty}
-      </p>
-    );
-  }
+  if (prospects.length === 0) return <EmptyState>{empty}</EmptyState>;
   return (
-    <ul className="divide-y divide-base-300 rounded-box border border-base-300">
+    <ul className="divide-y divide-base-300">
       {prospects.map((p) => (
-        <li key={p.number} className="flex items-start gap-3 px-4 py-3 text-sm">
-          <Favicon src={favicons[p.number]} domain={p.domain} />
-          <div className="min-w-0 flex-1 space-y-1">
-            <button
-              className="font-medium hover:underline"
-              onClick={() => onProspect(p.number)}
-            >
-              <span className="text-base-content/50">#{p.number}</span>{" "}
+        <li
+          key={p.number}
+          className="flex cursor-pointer items-start gap-3 px-4 py-3 text-sm hover:bg-base-200/60"
+          onClick={() => onProspect(p.number)}
+        >
+          <span className="mt-0.5">
+            <Favicon src={favicons[p.number]} domain={p.domain} />
+          </span>
+          <div className="min-w-0 flex-1 space-y-0.5">
+            <div className="truncate font-medium">
+              <span className="font-normal text-base-content/50">
+                #{p.number}
+              </span>{" "}
               {p.prospect}
-            </button>
-            <div className="break-words text-base-content/80">{detail(p)}</div>
+            </div>
+            <div className="min-w-0 break-words text-base-content/80">
+              {detail(p)}
+            </div>
           </div>
-          <StatusBadge prospect={p} />
+          <span className="shrink-0">
+            <StatusBadge prospect={p} />
+          </span>
         </li>
       ))}
     </ul>

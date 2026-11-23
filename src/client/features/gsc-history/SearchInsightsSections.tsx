@@ -131,7 +131,7 @@ export function ChangesTable({
           <th className="text-right">Clicks</th>
           <th className="text-right">Change</th>
           <th className="text-right">Impr. change</th>
-          <th className="hidden xl:table-cell">Driven by</th>
+          <th className="hidden 2xl:table-cell">Driven by</th>
         </tr>
       </thead>
       <tbody>
@@ -154,7 +154,7 @@ export function ChangesTable({
             <td className="text-right tabular-nums">
               <Delta current={row.impressions} previous={row.prevImpressions} />
             </td>
-            <td className="hidden max-w-xs text-xs text-base-content/70 xl:table-cell">
+            <td className="hidden max-w-xs text-xs text-base-content/70 2xl:table-cell">
               {row.drivers.length === 0
                 ? "—"
                 : row.drivers.map((driver) => (

@@ -7,6 +7,7 @@ import {
   type ChartSeries,
   TimeSeriesChart,
 } from "@/client/features/charts/TimeSeriesChart";
+import { SegmentGroup } from "@/client/features/charts/ChoiceMenu";
 import { OutreachProspectPanel } from "@/client/features/outreach/OutreachProspectPanel";
 import { OutreachSettingsForm } from "@/client/features/outreach/OutreachSettingsForm";
 import {
@@ -495,19 +496,15 @@ function SentChart({
       title="Emails sent"
       meta={`${total} ${view === "day" ? "in the last 14 days" : "in the last 8 weeks"} · first emails and follow-ups · ${timeZone}`}
       actions={
-        <div className="join" role="group" aria-label="Granularity">
-          {(["day", "week"] as const).map((value) => (
-            <button
-              key={value}
-              type="button"
-              aria-pressed={view === value}
-              className={`btn btn-xs join-item ${view === value ? "btn-active" : "btn-ghost"}`}
-              onClick={() => setView(value)}
-            >
-              {value === "day" ? "Days" : "Weeks"}
-            </button>
-          ))}
-        </div>
+        <SegmentGroup
+          label="Granularity"
+          items={[
+            { value: "day", label: "Days" },
+            { value: "week", label: "Weeks" },
+          ]}
+          value={view}
+          onChange={setView}
+        />
       }
     >
       <div className="px-2 pb-3 pt-4 sm:px-4">

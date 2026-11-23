@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { ChoiceMenu, SegmentGroup } from "@/client/features/charts/ChoiceMenu";
+import { countryName } from "@/client/features/gsc-history/countryNames";
 import { CalendarRange, X } from "lucide-react";
 import type { Granularity } from "@/client/features/gsc-history/searchSeries";
 import type {
@@ -7,7 +9,7 @@ import type {
 } from "@/types/schemas/gsc-history";
 
 // Period, comparison and granularity controls for Search Insights, in the
-// rank-tracking toggle style (joined extra-small buttons).
+// app's toolbar style: a segmented period group and same-height dropdowns.
 
 const RANGE_LABELS: Array<{ value: SearchInsightsRange; label: string }> = [
   { value: "7d", label: "7d" },
@@ -36,38 +38,12 @@ const DEVICE_OPTIONS: Array<{ value: Device; label: string }> = [
 
 const GRANULARITY_LABELS: Array<{ value: Granularity; label: string }> = [
   { value: "auto", label: "Auto" },
-  { value: "day", label: "Day" },
-  { value: "week", label: "Week" },
-  { value: "month", label: "Month" },
+  { value: "day", label: "By day" },
+  { value: "week", label: "By week" },
+  { value: "month", label: "By month" },
 ];
 
-function JoinToggle<T extends string>({
-  items,
-  value,
-  onChange,
-  label,
-}: {
-  items: Array<{ value: T; label: string }>;
-  value: T;
-  onChange: (value: T) => void;
-  label: string;
-}) {
-  return (
-    <div className="join" role="group" aria-label={label}>
-      {items.map((item) => (
-        <button
-          key={item.value}
-          type="button"
-          aria-pressed={value === item.value}
-          className={`btn btn-xs join-item ${value === item.value ? "btn-active" : "btn-ghost"}`}
-          onClick={() => onChange(item.value)}
-        >
-          {item.label}
-        </button>
-      ))}
-    </div>
-  );
-}
+const ALL = "all";
 
 export function InsightsControls({
   range,
@@ -108,11 +84,25 @@ export function InsightsControls({
   const [draftEnd, setDraftEnd] = useState(end ?? "");
   const [editing, setEditing] = useState(false);
   const showCustom = range === "custom" || editing;
+  const resolvedLabel =
+    GRANULARITY_LABELS.find((item) => item.value === resolvedGranularity)
+      ?.label ?? resolvedGranularity;
+  const countryOptions = [
+    { value: ALL, label: "All countries" },
+    ...(country && !countries.some((row) => row.country === country)
+      ? [{ value: country, label: countryName(country) }]
+      : []),
+    ...countries.map((row) => ({
+      value: row.country,
+      label: countryName(row.country),
+      hint: row.impressions.toLocaleString("en-US"),
+    })),
+  ];
 
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-2">
-        <JoinToggle
+        <SegmentGroup
           label="Period"
           items={RANGE_LABELS}
           value={showCustom ? "custom" : range}
@@ -127,75 +117,65 @@ export function InsightsControls({
             onChange({ range: value, start: undefined, end: undefined });
           }}
         />
-        <select
-          className="select select-bordered select-xs w-auto"
-          value={compare}
-          aria-label="Compare with"
-          onChange={(event) => {
-            const next = COMPARE_OPTIONS.find(
-              (option) => option.value === event.target.value,
-            );
-            if (next) onChange({ compare: next.value });
-          }}
-        >
-          {COMPARE_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-        <JoinToggle
-          label="Granularity"
-          items={GRANULARITY_LABELS.map((item) =>
-            item.value === "auto"
-              ? { ...item, label: `Auto (${resolvedGranularity})` }
-              : item,
-          )}
-          value={granularity}
-          onChange={(value) => onChange({ gran: value })}
-        />
-        <select
-          className="select select-bordered select-xs w-auto"
-          value={country ?? ""}
-          aria-label="Country"
-          title={
-            segmentsPending
-              ? "Country data is still being added for older days"
-              : undefined
-          }
-          onChange={(event) =>
-            onChange({ country: event.target.value || undefined })
-          }
-        >
-          <option value="">All countries</option>
-          {country && !countries.some((row) => row.country === country) ? (
-            <option value={country}>{country.toUpperCase()}</option>
-          ) : null}
-          {countries.map((row) => (
-            <option key={row.country} value={row.country}>
-              {row.country.toUpperCase()} ·{" "}
-              {row.impressions.toLocaleString("en-US")}
-            </option>
-          ))}
-        </select>
-        <select
-          className="select select-bordered select-xs w-auto"
-          value={device ?? ""}
-          aria-label="Device"
-          onChange={(event) => {
-            const next = DEVICE_OPTIONS.find(
-              (option) => option.value === event.target.value,
-            );
-            onChange({ device: next?.value });
-          }}
-        >
-          <option value="">All devices</option>
-          {DEVICE_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
+        <div className="flex flex-wrap items-center gap-2">
+          <ChoiceMenu
+            label="Compare with"
+            value={compare}
+            options={COMPARE_OPTIONS}
+            onChange={(value) => onChange({ compare: value })}
+            menuWidth="w-52"
+          />
+          <ChoiceMenu
+            label="Granularity"
+            value={granularity}
+            display={
+              granularity === "auto" ? (
+                <>
+                  {resolvedLabel}{" "}
+                  <span className="text-base-content/50">· auto</span>
+                </>
+              ) : undefined
+            }
+            options={GRANULARITY_LABELS.map((item) =>
+              item.value === "auto"
+                ? { ...item, label: "Auto", hint: resolvedLabel }
+                : item,
+            )}
+            onChange={(value) => onChange({ gran: value })}
+            menuWidth="w-44"
+          />
+          <ChoiceMenu
+            label="Country"
+            value={country ?? ALL}
+            options={countryOptions}
+            searchable
+            searchPlaceholder="Search countries"
+            narrowed={Boolean(country)}
+            display={country ? countryName(country) : "All countries"}
+            onChange={(value) =>
+              onChange({ country: value === ALL ? undefined : value })
+            }
+            menuWidth="w-64"
+          />
+          <ChoiceMenu
+            label="Device"
+            value={device ?? ALL}
+            options={[{ value: ALL, label: "All devices" }, ...DEVICE_OPTIONS]}
+            narrowed={Boolean(device)}
+            onChange={(value) =>
+              onChange({
+                device: DEVICE_OPTIONS.find((option) => option.value === value)
+                  ?.value,
+              })
+            }
+            menuWidth="w-44"
+          />
+        </div>
+        {segmentsPending ? (
+          <span className="text-xs text-base-content/50">
+            Country and device data is still being added for older days.
+          </span>
+        ) : null}
       </div>
       {showCustom ? (
         <form
@@ -210,7 +190,7 @@ export function InsightsControls({
           <CalendarRange className="size-4 text-base-content/50" />
           <input
             type="date"
-            className="input input-bordered input-xs w-36"
+            className="input input-bordered h-9 w-40 text-sm"
             value={draftStart}
             min={bounds.oldest ?? undefined}
             max={bounds.newest ?? undefined}
@@ -220,20 +200,20 @@ export function InsightsControls({
           <span className="text-xs text-base-content/50">to</span>
           <input
             type="date"
-            className="input input-bordered input-xs w-36"
+            className="input input-bordered h-9 w-40 text-sm"
             value={draftEnd}
             min={bounds.oldest ?? undefined}
             max={bounds.newest ?? undefined}
             onChange={(event) => setDraftEnd(event.target.value)}
             aria-label="To"
           />
-          <button type="submit" className="btn btn-primary btn-xs">
+          <button type="submit" className="btn btn-primary btn-sm h-9">
             Apply
           </button>
           {range !== "custom" ? (
             <button
               type="button"
-              className="btn btn-ghost btn-xs"
+              className="btn btn-ghost btn-sm h-9"
               onClick={() => setEditing(false)}
             >
               Cancel
@@ -288,7 +268,7 @@ export function FilterChips({
       <span className="text-xs text-base-content/50">Filtered to</span>
       {page ? chip("page", "Page", path) : null}
       {query ? chip("query", "Query", query) : null}
-      {country ? chip("country", "Country", country.toUpperCase()) : null}
+      {country ? chip("country", "Country", countryName(country)) : null}
       {device
         ? chip(
             "device",

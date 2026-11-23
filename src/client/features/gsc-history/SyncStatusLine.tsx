@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { AlertTriangle, Loader2, RefreshCw } from "lucide-react";
-import { formatDay } from "@/client/features/gsc-history/SearchInsightsChart";
+import { formatDay } from "@/client/features/gsc-history/annotationStyles";
 import type { HistoryStatus } from "@/client/features/gsc-history/types";
 import type { SearchHistorySync } from "@/client/features/gsc-history/useSearchHistorySync";
 import { formatCount } from "@/client/features/search-performance/SearchPerformanceColumns";

@@ -1,40 +1,80 @@
-import { useState } from "react";
+import { useMemo } from "react";
 import { Link } from "@tanstack/react-router";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
+import { TimeSeriesChart } from "@/client/features/charts/TimeSeriesChart";
 import { SearchConsoleConnectionCard } from "@/client/features/gsc/SearchConsoleConnectionCard";
 import { AnnotationsPanel } from "@/client/features/gsc-history/AnnotationsPanel";
-import { SearchInsightsChart } from "@/client/features/gsc-history/SearchInsightsChart";
+import { formatDay } from "@/client/features/gsc-history/annotationStyles";
+import {
+  FilterChips,
+  InsightsControls,
+} from "@/client/features/gsc-history/InsightsControls";
+import { MetricCards } from "@/client/features/gsc-history/MetricCards";
+import {
+  buildChartPoints,
+  chartStart,
+  type Granularity,
+  METRICS,
+  type MetricKey,
+  resolveGranularity,
+} from "@/client/features/gsc-history/searchSeries";
 import {
   CannibalizationTable,
   ChangesTable,
   CtrGapTable,
   InsightSection,
+  InsightsFilterContext,
   NearPageOneTable,
   NewPagesTable,
   NewQueriesTable,
 } from "@/client/features/gsc-history/SearchInsightsSections";
-import { TotalsRow } from "@/client/features/gsc-history/TotalsRow";
 import { SyncStatusLine } from "@/client/features/gsc-history/SyncStatusLine";
 import type { Insights } from "@/client/features/gsc-history/types";
 import { useSearchHistorySync } from "@/client/features/gsc-history/useSearchHistorySync";
 import { getStandardErrorMessage } from "@/client/lib/error-messages";
 import { getSearchInsights } from "@/serverFunctions/gscHistory";
-import {
-  SEARCH_INSIGHTS_PERIODS,
-  type SearchInsightsPeriod,
+import type {
+  SearchInsightsCompare,
+  SearchInsightsRange,
 } from "@/types/schemas/gsc-history";
 
-function isPeriod(value: number): value is SearchInsightsPeriod {
-  return SEARCH_INSIGHTS_PERIODS.some((option) => option === value);
-}
+export type SearchInsightsState = {
+  range: SearchInsightsRange;
+  start?: string;
+  end?: string;
+  compare: SearchInsightsCompare;
+  gran: Granularity;
+  metric: MetricKey;
+  page?: string;
+  query?: string;
+};
 
-export function SearchInsightsPage({ projectId }: { projectId: string }) {
-  const [days, setDays] = useState<SearchInsightsPeriod>(28);
+export type SearchInsightsPatch = Partial<{
+  [K in keyof SearchInsightsState]: SearchInsightsState[K] | undefined;
+}>;
 
+export function SearchInsightsPage({
+  projectId,
+  state,
+  onChange,
+}: {
+  projectId: string;
+  state: SearchInsightsState;
+  onChange: (patch: SearchInsightsPatch) => void;
+}) {
+  const request = {
+    projectId,
+    range: state.range,
+    start: state.range === "custom" ? state.start : undefined,
+    end: state.range === "custom" ? state.end : undefined,
+    compare: state.compare,
+    page: state.page || undefined,
+    query: state.query || undefined,
+  };
   const insightsQuery = useQuery({
-    queryKey: ["searchInsights", projectId, days],
-    queryFn: () => getSearchInsights({ data: { projectId, days } }),
+    queryKey: ["searchInsights", projectId, request],
+    queryFn: () => getSearchInsights({ data: request }),
     placeholderData: keepPreviousData,
     // Stored data changes only when a sync writes; the sync invalidates.
     staleTime: 60_000,
@@ -45,38 +85,25 @@ export function SearchInsightsPage({ projectId }: { projectId: string }) {
   const status = insightsQuery.data?.status;
   const insights = insightsQuery.data?.data ?? null;
   const sync = useSearchHistorySync(projectId, status);
+  const resolvedGranularity = resolveGranularity(
+    state.gran,
+    insights?.series.length ?? 28,
+  );
 
   return (
     <div className="px-4 py-4 pb-24 overflow-auto md:px-6 md:py-6 md:pb-8">
       <div className="mx-auto max-w-7xl space-y-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold">Search Insights</h1>
-            <p className="text-sm text-base-content/70">
-              What changed in Google Search and what to do about it, from your
-              stored Search Console history.
-            </p>
-          </div>
+        <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-semibold">Search Insights</h1>
             {insightsQuery.isFetching && !insightsQuery.isPending ? (
               <Loader2 className="size-4 animate-spin text-base-content/40" />
             ) : null}
-            <select
-              className="select select-bordered select-sm w-56"
-              value={days}
-              onChange={(event) => {
-                const value = Number(event.target.value);
-                if (isPeriod(value)) setDays(value);
-              }}
-              aria-label="Period"
-            >
-              {SEARCH_INSIGHTS_PERIODS.map((value) => (
-                <option key={value} value={value}>
-                  Last {value} days vs previous
-                </option>
-              ))}
-            </select>
           </div>
+          <p className="text-sm text-base-content/70">
+            What changed in Google Search and what to do about it, from your
+            stored Search Console history.
+          </p>
         </div>
 
         {insightsQuery.isPending ? (
@@ -103,7 +130,40 @@ export function SearchInsightsPage({ projectId }: { projectId: string }) {
               </div>
             )}
             {insights ? (
-              <InsightsBody projectId={projectId} insights={insights} />
+              <>
+                <InsightsControls
+                  key={`${state.range}-${state.start}-${state.end}`}
+                  range={state.range}
+                  start={state.start}
+                  end={state.end}
+                  compare={state.compare}
+                  granularity={state.gran}
+                  resolvedGranularity={resolvedGranularity}
+                  bounds={{
+                    oldest: status.oldestDay,
+                    newest: status.newestDay,
+                  }}
+                  onChange={onChange}
+                />
+                <FilterChips
+                  page={state.page}
+                  query={state.query}
+                  onClear={(key) => onChange({ [key]: undefined })}
+                />
+                <InsightsFilterContext.Provider
+                  value={(filter) =>
+                    onChange({ page: filter.page, query: filter.query })
+                  }
+                >
+                  <InsightsBody
+                    projectId={projectId}
+                    insights={insights}
+                    metric={state.metric}
+                    granularity={resolvedGranularity}
+                    onMetric={(metric) => onChange({ metric })}
+                  />
+                </InsightsFilterContext.Provider>
+              </>
             ) : status.connected ? (
               <div className="rounded-xl border border-base-300 bg-base-100 p-6 text-sm text-base-content/70">
                 No history stored yet. The first sync fills the newest days
@@ -117,12 +177,97 @@ export function SearchInsightsPage({ projectId }: { projectId: string }) {
   );
 }
 
+function periodText(range: { start: string; end: string }) {
+  return `${formatDay(range.start)} – ${formatDay(range.end)}`;
+}
+
+function ChartPanel({
+  insights,
+  metric,
+  granularity,
+}: {
+  insights: Insights;
+  metric: MetricKey;
+  granularity: "day" | "week" | "month";
+}) {
+  const { period } = insights;
+  const from = chartStart(insights.series, insights.firstDataDay);
+  const points = useMemo(
+    () =>
+      buildChartPoints({
+        series: insights.series,
+        // Filtered to one page, "new page" markers for other pages are noise.
+        annotations: insights.annotations.filter(
+          (note) =>
+            note.kind !== "first_seen" ||
+            (!insights.filter.page && !insights.filter.query) ||
+            note.url === insights.filter.page,
+        ),
+        metric,
+        granularity,
+        from,
+        hasCompare: Boolean(period.previous),
+      }),
+    [insights, metric, granularity, from, period.previous],
+  );
+  const trimmed = from && insights.series[0] && from > insights.series[0].date;
+  const hasPartial = points.some((point) => point.partial);
+  const noData = !insights.firstDataDay;
+  return (
+    <section className="rounded-xl border border-base-300 bg-base-100 p-4">
+      <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-base-content/60">
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-0.5 w-4 rounded bg-primary" />
+          {periodText(period.current)}
+        </span>
+        {period.previous ? (
+          <span className="inline-flex items-center gap-1.5">
+            <span className="w-4 border-t-2 border-dashed border-base-content/35" />
+            {periodText(period.previous)}
+          </span>
+        ) : null}
+        {hasPartial ? (
+          <span className="inline-flex items-center gap-1.5">
+            <span className="w-4 border-t-2 border-dashed border-primary/55" />
+            Still reporting
+          </span>
+        ) : null}
+        {period.compareMissing ? (
+          <span>No stored data for the comparison period</span>
+        ) : null}
+        {trimmed && insights.firstDataDay ? (
+          <span>No data before {formatDay(insights.firstDataDay)}</span>
+        ) : null}
+      </div>
+      {noData ? (
+        <div className="flex h-60 items-center justify-center text-sm text-base-content/50">
+          No impressions in this period.
+        </div>
+      ) : (
+        <TimeSeriesChart
+          points={points}
+          metric={METRICS[metric]}
+          compareName={
+            period.previous ? periodText(period.previous) : undefined
+          }
+        />
+      )}
+    </section>
+  );
+}
+
 function InsightsBody({
   projectId,
   insights,
+  metric,
+  granularity,
+  onMetric,
 }: {
   projectId: string;
   insights: Insights;
+  metric: MetricKey;
+  granularity: "day" | "week" | "month";
+  onMetric: (metric: MetricKey) => void;
 }) {
   const { period, changes } = insights;
   const curveNote =
@@ -134,16 +279,27 @@ function InsightsBody({
 
   return (
     <>
-      <p className="text-xs text-base-content/50">
-        {period.current.start} to {period.current.end} vs{" "}
-        {period.previous.start} to {period.previous.end}. Rows count from{" "}
-        {insights.minImpressions} impressions in the period.
-      </p>
-      <TotalsRow totals={insights.totals} prevTotals={insights.prevTotals} />
+      <MetricCards
+        totals={insights.totals}
+        prevTotals={insights.prevTotals}
+        selected={metric}
+        onSelect={onMetric}
+        compareLabel={period.previous ? periodText(period.previous) : null}
+      />
 
-      <section className="rounded-xl border border-base-300 bg-base-100 p-4">
-        <SearchInsightsChart insights={insights} />
-      </section>
+      <ChartPanel
+        insights={insights}
+        metric={metric}
+        granularity={granularity}
+      />
+
+      <p className="text-xs text-base-content/50">
+        Totals and the tables below cover {periodText(period.current)}
+        {period.previous
+          ? `, compared with ${periodText(period.previous)}`
+          : ""}
+        . Table rows need {insights.minImpressions}+ impressions.
+      </p>
 
       <div className="grid gap-4 xl:grid-cols-2">
         <InsightSection

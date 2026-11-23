@@ -10,6 +10,7 @@ import {
   insightPeriods,
   minImpressionsFor,
   rankCannibalization,
+  resolveInsightRange,
   topQueryDrivers,
 } from "@/server/features/gsc-history/insights";
 
@@ -182,5 +183,43 @@ describe("buildNewPages", () => {
       "2026-11-16",
     );
     expect(page.weeklyImpressions).toEqual([15, 20, 25]);
+  });
+});
+
+describe("resolveInsightRange", () => {
+  const bounds = { oldest: "2025-07-25", newest: "2026-11-22" };
+  const today = new Date("2026-11-23T10:00:00Z");
+
+  it("ends totals at the settled day, runs the chart to the newest day, and compares the same length before", () => {
+    const range = resolveInsightRange(
+      { range: "28d", presetDays: 28, compare: "previous" },
+      bounds,
+      today,
+    );
+    expect(range.current).toEqual({ start: "2026-10-24", end: "2026-11-20" });
+    expect(range.chartEnd).toBe("2026-11-22");
+    expect(range.previous).toEqual({ start: "2026-09-26", end: "2026-10-23" });
+  });
+
+  it("compares a year earlier on the same weekdays and clamps a custom range to stored days", () => {
+    const year = resolveInsightRange(
+      { range: "7d", presetDays: 7, compare: "year" },
+      bounds,
+      today,
+    );
+    expect(year.previous).toEqual({ start: "2025-11-15", end: "2025-11-21" });
+    const custom = resolveInsightRange(
+      {
+        range: "custom",
+        start: "2024-01-01",
+        end: "2026-12-31",
+        compare: "none",
+      },
+      bounds,
+      today,
+    );
+    expect(custom.current.start).toBe("2025-07-25");
+    expect(custom.chartEnd).toBe("2026-11-22");
+    expect(custom.previous).toBeNull();
   });
 });

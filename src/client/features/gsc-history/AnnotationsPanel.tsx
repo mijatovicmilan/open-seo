@@ -9,7 +9,7 @@ import { getFieldError } from "@/client/lib/forms";
 import {
   ANNOTATION_STYLES,
   formatDay,
-} from "@/client/features/gsc-history/SearchInsightsChart";
+} from "@/client/features/gsc-history/annotationStyles";
 import type { Insights } from "@/client/features/gsc-history/types";
 import {
   addSearchAnnotation,

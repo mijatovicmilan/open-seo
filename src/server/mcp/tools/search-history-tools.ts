@@ -192,8 +192,8 @@ function section<T>(
 function insightsText(data: Data): string {
   const { period, totals, prevTotals } = data;
   const header =
-    `Period ${period.current.start}→${period.current.end} vs ${period.previous.start}→${period.previous.end}. ` +
-    `Clicks ${totals.clicks} (prev ${prevTotals.clicks}), impressions ${totals.impressions} (prev ${prevTotals.impressions}), ` +
+    `Period ${period.current.start}→${period.current.end}${period.previous ? ` vs ${period.previous.start}→${period.previous.end}` : ""}. ` +
+    `Clicks ${totals.clicks}${prevTotals ? ` (prev ${prevTotals.clicks})` : ""}, impressions ${totals.impressions}${prevTotals ? ` (prev ${prevTotals.impressions})` : ""}, ` +
     `CTR ${pct(totals.ctr)}, position ${pos(totals.position)}. Rows count from ${data.minImpressions} impressions; expected CTR source: ${data.ctrCurve.source}.`;
   return [
     header,
@@ -253,7 +253,7 @@ export const getSearchInsightsTool = {
     async (args: z.infer<z.ZodObject<typeof insightsInputSchema>>, context) => {
       const { status, data } = await GscHistoryService.getInsights(
         args.projectId,
-        args.days,
+        { range: "preset", presetDays: args.days, compare: "previous" },
       );
       const meta = buildProjectMeta(
         context,
@@ -268,7 +268,7 @@ export const getSearchInsightsTool = {
         });
       }
       // The chart series and annotations stay out of the agent's context.
-      const insights = omit(data, ["daily", "annotations"]);
+      const insights = omit(data, ["series", "annotations"]);
       return mcpResponse({
         text: `${insightsText(data)}\n\n${statusLine(status)}`,
         meta,

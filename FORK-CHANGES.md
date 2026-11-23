@@ -27,7 +27,8 @@ Our own files:
 - `src/serverFunctions/outreach.ts`, `src/serverFunctions/gscHistory.ts`
 - `src/shared/outreach.ts`, `src/types/schemas/outreach.ts`,
   `src/types/schemas/gsc-history.ts`
-- `src/client/features/outreach/`, `src/client/features/gsc-history/`
+- `src/client/features/outreach/`, `src/client/features/gsc-history/`,
+  `src/client/features/charts/` (the shared time-series chart)
 - `src/routes/_project/p/$projectId/outreach.tsx`,
   `src/routes/_project/p/$projectId/search-insights.tsx`
 - `scripts/outreach-import-d1.ts`

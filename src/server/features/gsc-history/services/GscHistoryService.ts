@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the read side of Search Console history: status, insights, chart series and notes */
 import { GscService } from "@/server/features/gsc/services/GscService";
 import {
   GscHistoryRepository,
@@ -11,7 +12,7 @@ import {
   buildPageChanges,
   countRankingFlips,
   findCannibalizationCandidates,
-  insightPeriods,
+  resolveInsightRange,
   minImpressionsFor,
   rankCannibalization,
   topQueryDrivers,
@@ -115,19 +116,6 @@ function sumTotals(
 }
 
 type Range = { start: string; end: string };
-
-/** The chart starts a week before the first day with impressions (or at the
- *  previous period), so a young site is not a flat line of empty months. */
-function trimLeadingEmptyDays<T extends { date: string; impressions: number }>(
-  daily: T[],
-  previousStart: string,
-): T[] {
-  const first = daily.find((row) => row.impressions > 0);
-  if (!first) return daily;
-  const fromFirst = addDays(first.date, -7);
-  const from = fromFirst < previousStart ? fromFirst : previousStart;
-  return daily.filter((row) => row.date >= from);
-}
 
 async function loadCannibalization(
   projectId: string,
@@ -249,9 +237,54 @@ async function loadAnnotations(
   ];
 }
 
+type InsightsOptions = {
+  range: string;
+  /** Length for a preset range; the page derives it from the preset key. */
+  presetDays?: number;
+  start?: string;
+  end?: string;
+  compare: "previous" | "year" | "none";
+  page?: string;
+  query?: string;
+};
+
+type DayPoint = {
+  date: string;
+  clicks: number;
+  impressions: number;
+  position: number;
+};
+
+/** Every day from start to end, with zeros where nothing is stored. */
+function fillDays(rows: DayPoint[], range: Range): DayPoint[] {
+  const byDate = new Map(rows.map((row) => [row.date, row]));
+  const out: DayPoint[] = [];
+  for (let day = range.start; day <= range.end; day = addDays(day, 1)) {
+    out.push(
+      byDate.get(day) ?? { date: day, clicks: 0, impressions: 0, position: 0 },
+    );
+  }
+  return out;
+}
+
+function inRange<T extends { date: string }>(rows: T[], range: Range) {
+  return rows.filter((row) => row.date >= range.start && row.date <= range.end);
+}
+
+async function loadDays(
+  projectId: string,
+  filter: { page?: string; query?: string },
+  range: Range,
+): Promise<DayPoint[]> {
+  if (filter.page || filter.query) {
+    return GscHistoryRepository.listFilteredDays(projectId, filter, range);
+  }
+  return inRange(await GscHistoryRepository.listDailyTotals(projectId), range);
+}
+
 async function getInsights(
   projectId: string,
-  days: number,
+  options: InsightsOptions,
   now: Date = new Date(),
 ) {
   const status = await getStatus(projectId, now);
@@ -260,25 +293,84 @@ async function getInsights(
   }
   const oldest = status.oldestDay;
   const newest = status.newestDay;
-  const { current, previous } = insightPeriods(newest, now, days);
+  const resolved = resolveInsightRange(options, { oldest, newest }, now);
+  const { current, chartEnd, settledEnd, days } = resolved;
+  // A comparison that starts before the stored history would read as zeros
+  // ("everything grew"); it is left out and the page says why.
+  const compareMissing = Boolean(
+    resolved.previous && resolved.previous.start < oldest,
+  );
+  const previous = compareMissing ? null : resolved.previous;
+  const filter = {
+    ...(options.page ? { page: options.page } : {}),
+    ...(options.query ? { query: options.query } : {}),
+  };
+  const filtered = Boolean(filter.page || filter.query);
 
-  const daily = await GscHistoryRepository.listDailyTotals(projectId);
-  const inRange = (range: Range) =>
-    daily.filter((row) => row.date >= range.start && row.date <= range.end);
-  const totals = sumTotals(inRange(current));
-  const prevTotals = sumTotals(inRange(previous));
+  const loadStart =
+    previous && previous.start < current.start ? previous.start : current.start;
+  const loaded = await loadDays(projectId, filter, {
+    start: loadStart,
+    end: chartEnd,
+  });
+  const totals = sumTotals(inRange(loaded, current));
+  const prevTotals = previous ? sumTotals(inRange(loaded, previous)) : null;
+  const chartRange = { start: current.start, end: chartEnd };
+  const chartDays = fillDays(inRange(loaded, chartRange), chartRange);
+  const compareDays = previous
+    ? fillDays(inRange(loaded, previous), {
+        start: previous.start,
+        end: addDays(previous.start, chartDays.length - 1),
+      })
+    : [];
+  const firstDataDay = loaded.find((row) => row.impressions > 0)?.date ?? null;
+  const series = chartDays.map((row, index) => {
+    const prior = compareDays[index];
+    return {
+      date: row.date,
+      clicks: row.clicks,
+      impressions: row.impressions,
+      ctr: row.impressions > 0 ? row.clicks / row.impressions : null,
+      position: row.impressions > 0 ? row.position : null,
+      partial: row.date > settledEnd,
+      compare: prior
+        ? {
+            date: prior.date,
+            clicks: prior.clicks,
+            impressions: prior.impressions,
+            ctr:
+              prior.impressions > 0 ? prior.clicks / prior.impressions : null,
+            position: prior.impressions > 0 ? prior.position : null,
+          }
+        : null,
+    };
+  });
 
-  const queryPages = await GscHistoryRepository.aggregateQueryPages(
+  const matches = (row: { page?: string | null; query?: string }) =>
+    (!filter.page || row.page === filter.page) &&
+    (!filter.query || row.query === filter.query);
+  const allQueryPages = await GscHistoryRepository.aggregateQueryPages(
     projectId,
     current,
     QUERY_PAGE_AGGREGATE_LIMIT,
   );
-  const minImpressions = minImpressionsFor(totals.impressions, days);
-  const curve = buildCtrCurve(queryPages, minImpressions);
+  const queryPages = filtered ? allQueryPages.filter(matches) : allQueryPages;
+  const siteTotals = filtered
+    ? sumTotals(
+        inRange(await GscHistoryRepository.listDailyTotals(projectId), current),
+      )
+    : totals;
+  const minImpressions = minImpressionsFor(siteTotals.impressions, days);
+  // The expected-CTR curve always comes from the whole site.
+  const curve = buildCtrCurve(allQueryPages, minImpressions);
   const hasBaseline = oldest <= addDays(current.start, -NEW_BASELINE_DAYS);
+  const comparison = previous ?? {
+    start: addDays(current.start, -days),
+    end: addDays(current.start, -1),
+  };
 
   const [changes, cannibalization, newQueries, newPages] = await Promise.all([
-    loadChanges(projectId, current, previous),
+    loadChanges(projectId, current, comparison),
     loadCannibalization(projectId, current, queryPages, minImpressions),
     hasBaseline
       ? GscHistoryRepository.listNewQueries(projectId, current, NEW_ITEMS_LIMIT)
@@ -288,32 +380,51 @@ async function getInsights(
 
   // The best page for each new query, from the period's query x page rows.
   const bestPage = new Map<string, { page: string; position: number }>();
-  for (const row of queryPages) {
+  for (const row of allQueryPages) {
     const best = bestPage.get(row.query);
     if (!best || row.position < best.position) {
       bestPage.set(row.query, { page: row.page, position: row.position });
     }
   }
+  const keepChange = (row: {
+    page: string;
+    drivers: Array<{ query: string }>;
+  }) =>
+    (!filter.page || row.page === filter.page) &&
+    (!filter.query || row.drivers.some((d) => d.query === filter.query));
 
   return {
     status,
     data: {
-      period: { days, current, previous },
+      period: {
+        days,
+        current,
+        previous,
+        settledEnd,
+        chartEnd,
+        compareMissing,
+      },
+      filter,
       totals,
       prevTotals,
       minImpressions,
       ctrCurve: curve,
       hasNewBaseline: hasBaseline,
-      changes,
-      newQueries: newQueries.map((row) => ({
-        ...row,
-        page: bestPage.get(row.query)?.page ?? null,
-      })),
+      changes: {
+        rising: changes.rising.filter(keepChange),
+        falling: changes.falling.filter(keepChange),
+      },
+      newQueries: newQueries
+        .map((row) => ({ ...row, page: bestPage.get(row.query)?.page ?? null }))
+        .filter(matches),
       nearPageOne: buildNearPageOne(queryPages, minImpressions, curve),
       ctrGaps: buildCtrGaps(queryPages, minImpressions, curve),
       cannibalization,
-      newPages,
-      daily: trimLeadingEmptyDays(daily, previous.start),
+      newPages: filter.query
+        ? []
+        : newPages.filter((row) => !filter.page || row.page === filter.page),
+      series,
+      firstDataDay,
       annotations: await loadAnnotations(projectId, newPages),
     },
   };

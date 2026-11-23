@@ -1,33 +1,73 @@
-import type { ReactNode } from "react";
+import { createContext, useContext, type ReactNode } from "react";
 import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 import {
   formatCount,
   formatCtr,
   formatPosition,
 } from "@/client/features/search-performance/SearchPerformanceColumns";
-import { formatDay } from "@/client/features/gsc-history/SearchInsightsChart";
+import { formatDay } from "@/client/features/gsc-history/annotationStyles";
 import type { Insights } from "@/client/features/gsc-history/types";
 
-/** A URL shown as its path, full URL on hover. */
-function PageCell({ url }: { url: string | null }) {
-  if (!url) return <span className="text-base-content/40">—</span>;
-  let label = url;
+type InsightsFilter = { page?: string; query?: string };
+
+/** Clicking a page or query in any table filters the whole page to it. */
+export const InsightsFilterContext = createContext<
+  ((filter: InsightsFilter) => void) | null
+>(null);
+
+function pathOf(url: string) {
   try {
     const parsed = new URL(url);
-    label = `${parsed.pathname}${parsed.search}` || "/";
+    return `${parsed.pathname}${parsed.search}` || "/";
   } catch {
-    label = url;
+    return url;
+  }
+}
+
+/** A URL shown as its path; click filters to the page, full URL on hover. */
+function PageCell({ url }: { url: string | null }) {
+  const onFilter = useContext(InsightsFilterContext);
+  if (!url) return <span className="text-base-content/40">—</span>;
+  const label = pathOf(url);
+  if (!onFilter) {
+    return (
+      <span
+        title={url}
+        className="block max-w-[12rem] truncate 2xl:max-w-[22rem]"
+      >
+        {label}
+      </span>
+    );
   }
   return (
-    <a
-      href={url}
-      target="_blank"
-      rel="noopener noreferrer"
-      title={url}
-      className="link link-hover block max-w-[12rem] 2xl:max-w-[22rem] truncate"
+    <button
+      type="button"
+      title={`Filter to ${url}`}
+      onClick={() => onFilter({ page: url })}
+      className="link link-hover block max-w-[12rem] truncate text-left 2xl:max-w-[22rem]"
     >
       {label}
-    </a>
+    </button>
+  );
+}
+
+function QueryCell({ query }: { query: string }) {
+  const onFilter = useContext(InsightsFilterContext);
+  return (
+    <td className="max-w-[10rem] truncate 2xl:max-w-[18rem]">
+      {onFilter ? (
+        <button
+          type="button"
+          title={`Filter to "${query}"`}
+          onClick={() => onFilter({ query })}
+          className="link link-hover max-w-full truncate text-left"
+        >
+          {query}
+        </button>
+      ) : (
+        query
+      )}
+    </td>
   );
 }
 
@@ -169,9 +209,7 @@ export function NewQueriesTable({ rows }: { rows: Insights["newQueries"] }) {
       <tbody>
         {rows.map((row) => (
           <tr key={row.query}>
-            <td className="max-w-[10rem] truncate 2xl:max-w-[18rem]">
-              {row.query}
-            </td>
+            <QueryCell query={row.query} />
             <td>
               <PageCell url={row.page} />
             </td>
@@ -208,9 +246,7 @@ export function NearPageOneTable({ rows }: { rows: Insights["nearPageOne"] }) {
       <tbody>
         {rows.map((row) => (
           <tr key={row.query}>
-            <td className="max-w-[10rem] truncate 2xl:max-w-[18rem]">
-              {row.query}
-            </td>
+            <QueryCell query={row.query} />
             <td>
               <PageCell url={row.page} />
             </td>
@@ -249,9 +285,7 @@ export function CtrGapTable({ rows }: { rows: Insights["ctrGaps"] }) {
       <tbody>
         {rows.map((row) => (
           <tr key={`${row.query}::${row.page}`}>
-            <td className="max-w-[10rem] truncate 2xl:max-w-[18rem]">
-              {row.query}
-            </td>
+            <QueryCell query={row.query} />
             <td>
               <PageCell url={row.page} />
             </td>
@@ -290,9 +324,7 @@ export function CannibalizationTable({
       <tbody>
         {rows.map((row) => (
           <tr key={row.query}>
-            <td className="max-w-[10rem] truncate 2xl:max-w-[16rem]">
-              {row.query}
-            </td>
+            <QueryCell query={row.query} />
             <td className="text-right tabular-nums">
               {formatCount(row.impressions)}
             </td>

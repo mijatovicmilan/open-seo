@@ -11,6 +11,7 @@ import {
   deleteAnnotationInputSchema,
   searchHistoryProjectInputSchema,
   searchInsightsInputSchema,
+  SEARCH_INSIGHTS_RANGES,
 } from "@/types/schemas/gsc-history";
 
 // Search Insights (fork feature). The `projectId` in each validator triggers
@@ -21,7 +22,18 @@ export const getSearchInsights = createServerFn({ method: "POST" })
   .middleware(requireProjectContext)
   .validator(searchInsightsInputSchema)
   .handler(async ({ data, context }) =>
-    GscHistoryService.getInsights(context.projectId, data.days),
+    GscHistoryService.getInsights(context.projectId, {
+      range: data.range,
+      presetDays:
+        data.range === "custom"
+          ? undefined
+          : SEARCH_INSIGHTS_RANGES[data.range],
+      start: data.start,
+      end: data.end,
+      compare: data.compare,
+      page: data.page,
+      query: data.query,
+    }),
   );
 
 /** One bounded catch-up run. The page calls again while days remain. */

@@ -39,6 +39,64 @@ export function insightPeriods(
   };
 }
 
+type Range = { start: string; end: string };
+
+/** The ranges the Search Insights page reads for a preset or custom range.
+ *  `current` ends at the settled end (past GSC's ~3-day lag) for presets, so
+ *  totals and sections never count half-reported days; the chart runs on to
+ *  `chartEnd`, the newest stored day, and marks the days after `settledEnd`
+ *  as partial. The comparison is the same length before, or the same dates
+ *  52 weeks earlier (same weekdays), or none. */
+export function resolveInsightRange(
+  input: {
+    range: string;
+    presetDays?: number;
+    start?: string;
+    end?: string;
+    compare: "previous" | "year" | "none";
+  },
+  bounds: { oldest: string; newest: string },
+  today: Date,
+): {
+  current: Range;
+  previous: Range | null;
+  chartEnd: string;
+  settledEnd: string;
+  days: number;
+} {
+  const settledCut = addDays(today.toISOString().slice(0, 10), -3);
+  const settledEnd = bounds.newest < settledCut ? bounds.newest : settledCut;
+  let start: string;
+  let end: string;
+  let chartEnd: string;
+  if (input.range === "custom" && input.start && input.end) {
+    const [from, to] =
+      input.start <= input.end
+        ? [input.start, input.end]
+        : [input.end, input.start];
+    end = to > bounds.newest ? bounds.newest : to;
+    start = from < bounds.oldest ? bounds.oldest : from;
+    if (start > end) start = end;
+    chartEnd = end;
+    end = end > settledEnd ? settledEnd : end;
+    if (start > end) end = start;
+  } else {
+    const length = input.presetDays ?? 28;
+    end = settledEnd;
+    const wanted = addDays(end, -(length - 1));
+    start = wanted < bounds.oldest ? bounds.oldest : wanted;
+    chartEnd = bounds.newest;
+  }
+  const days = daysBetween(start, end) + 1;
+  const previous =
+    input.compare === "none"
+      ? null
+      : input.compare === "year"
+        ? { start: addDays(start, -364), end: addDays(end, -364) }
+        : { start: addDays(start, -days), end: addDays(start, -1) };
+  return { current: { start, end }, previous, chartEnd, settledEnd, days };
+}
+
 /** Minimum impressions for a query x page row to count. 20 per 28 days as a
  *  floor (scaled to the period), or 0.05% of the site's impressions in the
  *  period when that is higher. */

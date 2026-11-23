@@ -2,6 +2,11 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowDown, ArrowUp, Loader2, Search, Settings2 } from "lucide-react";
+import {
+  type ChartMetric,
+  type ChartPoint,
+  TimeSeriesChart,
+} from "@/client/features/charts/TimeSeriesChart";
 import { OutreachProspectPanel } from "@/client/features/outreach/OutreachProspectPanel";
 import { OutreachSettingsForm } from "@/client/features/outreach/OutreachSettingsForm";
 import {
@@ -409,7 +414,8 @@ function Overview({
 
       <div className="grid gap-4 xl:grid-cols-[2fr_3fr]">
         <SentChart
-          data={analytics.sentPerDay}
+          perDay={analytics.sentPerDay}
+          perWeek={analytics.sentPerWeek}
           timeZone={analytics.timeZoneLabel}
         />
         <Results analytics={analytics} />
@@ -442,58 +448,73 @@ function Stat({
   );
 }
 
+const SENT_METRIC: ChartMetric = {
+  name: "Sent",
+  integer: true,
+  format: (value) => `${value}`,
+};
+
+function sentTick(date: string) {
+  return new Date(`${date}T00:00:00Z`).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  });
+}
+
 function SentChart({
-  data,
+  perDay,
+  perWeek,
   timeZone,
 }: {
-  data: Array<{ date: string; value: number }>;
+  perDay: Array<{ date: string; value: number }>;
+  perWeek: Array<{ date: string; value: number }>;
   timeZone: string;
 }) {
-  const max = Math.max(1, ...data.map((day) => day.value));
-  const total = data.reduce((sum, day) => sum + day.value, 0);
+  const [view, setView] = useState<"day" | "week">("day");
+  const data = view === "day" ? perDay : perWeek;
+  const total = data.reduce((sum, item) => sum + item.value, 0);
+  const points: ChartPoint[] = data.map((item) => ({
+    key: item.date,
+    tick: sentTick(item.date),
+    label:
+      view === "day"
+        ? new Date(`${item.date}T00:00:00Z`).toLocaleDateString("en-US", {
+            weekday: "short",
+            month: "short",
+            day: "numeric",
+            timeZone: "UTC",
+          })
+        : `Week of ${sentTick(item.date)}`,
+    value: item.value,
+  }));
   return (
     <Panel
       title="Emails sent"
-      meta={`${total} in the last 14 days · first emails and follow-ups · ${timeZone}`}
+      meta={`${total} ${view === "day" ? "in the last 14 days" : "in the last 8 weeks"} · first emails and follow-ups · ${timeZone}`}
+      actions={
+        <div className="join" role="group" aria-label="Granularity">
+          {(["day", "week"] as const).map((value) => (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={view === value}
+              className={`btn btn-xs join-item ${view === value ? "btn-active" : "btn-ghost"}`}
+              onClick={() => setView(value)}
+            >
+              {value === "day" ? "Days" : "Weeks"}
+            </button>
+          ))}
+        </div>
+      }
     >
-      <div className="px-4 pb-3 pt-4">
-        <div className="flex h-28 items-end gap-1 border-b border-base-300">
-          {data.map((day) => (
-            <div
-              key={day.date}
-              className="flex h-full min-w-0 flex-1 flex-col items-center justify-end"
-              title={`${day.date}: ${day.value} sent`}
-            >
-              {day.value > 0 ? (
-                <>
-                  <span className="mb-0.5 text-[10px] tabular-nums text-base-content/60">
-                    {day.value}
-                  </span>
-                  <div
-                    className="w-full max-w-3 rounded-t-sm bg-primary/80"
-                    style={{
-                      height: `${Math.max(8, (day.value / max) * 80)}%`,
-                    }}
-                  />
-                </>
-              ) : null}
-            </div>
-          ))}
-        </div>
-        <div className="mt-1 flex gap-1">
-          {data.map((day, index) => (
-            <span
-              key={day.date}
-              className={`min-w-0 flex-1 text-center text-[10px] tabular-nums text-base-content/50 ${index % 2 ? "max-sm:invisible" : ""}`}
-            >
-              {Number(day.date.slice(8))}
-            </span>
-          ))}
-        </div>
-        <p className="mt-3 text-xs text-base-content/60">
-          Link outreach replies average 1 to 5 percent. Compare angles after 50
-          to 100 sends, not one batch.
-        </p>
+      <div className="px-2 pb-3 pt-4 sm:px-4">
+        <TimeSeriesChart
+          points={points}
+          metric={SENT_METRIC}
+          kind="bar"
+          height={180}
+        />
       </div>
     </Panel>
   );

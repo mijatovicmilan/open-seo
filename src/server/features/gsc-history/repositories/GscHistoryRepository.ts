@@ -294,6 +294,59 @@ function toAggregate(row: {
 
 type Range = { start: string; end: string };
 
+/** Daily sums for one page and/or one query over a date range: from the
+ *  page table for a page alone (it keeps anonymized-query clicks), from the
+ *  query x page table when a query is involved. */
+async function listFilteredDays(
+  projectId: string,
+  filter: { page?: string; query?: string },
+  range: Range,
+): Promise<Array<AggregateRow & { date: string }>> {
+  if (filter.query) {
+    const t = gscDailyQueryPages;
+    const rows = await db
+      .select({
+        date: t.date,
+        clicks: sql`sum(${t.clicks})`,
+        impressions: sql`sum(${t.impressions})`,
+        weighted: sql`sum(${t.position} * ${t.impressions})`,
+      })
+      .from(t)
+      .where(
+        and(
+          eq(t.projectId, projectId),
+          eq(t.query, filter.query),
+          ...(filter.page ? [eq(t.page, filter.page)] : []),
+          gte(t.date, range.start),
+          lte(t.date, range.end),
+        ),
+      )
+      .groupBy(t.date)
+      .orderBy(asc(t.date));
+    return rows.map((row) => ({ date: row.date, ...toAggregate(row) }));
+  }
+  const t = gscDailyPages;
+  const rows = await db
+    .select({
+      date: t.date,
+      clicks: sql`sum(${t.clicks})`,
+      impressions: sql`sum(${t.impressions})`,
+      weighted: sql`sum(${t.position} * ${t.impressions})`,
+    })
+    .from(t)
+    .where(
+      and(
+        eq(t.projectId, projectId),
+        eq(t.page, filter.page ?? ""),
+        gte(t.date, range.start),
+        lte(t.date, range.end),
+      ),
+    )
+    .groupBy(t.date)
+    .orderBy(asc(t.date));
+  return rows.map((row) => ({ date: row.date, ...toAggregate(row) }));
+}
+
 /** Per-page sums over a date range, highest impressions first. */
 async function aggregatePages(
   projectId: string,
@@ -524,6 +577,7 @@ async function deleteAnnotation(
 }
 
 export const GscHistoryRepository = {
+  listFilteredDays,
   writeDay,
   writeEmptyDays,
   listStoredDates,

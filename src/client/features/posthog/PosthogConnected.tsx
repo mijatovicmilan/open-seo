@@ -25,6 +25,7 @@ export function ConnectedPosthog({
 }) {
   const [keyEvents, setKeyEvents] = React.useState(source.keyEvents);
   const [replacing, setReplacing] = React.useState(false);
+  const [confirming, setConfirming] = React.useState(false);
   const [newKey, setNewKey] = React.useState("");
   const posthogProjectId = source.posthogProjectId ?? "";
   const saveEvents = useSourceMutation(
@@ -121,22 +122,32 @@ export function ConnectedPosthog({
             type="button"
             className="btn btn-ghost btn-sm text-error"
             disabled={disconnect.isPending}
-            onClick={() => {
-              if (
-                window.confirm(
-                  "Disconnect PostHog? This project goes back to Google Analytics. The key is deleted when no other project uses it.",
-                )
-              ) {
-                disconnect.mutate(undefined);
-              }
-            }}
+            onClick={() =>
+              confirming ? disconnect.mutate(undefined) : setConfirming(true)
+            }
           >
             {disconnect.isPending ? (
               <Loader2 className="size-4 animate-spin" />
             ) : null}
-            Disconnect
+            {confirming ? "Confirm disconnect" : "Disconnect"}
           </button>
+          {confirming ? (
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={() => setConfirming(false)}
+            >
+              Cancel
+            </button>
+          ) : null}
         </div>
+      ) : null}
+      {confirming ? (
+        <p className="text-sm text-base-content/70">
+          This project goes back to Google Analytics. The key is deleted when no
+          other project uses it; the PostHog project ID and key events are kept
+          for a later reconnect.
+        </p>
       ) : null}
       <MutationError mutation={importEnv} />
       <MutationError mutation={disconnect} />

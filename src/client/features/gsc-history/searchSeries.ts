@@ -71,7 +71,8 @@ export const METRICS: Record<
     integer: true,
     format: count,
     minTop: 4,
-    color: "var(--color-accent)",
+    // Violet and pink: apart from the theme's blue, orange, green and red.
+    color: "oklch(62% 0.17 300)",
   },
   signups: {
     key: "signups",
@@ -79,7 +80,7 @@ export const METRICS: Record<
     integer: true,
     format: count,
     minTop: 2,
-    color: "var(--color-secondary)",
+    color: "oklch(64% 0.19 350)",
   },
 };
 

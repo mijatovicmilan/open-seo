@@ -8,6 +8,12 @@ import { Button } from "@/client/components/ui/button";
 import { SortableHeader } from "@/client/components/table/SortableHeader";
 import type { RankTrackingRow } from "@/types/schemas/rank-tracking";
 import { formatLocationLabel } from "@/shared/keyword-locations";
+// Fork addition (FORK-CHANGES.md): Search Console positions.
+import {
+  GSC_POSITION_HELP,
+  GscPositionCell,
+  type KeywordGscPosition,
+} from "@/client/features/gsc-history/KeywordGscPosition";
 import {
   CpcCell,
   DeviceRankCell,
@@ -268,15 +274,48 @@ function makeSerpColumn(
   };
 }
 
-/** Without `actions` the table is read-only: no selection, pins or history. */
+// Fork addition (FORK-CHANGES.md): sorts by position, keywords without
+// Search Console impressions last.
+function makeGscColumn(
+  gscPositions: Map<string, KeywordGscPosition>,
+): ColumnDef<RankTrackingRow> {
+  return {
+    id: "gscPosition",
+    accessorFn: (row) => gscPositions.get(row.keyword)?.position,
+    header: ({ column }) => (
+      <SortableHeader
+        column={column}
+        label="GSC"
+        title={GSC_POSITION_HELP}
+        className={RANK_TRACKING_HEADER_CLASS}
+      />
+    ),
+    size: 130,
+    cell: ({ row }) => (
+      <GscPositionCell value={gscPositions.get(row.original.keyword)} />
+    ),
+    sortUndefined: "last",
+  };
+}
+
+/** Without `actions` the table is read-only: no selection, pins or history.
+ *  Without `gscPositions` (the public widget) there is no Search Console column. */
 export function useRankTrackingColumns(options: {
   showDesktop: boolean;
   showMobile: boolean;
   domain: string;
   actions?: RankTrackingActions;
   locationName?: string | null;
+  gscPositions?: Map<string, KeywordGscPosition>;
 }): ColumnDef<RankTrackingRow>[] {
-  const { showDesktop, showMobile, domain, actions, locationName } = options;
+  const {
+    showDesktop,
+    showMobile,
+    domain,
+    actions,
+    locationName,
+    gscPositions,
+  } = options;
   const locationLabel = locationName
     ? formatLocationLabel(locationName, 2)
     : undefined;
@@ -294,6 +333,7 @@ export function useRankTrackingColumns(options: {
       cols.push(makeDeviceColumn("mobile"));
       cols.push(makeUrlColumn("mobile", domain));
     }
+    if (gscPositions) cols.push(makeGscColumn(gscPositions));
     cols.push(makeVolumeColumn(locationLabel), kdColumn, cpcColumn);
     if (showDesktop) {
       cols.push(makeSerpColumn("desktop"));
@@ -302,5 +342,5 @@ export function useRankTrackingColumns(options: {
       cols.push(makeSerpColumn("mobile"));
     }
     return cols;
-  }, [showDesktop, showMobile, domain, actions, locationLabel]);
+  }, [showDesktop, showMobile, domain, actions, locationLabel, gscPositions]);
 }

@@ -17,6 +17,13 @@ import { ScoreBadge } from "@/client/components/table/ScoreBadge";
 import { IntentBadge } from "@/client/features/keywords/components";
 import type { KeywordIntent, SavedKeywordRow } from "@/types/keywords";
 import { TagChip } from "./TagChip";
+// Fork addition (FORK-CHANGES.md): Search Console positions.
+import {
+  GSC_POSITION_HELP,
+  GscPositionCell,
+} from "@/client/features/gsc-history/KeywordGscPosition";
+import { useKeywordGscPositions } from "@/client/features/gsc-history/useKeywordGscPositions";
+import { HelpLabel } from "@/client/components/HelpLabel";
 import {
   formatSavedKeywordDate,
   formatSavedKeywordNumber,
@@ -40,6 +47,7 @@ export function SavedKeywordsTable({
   onSortingChange,
   toolbar,
   footer,
+  projectId,
 }: {
   rows: SavedKeywordRow[];
   rowSelection: RowSelectionState;
@@ -51,8 +59,14 @@ export function SavedKeywordsTable({
   onSortingChange: OnChangeFn<SortingState>;
   toolbar: ReactNode;
   footer: ReactNode;
+  projectId: string;
 }) {
   const selectAnchorRef = useSelectionAnchor();
+  // Fork addition (FORK-CHANGES.md): Search Console positions for this page.
+  const gscPositions = useKeywordGscPositions(
+    projectId,
+    rows.map((row) => row.keyword),
+  );
   const columns = useMemo<ColumnDef<SavedKeywordRow>[]>(
     () => [
       makeSelectionColumn<SavedKeywordRow>(selectAnchorRef),
@@ -63,6 +77,17 @@ export function SavedKeywordsTable({
         cell: ({ getValue }) => (
           <span className="font-medium">{getValue()}</span>
         ),
+      }),
+      // Fork addition (FORK-CHANGES.md).
+      columnHelper.display({
+        id: "gscPosition",
+        header: () => (
+          <HelpLabel label="GSC position" helpText={GSC_POSITION_HELP} />
+        ),
+        cell: ({ row }) => (
+          <GscPositionCell value={gscPositions.get(row.original.keyword)} />
+        ),
+        enableSorting: false,
       }),
       columnHelper.accessor("searchVolume", {
         header: ({ column }) => (
@@ -133,7 +158,7 @@ export function SavedKeywordsTable({
         ),
       }),
     ],
-    [selectAnchorRef],
+    [selectAnchorRef, gscPositions],
   );
   const table = useDataTable({
     data: rows,

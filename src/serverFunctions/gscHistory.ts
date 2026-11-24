@@ -5,9 +5,11 @@ import {
   GscHistorySyncService,
   PAGE_DETAIL_DAYS_PER_RUN,
 } from "@/server/features/gsc-history/services/GscHistorySyncService";
+import { KeywordPositionsService } from "@/server/features/gsc-history/services/KeywordPositionsService";
 import { requireProjectContext } from "@/serverFunctions/middleware";
 import {
   createAnnotationInputSchema,
+  keywordPositionsInputSchema,
   deleteAnnotationInputSchema,
   updateAnnotationInputSchema,
   searchHistoryProjectInputSchema,
@@ -91,3 +93,12 @@ export const deleteSearchAnnotation = createServerFn({ method: "POST" })
     if (!deleted) throw new AppError("NOT_FOUND", "Annotation not found.");
     return { deleted };
   });
+
+/** Search Console position, clicks and impressions for saved or tracked
+ *  keywords over the last 28 settled days, from stored history. */
+export const getKeywordGscPositions = createServerFn({ method: "POST" })
+  .middleware(requireProjectContext)
+  .validator(keywordPositionsInputSchema)
+  .handler(({ data, context }) =>
+    KeywordPositionsService.getPositions(context.projectId, data.keywords),
+  );

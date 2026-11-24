@@ -339,6 +339,7 @@ function SavedKeywordsPage() {
         {savedKeywordsQuery.isError && data === undefined ? null : (
           <SavedKeywordsTable
             rows={savedKeywords}
+            projectId={projectId}
             rowSelection={rowSelection}
             sorting={sorting}
             isLoading={isLoading}

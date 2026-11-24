@@ -77,6 +77,12 @@ export const searchHistoryProjectInputSchema = z.object({
   projectId: z.string().min(1),
 });
 
+/** Saved or tracked keywords to look up in the stored Search Console history. */
+export const keywordPositionsInputSchema = z.object({
+  projectId: z.string().min(1),
+  keywords: z.array(z.string().trim().min(1).max(200)).max(500),
+});
+
 export const annotationFieldsSchema = {
   date: isoDay,
   kind: z.enum(GSC_ANNOTATION_KINDS),

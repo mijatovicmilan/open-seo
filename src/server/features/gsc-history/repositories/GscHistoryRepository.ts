@@ -673,6 +673,37 @@ async function aggregateQueryPages(
   }));
 }
 
+/** Sums for exactly these queries over the range, across all their pages. */
+async function aggregateQueries(
+  projectId: string,
+  range: Range,
+  queries: string[],
+): Promise<Array<AggregateRow & { query: string }>> {
+  const t = gscDailyQueryPages;
+  const rows = await Promise.all(
+    chunk(queries, MAX_IN_LIST).map((part) =>
+      db
+        .select({
+          query: t.query,
+          clicks: sql`sum(${t.clicks})`,
+          impressions: sql`sum(${t.impressions})`,
+          weighted: sql`sum(${t.position} * ${t.impressions})`,
+        })
+        .from(t)
+        .where(
+          and(
+            eq(t.projectId, projectId),
+            gte(t.date, range.start),
+            lte(t.date, range.end),
+            inArray(t.query, part),
+          ),
+        )
+        .groupBy(t.query),
+    ),
+  );
+  return rows.flat().map((row) => ({ query: row.query, ...toAggregate(row) }));
+}
+
 /** Queries whose first stored impression falls in the range, with their
  *  sums over it (all their stored rows up to `end` are inside the range). */
 async function listNewQueries(projectId: string, range: Range, limit: number) {
@@ -869,6 +900,7 @@ export const GscHistoryRepository = {
   listDailyTotals,
   aggregatePages,
   aggregateQueryPages,
+  aggregateQueries,
   listNewQueries,
   listNewPages,
   listPageDays,

@@ -18,6 +18,7 @@ import {
   PINNED_COLUMN_ID,
   useRankTrackingColumns,
 } from "./RankTrackingColumns";
+import { useKeywordGscPositions } from "@/client/features/gsc-history/useKeywordGscPositions";
 import { useSetKeywordPinned } from "./useSetKeywordPinned";
 import { exportRankTracking } from "./RankTrackingTableParts";
 import {
@@ -91,12 +92,18 @@ export function RankTrackingTable({
     }),
     [handleKeywordClick, setKeywordPinned],
   );
+  // Fork addition (FORK-CHANGES.md): Search Console positions.
+  const gscPositions = useKeywordGscPositions(
+    projectId,
+    rows.map((row) => row.keyword),
+  );
   const columns = useRankTrackingColumns({
     showDesktop,
     showMobile,
     domain,
     actions,
     locationName,
+    gscPositions,
   });
 
   // The pinned column sorts first and stays out of the sorting the page owns.

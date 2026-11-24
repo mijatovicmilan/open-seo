@@ -105,7 +105,7 @@ export const createRankTrackingConfig = createServerFn({ method: "POST" })
     // then adds nothing new — so this is the only place its check can start.
     // Fork addition (FORK-CHANGES.md): not while automatic DataForSEO calls
     // are off.
-    if (!automaticDataforseoCallsOff())
+    if (!(await automaticDataforseoCallsOff(context.organizationId)))
       await runAutoCheck({
         configId: result.id,
         projectId: context.projectId,
@@ -248,7 +248,9 @@ export const addTrackingKeywords = createServerFn({ method: "POST" })
 
     // Fork addition (FORK-CHANGES.md): with automatic DataForSEO calls off,
     // new keywords wait for a check and a stats refresh someone starts.
-    const automatic = !automaticDataforseoCallsOff();
+    const automatic = !(await automaticDataforseoCallsOff(
+      context.organizationId,
+    ));
     const autoCheck =
       automatic && result.addedIds.length > 0
         ? await runAutoCheck({

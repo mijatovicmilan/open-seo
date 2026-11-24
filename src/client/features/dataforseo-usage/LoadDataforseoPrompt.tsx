@@ -4,7 +4,7 @@ import { Button } from "@/client/components/ui/button";
 
 /**
  * Fork feature (FORK-CHANGES.md): shown in place of DataForSEO data that was
- * never loaded while automatic calls are off (DATAFORSEO_AUTO_CALLS=off).
+ * never loaded while automatic calls are off.
  */
 export function LoadDataforseoPrompt({
   cost,

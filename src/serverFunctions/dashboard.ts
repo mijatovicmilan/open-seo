@@ -83,7 +83,7 @@ export const getDashboardKeywords = createServerFn({ method: "POST" })
 export const getDashboardBacklinks = createServerFn({ method: "POST" })
   .middleware(requireProjectContext)
   .validator(dashboardBacklinksInputSchema)
-  .handler(({ context, data }) => {
+  .handler(async ({ context, data }) => {
     if (!context.project.domain)
       throw new AppError(
         "VALIDATION_ERROR",
@@ -94,7 +94,7 @@ export const getDashboardBacklinks = createServerFn({ method: "POST" })
     return DashboardSiteService.getBacklinks(
       { domain: context.project.domain, kind: data.kind },
       context,
-      data.load || !automaticDataforseoCallsOff(),
+      data.load || !(await automaticDataforseoCallsOff(context.organizationId)),
     );
   });
 export const getDashboardEmergingQueries = createServerFn({ method: "POST" })
@@ -109,12 +109,12 @@ export const getDashboardEmergingQueries = createServerFn({ method: "POST" })
 export const getDashboardLinkActivity = createServerFn({ method: "POST" })
   .middleware(requireProjectContext)
   .validator(dashboardLinkActivityInputSchema)
-  .handler(({ context, data }) => {
+  .handler(async ({ context, data }) => {
     if (!context.project.domain)
       throw new AppError("VALIDATION_ERROR", "Add your website first.");
     return DashboardSiteService.getLinkActivity(
       context.project.domain,
       context,
-      data.load || !automaticDataforseoCallsOff(),
+      data.load || !(await automaticDataforseoCallsOff(context.organizationId)),
     );
   });

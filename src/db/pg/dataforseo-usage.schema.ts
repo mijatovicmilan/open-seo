@@ -1,4 +1,10 @@
-import { doublePrecision, index, pgTable, text } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  doublePrecision,
+  index,
+  pgTable,
+  text,
+} from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { projects } from "./app.schema";
 import { organization } from "./better-auth-schema";
@@ -29,3 +35,11 @@ export const dataforseoCalls = pgTable(
     ),
   ],
 );
+
+export const dataforseoSettings = pgTable("dataforseo_settings", {
+  organizationId: text("organization_id")
+    .primaryKey()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  automaticCalls: boolean("automatic_calls").notNull(),
+  updatedAt: text("updated_at").notNull().default(isoNow),
+});

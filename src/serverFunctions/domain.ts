@@ -43,7 +43,11 @@ export const getDomainKeywordSuggestions = createServerFn({ method: "POST" })
   .validator(domainKeywordSuggestionsSchema)
   .handler(async ({ data, context }) => {
     // Fork addition (FORK-CHANGES.md): null asks for a click first.
-    if (automaticDataforseoCallsOff() && !data.load) return null;
+    if (
+      !data.load &&
+      (await automaticDataforseoCallsOff(context.organizationId))
+    )
+      return null;
     return DomainService.getSuggestedKeywords(
       {
         ...data,

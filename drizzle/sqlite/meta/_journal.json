@@ -561,6 +561,13 @@
       "when": 1795497496388,
       "tag": "0079_fork_outreach_smtp_login",
       "breakpoints": true
+    },
+    {
+      "idx": 80,
+      "version": "6",
+      "when": 1795499985316,
+      "tag": "0080_fork_dataforseo_settings",
+      "breakpoints": true
     }
   ]
 }

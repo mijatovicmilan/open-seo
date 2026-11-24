@@ -200,4 +200,5 @@ export const {
   everyAppTransfers,
   everyAppTransferUsers,
   dataforseoCalls,
+  dataforseoSettings,
 } = schema;

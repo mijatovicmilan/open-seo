@@ -39,6 +39,10 @@ vi.mock("@/server/features/rank-tracking/services/RankTrackingService", () => ({
 vi.mock("@/server/lib/posthog", () => ({
   captureServerEvent: mocks.captureServerEvent,
 }));
+// Fork addition (FORK-CHANGES.md): automatic DataForSEO calls on, as upstream.
+vi.mock("@/server/features/dataforseo-usage/automaticCalls", () => ({
+  automaticDataforseoCallsOff: async () => false,
+}));
 
 const projectId = "11111111-1111-4111-8111-111111111111";
 const trackerId = "22222222-2222-4222-8222-222222222222";

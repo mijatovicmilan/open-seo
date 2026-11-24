@@ -34,7 +34,7 @@ export const dashboardSearchSchema = z.object({
   tab: dashboardSiteTabSchema.optional().catch(undefined),
 });
 // Fork addition (FORK-CHANGES.md): `load` is a click on "Load" while
-// automatic DataForSEO calls are off (DATAFORSEO_AUTO_CALLS=off).
+// automatic DataForSEO calls are off.
 export const dashboardBacklinksInputSchema = dashboardProjectInputSchema.extend(
   {
     kind: z.enum(["new", "lost", "all"]).default("new"),

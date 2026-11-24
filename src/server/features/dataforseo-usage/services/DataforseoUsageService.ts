@@ -21,10 +21,11 @@ async function readBalance(): Promise<number | null> {
 
 async function getUsage(organizationId: string) {
   const since = new Date(Date.now() - WINDOW_DAYS * 86400_000).toISOString();
-  const [rows, recent, balanceUsd] = await Promise.all([
+  const [rows, recent, balanceUsd, automaticCallsOff] = await Promise.all([
     DataforseoCallRepository.summarize(organizationId, since),
     DataforseoCallRepository.listRecent(organizationId, 50),
     readBalance(),
+    automaticDataforseoCallsOff(organizationId),
   ]);
 
   const features = new Map<string, { calls: number; costUsd: number }>();
@@ -37,7 +38,7 @@ async function getUsage(organizationId: string) {
 
   return {
     windowDays: WINDOW_DAYS,
-    automaticCallsOff: automaticDataforseoCallsOff(),
+    automaticCallsOff,
     balanceUsd,
     totalCostUsd: rows.reduce((sum, row) => sum + row.costUsd, 0),
     totalCalls: rows.reduce((sum, row) => sum + row.calls, 0),

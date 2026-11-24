@@ -1,4 +1,10 @@
-import { index, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import {
+  index,
+  integer,
+  real,
+  sqliteTable,
+  text,
+} from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 import { projects } from "./app.schema";
 import { organization } from "./better-auth-schema";
@@ -37,3 +43,14 @@ export const dataforseoCalls = sqliteTable(
     ),
   ],
 );
+
+// One row per organization, changed in Settings → DataForSEO usage. Without a
+// row, automatic calls are on (the dashboard's backlink cards load by
+// themselves, a rank tracker checks new keywords right away).
+export const dataforseoSettings = sqliteTable("dataforseo_settings", {
+  organizationId: text("organization_id")
+    .primaryKey()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  automaticCalls: integer("automatic_calls", { mode: "boolean" }).notNull(),
+  updatedAt: text("updated_at").notNull().default(isoNow),
+});

@@ -65,7 +65,7 @@ export const domainKeywordSuggestionsSchema = z.object({
   locationCode: z.number().int().positive().optional(),
   languageCode: z.string().min(2).max(8).optional(),
   // Fork addition (FORK-CHANGES.md): a click while automatic DataForSEO calls
-  // are off (DATAFORSEO_AUTO_CALLS=off).
+  // are off.
   load: z.boolean().optional(),
 });
 

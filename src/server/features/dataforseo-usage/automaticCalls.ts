@@ -1,14 +1,17 @@
-import { env } from "cloudflare:workers";
+import { DataforseoSettingsRepository } from "./repositories/DataforseoSettingsRepository";
 
 /**
- * Fork feature (FORK-CHANGES.md). DATAFORSEO_AUTO_CALLS=off stops the
- * DataForSEO calls nobody asked for by name: the dashboard's New backlinks
- * card and Backlinks tab (shown from the saved result, loaded on a click),
- * and a rank tracker's keyword suggestions and its check and stats right
- * after keywords are added. Searches, checks and refreshes a person starts
- * still run.
+ * Fork feature (FORK-CHANGES.md). With automatic calls turned off in
+ * Settings → DataForSEO usage, the DataForSEO calls nobody asked for by name
+ * wait for a click: the dashboard's New backlinks card and Backlinks tab
+ * (shown from the saved result), and a rank tracker's keyword suggestions
+ * and its check and stats right after keywords are added. Searches, checks
+ * and refreshes a person starts still run.
  */
-export function automaticDataforseoCallsOff(): boolean {
-  const value: unknown = Reflect.get(env, "DATAFORSEO_AUTO_CALLS");
-  return typeof value === "string" && value.trim().toLowerCase() === "off";
+export async function automaticDataforseoCallsOff(
+  organizationId: string,
+): Promise<boolean> {
+  return !(await DataforseoSettingsRepository.getAutomaticCalls(
+    organizationId,
+  ));
 }

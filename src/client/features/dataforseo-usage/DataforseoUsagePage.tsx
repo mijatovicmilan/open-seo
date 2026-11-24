@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Receipt } from "lucide-react";
 import { CardShell } from "@/client/components/CardShell";
 import { EmptyState } from "@/client/components/EmptyState";
@@ -13,7 +13,11 @@ import {
   TableRow,
 } from "@/client/components/ui/table";
 import { creditFeatureLabel } from "@/shared/billing-credit-features";
-import { getDataforseoUsage } from "@/serverFunctions/dataforseo-usage";
+import { Switch } from "@/client/components/ui/switch";
+import {
+  getDataforseoUsage,
+  setDataforseoAutomaticCalls,
+} from "@/serverFunctions/dataforseo-usage";
 
 // Fork feature (FORK-CHANGES.md): what this install's DataForSEO calls cost.
 
@@ -46,11 +50,7 @@ export function DataforseoUsagePage() {
               title="DataForSEO usage"
               hint={`What OpenSEO's DataForSEO calls cost in the last ${usage.windowDays} days, as DataForSEO reported each one. Calls that fail without a charge, such as on an empty balance, are not listed.`}
             />
-            <p className="text-sm text-muted-foreground">
-              {usage.automaticCallsOff
-                ? "Automatic calls are off (DATAFORSEO_AUTO_CALLS=off): the dashboard's backlink cards and a rank tracker's suggestions, first check and stats wait for a click. Searches and checks you start still run."
-                : "Automatic calls are on: the dashboard's backlink cards load once a day, and a rank tracker checks new keywords as soon as they are added. Set DATAFORSEO_AUTO_CALLS=off in .env to stop them."}
-            </p>
+            <AutomaticCallsSwitch enabled={!usage.automaticCallsOff} />
             <div className="grid gap-4 sm:grid-cols-3">
               <Stat
                 label="Balance"
@@ -182,6 +182,36 @@ function Stat({ label, value }: { label: string; value: string }) {
     <div className="rounded-xl border bg-card p-4">
       <div className="text-sm text-muted-foreground">{label}</div>
       <div className="mt-1 text-2xl font-semibold tabular-nums">{value}</div>
+    </div>
+  );
+}
+
+function AutomaticCallsSwitch({ enabled }: { enabled: boolean }) {
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: (next: boolean) =>
+      setDataforseoAutomaticCalls({ data: { enabled: next } }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["dataforseoUsage"] }),
+  });
+  const checked = mutation.isPending ? mutation.variables : enabled;
+  return (
+    <div className="flex items-start justify-between gap-6 rounded-xl border bg-card p-4">
+      <div>
+        <p className="text-sm font-medium">Automatic DataForSEO calls</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {checked
+            ? "On: the dashboard's backlink cards load by themselves once a day, and a rank tracker looks up suggested keywords and checks new keywords as soon as they are added."
+            : "Off: those calls wait for a click (a Load button on the dashboard, a question in the rank tracker). Searches, checks and refreshes you start still run."}{" "}
+          This applies to every project.
+        </p>
+      </div>
+      <Switch
+        checked={checked}
+        disabled={mutation.isPending}
+        onCheckedChange={(next) => mutation.mutate(next)}
+        aria-label="Automatic DataForSEO calls"
+      />
     </div>
   );
 }

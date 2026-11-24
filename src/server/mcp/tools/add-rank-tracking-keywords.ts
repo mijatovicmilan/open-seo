@@ -117,7 +117,7 @@ export const addRankTrackingKeywordsTool = {
       result.added === 0
         ? ""
         : // Fork addition (FORK-CHANGES.md).
-          automaticDataforseoCallsOff()
+          (await automaticDataforseoCallsOff(context.billing.organizationId))
           ? " Search volume, difficulty and CPC were not fetched: automatic DataForSEO calls are off on this install (refresh them when needed)."
           : await fetchKeywordMetrics(args, context.billing);
     return mcpResponse({

@@ -11,6 +11,7 @@ import {
 } from "@/server/lib/dataforseo/ai-tracking";
 import { dataforseoPricing } from "@/server/lib/dataforseo/pricing";
 import { isHostedServerAuthMode } from "@/server/lib/runtime-env";
+import { callAndLogDataforseo } from "@/server/features/dataforseo-usage/callAndLogDataforseo";
 import { creditsForProviderUsd } from "@/shared/billing";
 
 // Queued AI visibility answers are billed on arrival. DataForSEO charges at
@@ -36,7 +37,13 @@ export async function postAiTrackingTasksOnHold(
   input: Parameters<typeof postAiTrackingTasks>[0],
 ): Promise<{ tasks: PostedAiTrackingTask[]; hold: AiTrackingHold | null }> {
   if (!(await isHostedServerAuthMode())) {
-    return { tasks: (await postAiTrackingTasks(input)).data, hold: null };
+    // Fork addition (FORK-CHANGES.md): the DataForSEO spend log.
+    const tasks = await callAndLogDataforseo(
+      customer,
+      () => postAiTrackingTasks(input),
+      "ai_prompt_responses",
+    );
+    return { tasks, hold: null };
   }
   const billingCustomer = await getOrCreateOrganizationCustomer(customer);
   // One call gets one hold, or INSUFFICIENT_CREDITS.

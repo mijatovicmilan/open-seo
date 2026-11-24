@@ -68,6 +68,8 @@ import {
 } from "@/server/lib/dataforseo/request-slots";
 import { isHostedServerAuthMode } from "@/server/lib/runtime-env";
 import { AppError } from "@/server/lib/errors";
+// Fork addition (FORK-CHANGES.md): the DataForSEO spend log.
+import { callAndLogDataforseo } from "@/server/features/dataforseo-usage/callAndLogDataforseo";
 
 /**
  * Wraps a section fetcher with billing metering. Each entry on the client is
@@ -379,8 +381,11 @@ async function meterDataforseoCalls<T>(
   const isHostedMode = await isHostedServerAuthMode();
 
   if (!isHostedMode) {
+    // Fork addition (FORK-CHANGES.md): log what each call cost.
     return Promise.allSettled(
-      executes.map(async (execute) => (await execute()).data),
+      executes.map((execute) =>
+        callAndLogDataforseo(customer, execute, creditFeature),
+      ),
     );
   }
 

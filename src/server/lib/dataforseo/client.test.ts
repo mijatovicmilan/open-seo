@@ -30,7 +30,9 @@ const {
   getOrCreateMock,
   isHostedServerAuthModeMock,
   mockEnv,
+  insertCallMock,
 } = vi.hoisted(() => ({
+  insertCallMock: vi.fn(),
   checkMock: vi.fn<(arg: CheckCallArg) => Promise<CheckResult>>(),
   finalizeMock:
     vi.fn<(arg: FinalizeCallArg) => Promise<{ success: boolean }>>(),
@@ -66,6 +68,12 @@ vi.mock("@/server/billing/subscription", async (importOriginal) => {
 vi.mock("@/server/lib/runtime-env", () => ({
   isHostedServerAuthMode: isHostedServerAuthModeMock,
 }));
+
+// Fork addition (FORK-CHANGES.md): the self-hosted spend log.
+vi.mock(
+  "@/server/features/dataforseo-usage/repositories/DataforseoCallRepository",
+  () => ({ DataforseoCallRepository: { insert: insertCallMock } }),
+);
 
 vi.mock("@/server/lib/posthog", () => ({
   captureServerEvent: vi.fn(),
@@ -197,6 +205,33 @@ describe("meterDataforseoCall", () => {
     expect(result).toEqual({ rank: 42 });
     expect(checkMock).not.toHaveBeenCalled();
     expect(finalizeMock).not.toHaveBeenCalled();
+  });
+
+  // Fork addition (FORK-CHANGES.md).
+  it("in non-hosted mode logs the cost DataForSEO reported, including a charged failure", async () => {
+    isHostedServerAuthModeMock.mockResolvedValue(false);
+    mockDataforseoResult(RAW_COST);
+    const client = createDataforseoClient(billingCustomer);
+    await client.backlinks.summary(backlinksInput);
+
+    const failure = { costUsd: 0.01, path: backlinksPath };
+    vi.mocked(fetchBacklinksSummary).mockRejectedValue(
+      new DataforseoChargedTaskError("DataForSEO task failed", failure),
+    );
+    await expect(client.backlinks.summary(backlinksInput)).rejects.toThrow(
+      "DataForSEO task failed",
+    );
+
+    const logged = {
+      organizationId: "org_123",
+      projectId: null,
+      endpoint: "backlinks/summary/live",
+      feature: "backlinks",
+    };
+    expect(insertCallMock.mock.calls).toEqual([
+      [{ ...logged, costUsd: RAW_COST }],
+      [{ ...logged, costUsd: 0.01 }],
+    ]);
   });
 
   it("never calls the provider when the hold is refused", async () => {

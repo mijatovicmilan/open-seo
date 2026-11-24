@@ -48,6 +48,7 @@ import { Route as ETokenWidgetRouteImport } from './routes/e/$token/$widget'
 import { Route as ApiAutumnSplatRouteImport } from './routes/api/autumn/$'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as AppSettingsOrganizationRouteImport } from './routes/_app/settings/organization'
+import { Route as AppSettingsDataforseoRouteImport } from './routes/_app/settings/dataforseo'
 import { Route as AppSettingsAgentRouteImport } from './routes/_app/settings/agent'
 import { Route as AppHelpOpenrouterApiKeyRouteImport } from './routes/_app/help/openrouter-api-key'
 import { Route as AppHelpDataforseoApiKeyRouteImport } from './routes/_app/help/dataforseo-api-key'
@@ -283,6 +284,11 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
 const AppSettingsOrganizationRoute = AppSettingsOrganizationRouteImport.update({
   id: '/organization',
   path: '/organization',
+  getParentRoute: () => AppSettingsRoute,
+} as any)
+const AppSettingsDataforseoRoute = AppSettingsDataforseoRouteImport.update({
+  id: '/dataforseo',
+  path: '/dataforseo',
   getParentRoute: () => AppSettingsRoute,
 } as any)
 const AppSettingsAgentRoute = AppSettingsAgentRouteImport.update({
@@ -537,6 +543,7 @@ export interface FileRoutesByFullPath {
   '/help/dataforseo-api-key': typeof AppHelpDataforseoApiKeyRoute
   '/help/openrouter-api-key': typeof AppHelpOpenrouterApiKeyRoute
   '/settings/agent': typeof AppSettingsAgentRoute
+  '/settings/dataforseo': typeof AppSettingsDataforseoRoute
   '/settings/organization': typeof AppSettingsOrganizationRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/autumn/$': typeof ApiAutumnSplatRoute
@@ -613,6 +620,7 @@ export interface FileRoutesByTo {
   '/help/dataforseo-api-key': typeof AppHelpDataforseoApiKeyRoute
   '/help/openrouter-api-key': typeof AppHelpOpenrouterApiKeyRoute
   '/settings/agent': typeof AppSettingsAgentRoute
+  '/settings/dataforseo': typeof AppSettingsDataforseoRoute
   '/settings/organization': typeof AppSettingsOrganizationRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/autumn/$': typeof ApiAutumnSplatRoute
@@ -691,6 +699,7 @@ export interface FileRoutesById {
   '/_app/help/dataforseo-api-key': typeof AppHelpDataforseoApiKeyRoute
   '/_app/help/openrouter-api-key': typeof AppHelpOpenrouterApiKeyRoute
   '/_app/settings/agent': typeof AppSettingsAgentRoute
+  '/_app/settings/dataforseo': typeof AppSettingsDataforseoRoute
   '/_app/settings/organization': typeof AppSettingsOrganizationRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/autumn/$': typeof ApiAutumnSplatRoute
@@ -771,6 +780,7 @@ export interface FileRouteTypes {
     | '/help/dataforseo-api-key'
     | '/help/openrouter-api-key'
     | '/settings/agent'
+    | '/settings/dataforseo'
     | '/settings/organization'
     | '/api/auth/$'
     | '/api/autumn/$'
@@ -847,6 +857,7 @@ export interface FileRouteTypes {
     | '/help/dataforseo-api-key'
     | '/help/openrouter-api-key'
     | '/settings/agent'
+    | '/settings/dataforseo'
     | '/settings/organization'
     | '/api/auth/$'
     | '/api/autumn/$'
@@ -924,6 +935,7 @@ export interface FileRouteTypes {
     | '/_app/help/dataforseo-api-key'
     | '/_app/help/openrouter-api-key'
     | '/_app/settings/agent'
+    | '/_app/settings/dataforseo'
     | '/_app/settings/organization'
     | '/api/auth/$'
     | '/api/autumn/$'
@@ -1281,6 +1293,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsOrganizationRouteImport
       parentRoute: typeof AppSettingsRoute
     }
+    '/_app/settings/dataforseo': {
+      id: '/_app/settings/dataforseo'
+      path: '/dataforseo'
+      fullPath: '/settings/dataforseo'
+      preLoaderRoute: typeof AppSettingsDataforseoRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
     '/_app/settings/agent': {
       id: '/_app/settings/agent'
       path: '/agent'
@@ -1566,12 +1585,14 @@ declare module '@tanstack/react-router' {
 
 interface AppSettingsRouteChildren {
   AppSettingsAgentRoute: typeof AppSettingsAgentRoute
+  AppSettingsDataforseoRoute: typeof AppSettingsDataforseoRoute
   AppSettingsOrganizationRoute: typeof AppSettingsOrganizationRoute
   AppSettingsIndexRoute: typeof AppSettingsIndexRoute
 }
 
 const AppSettingsRouteChildren: AppSettingsRouteChildren = {
   AppSettingsAgentRoute: AppSettingsAgentRoute,
+  AppSettingsDataforseoRoute: AppSettingsDataforseoRoute,
   AppSettingsOrganizationRoute: AppSettingsOrganizationRoute,
   AppSettingsIndexRoute: AppSettingsIndexRoute,
 }

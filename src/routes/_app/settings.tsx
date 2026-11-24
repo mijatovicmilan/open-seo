@@ -1,7 +1,7 @@
 import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { NavTab, NavTabs } from "@/client/components/NavTabs";
 import { PageHeader } from "@/client/components/PageHeader";
-import { usesBetterAuthClient } from "@/lib/auth-mode";
+import { isHostedClientAuthMode, usesBetterAuthClient } from "@/lib/auth-mode";
 import { pageHead } from "@/client/lib/pageHead";
 
 export const Route = createFileRoute("/_app/settings")({
@@ -17,6 +17,11 @@ function SettingsLayout() {
     { to: "/settings" as const, label: "Personal", exact: true },
     // Fork addition (FORK-CHANGES.md): agent setup moved here from the sidebar.
     { to: "/settings/agent" as const, label: "Agent setup" },
+    // Fork addition (FORK-CHANGES.md): self-hosted installs pay DataForSEO
+    // directly; the hosted app has its own billing page.
+    ...(isHostedClientAuthMode()
+      ? []
+      : [{ to: "/settings/dataforseo" as const, label: "DataForSEO usage" }]),
     // Access / no-auth self-host has no memberships — the organization tab
     // would 404.
     ...(usesBetterAuthClient()

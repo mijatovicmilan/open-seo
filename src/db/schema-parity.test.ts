@@ -19,6 +19,7 @@ import * as sqliteTelemetry from "./telemetry.schema";
 import * as sqliteOutreach from "./outreach.schema";
 import * as sqliteGscHistory from "./gsc-history.schema";
 import * as sqliteAnalyticsSource from "./analytics-source.schema";
+import * as sqliteDataforseoUsage from "./dataforseo-usage.schema";
 import * as sqliteAiVisibility from "./ai-visibility.schema";
 import * as sqliteLocalSeo from "./local-seo.schema";
 import * as pgApp from "./pg/app.schema";
@@ -35,6 +36,7 @@ import * as pgTelemetry from "./pg/telemetry.schema";
 import * as pgOutreach from "./pg/outreach.schema";
 import * as pgGscHistory from "./pg/gsc-history.schema";
 import * as pgAnalyticsSource from "./pg/analytics-source.schema";
+import * as pgDataforseoUsage from "./pg/dataforseo-usage.schema";
 import * as pgAiVisibility from "./pg/ai-visibility.schema";
 import * as pgLocalSeo from "./pg/local-seo.schema";
 
@@ -174,6 +176,7 @@ const sqliteAppTables = tablesFrom(
   sqliteAnalyticsSource,
   sqliteAiVisibility,
   sqliteLocalSeo,
+  sqliteDataforseoUsage,
 );
 const pgAppTables = tablesFrom(
   pgApp,
@@ -191,6 +194,7 @@ const pgAppTables = tablesFrom(
   pgAnalyticsSource,
   pgAiVisibility,
   pgLocalSeo,
+  pgDataforseoUsage,
 );
 const sqliteAuthTables = tablesFrom(sqliteAuth);
 const pgAuthTables = tablesFrom(pgAuth);

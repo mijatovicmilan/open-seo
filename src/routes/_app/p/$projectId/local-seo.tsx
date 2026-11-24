@@ -1,4 +1,9 @@
-import { createFileRoute, Outlet, useParams } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  Outlet,
+  redirect,
+  useParams,
+} from "@tanstack/react-router";
 import { BackLink, PageHeader } from "@/client/components/PageHeader";
 import { pageHead } from "@/client/lib/pageHead";
 import leafletCss from "leaflet/dist/leaflet.css?url";
@@ -12,6 +17,14 @@ export const Route = createFileRoute("/_app/p/$projectId/local-seo")({
       { rel: "stylesheet", href: localRankMapCss },
     ],
   }),
+  // Fork addition (FORK-CHANGES.md): Local SEO is hidden; this layout covers
+  // the tracker pages too, so every Local SEO URL lands on Rank Tracking.
+  beforeLoad: ({ params }) => {
+    throw redirect({
+      to: "/p/$projectId/rank-tracking",
+      params: { projectId: params.projectId },
+    });
+  },
   component: LocalSeoLayout,
 });
 function LocalSeoLayout() {

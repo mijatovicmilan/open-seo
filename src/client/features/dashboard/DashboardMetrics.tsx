@@ -101,11 +101,18 @@ export function TrendChart({
   data: Record<string, string | number | null>[];
 }) {
   const series = Object.keys(config);
+  // Fork addition (FORK-CHANGES.md): a new site's first weeks are zero-filled
+  // days before any data, drawn as a flat line ending in a spike. Start at the
+  // first day with a value, keeping at least two points for a line.
+  const firstValue = data.findIndex((row) =>
+    series.some((key) => Number(row[key] ?? 0) !== 0),
+  );
+  const shown = data.slice(Math.max(0, Math.min(firstValue, data.length - 2)));
   return (
     <div className="relative min-h-28 flex-1">
       <ChartContainer config={config} className="absolute inset-0">
         <LineChart
-          data={data}
+          data={shown}
           margin={{ top: 4, right: 2, bottom: 4, left: 2 }}
         >
           <XAxis dataKey="date" hide />

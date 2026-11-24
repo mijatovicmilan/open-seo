@@ -13,6 +13,7 @@ import { CardShell } from "@/client/components/CardShell";
 import { EmptyState } from "@/client/components/EmptyState";
 import { Button } from "@/client/components/ui/button";
 import { QueryState } from "@/client/components/QueryState";
+import { getErrorCode } from "@/client/lib/error-messages";
 import { getDashboardLinkActivity } from "@/serverFunctions/dashboard";
 import { DashboardInfo, ExternalPage, Freshness } from "./siteTabParts";
 import { cardTableClass, moreDetailsClass } from "./cardParts";
@@ -29,6 +30,23 @@ export function DashboardLinkActivity({
     staleTime: 86400_000,
     retry: false,
   });
+  // Fork addition (FORK-CHANGES.md): an empty DataForSEO balance is a setup
+  // step, not a failure a retry can fix (the server waits an hour anyway).
+  if (
+    query.data === undefined &&
+    getErrorCode(query.error) === "BACKLINKS_BILLING_ISSUE"
+  ) {
+    return (
+      <CardShell title="New backlinks" icon={<Link2 className="size-5" />}>
+        <EmptyState
+          variant="plain"
+          icon={Link2}
+          title="Add DataForSEO credits to see new links"
+          description="The connected DataForSEO account has no balance or a billing issue. After a top-up, this card checks again within an hour."
+        />
+      </CardShell>
+    );
+  }
   return (
     <QueryState query={query} errorFallback="Could not load new links">
       {(data) => (

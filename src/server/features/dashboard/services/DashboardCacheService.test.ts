@@ -147,17 +147,19 @@ it("does not share cached provider data between organizations", async () => {
   expect(load).toHaveBeenCalledTimes(2);
 });
 
-it("backs off cold failures without another provider charge", async () => {
+it("backs off a cold billing failure for an hour, repeating its reason instead of calling the provider", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
   const load = vi.fn(async () => {
-    throw new Error("out of credits");
+    throw new AppError("BACKLINKS_BILLING_ISSUE");
   });
-  await expect(DashboardCacheService.readThrough(input(load))).rejects.toThrow(
-    "out of credits",
-  );
-  await expect(DashboardCacheService.readThrough(input(load))).rejects.toThrow(
-    "temporarily paused",
-  );
+  const read = () => DashboardCacheService.readThrough(input(load));
+  await expect(read()).rejects.toThrow("BACKLINKS_BILLING_ISSUE");
+  vi.advanceTimersByTime(30 * 60_000);
+  await expect(read()).rejects.toThrow("BACKLINKS_BILLING_ISSUE");
   expect(load).toHaveBeenCalledTimes(1);
+  vi.advanceTimersByTime(31 * 60_000);
+  await expect(read()).rejects.toThrow("BACKLINKS_BILLING_ISSUE");
+  expect(load).toHaveBeenCalledTimes(2);
 });
 
 const customer = {

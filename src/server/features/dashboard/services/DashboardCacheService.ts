@@ -9,6 +9,15 @@ import {
 import { deleteR2Prefix } from "@/server/lib/r2";
 import { DataRefreshClaimRepository } from "@/server/features/dashboard/repositories/DataRefreshClaimRepository";
 import { AppError, asAppError } from "@/server/lib/errors";
+import { errorCodeSchema, type ErrorCode } from "@/shared/error-codes";
+
+// Fork addition (FORK-CHANGES.md): see the backoff in readThrough.
+const BILLING_CODES = new Set<ErrorCode>([
+  "BACKLINKS_BILLING_ISSUE",
+  "AI_SEARCH_BILLING_ISSUE",
+  "INSUFFICIENT_CREDITS",
+]);
+const failureSchema = z.object({ code: errorCodeSchema });
 
 // Cached provider responses are disposable; keep them longer than their refresh
 // cadence so credit/provider failures can display the last successful result.
@@ -44,6 +53,10 @@ async function readThrough<T>(input: {
         stale: true,
         refreshError: "Update already running or temporarily paused.",
       };
+    // Fork addition (FORK-CHANGES.md): while a failed refresh backs off, a
+    // retry gets that failure's reason, not "too many requests".
+    const failure = failureSchema.safeParse(await getCached(`${key}:failure`));
+    if (failure.success) throw new AppError(failure.data.code);
     throw new AppError(
       "RATE_LIMITED",
       "An update is already running or temporarily paused. Try again shortly.",
@@ -67,8 +80,15 @@ async function readThrough<T>(input: {
     await DataRefreshClaimRepository.finish(key, token, 0);
     return { ...result, stale: false, refreshError: null };
   } catch (error) {
-    await DataRefreshClaimRepository.finish(key, token, 5 * 60_000);
-    if (!cached) throw error;
+    // Fork addition (FORK-CHANGES.md): an empty DataForSEO balance is not
+    // fixed in five minutes, so back off for an hour and keep the reason.
+    const code = asAppError(error)?.code ?? "INTERNAL_ERROR";
+    const backoffMs = BILLING_CODES.has(code) ? 60 * 60_000 : 5 * 60_000;
+    await DataRefreshClaimRepository.finish(key, token, backoffMs);
+    if (!cached) {
+      await setCached(`${key}:failure`, { code }, backoffMs / 1000);
+      throw error;
+    }
     return {
       ...cached,
       stale: true,

@@ -47,6 +47,7 @@ import {
   OutreachRepository,
 } from "@/server/features/outreach/repositories/OutreachRepository";
 import { isScheduleTime, parseScheduleDays } from "@/shared/outreachSchedule";
+import { encryptSecret, SecretKeyMissingError } from "@/server/lib/secretBox";
 import { AppError } from "@/server/lib/errors";
 import {
   countOutreach,
@@ -112,7 +113,8 @@ function configFrom(row: SettingsRow): OutreachConfig {
     signature: row.signature,
     smtpHost: row.smtpHost,
     smtpPort: row.smtpPort,
-    mailEnvKey: row.mailEnvKey,
+    smtpUser: row.smtpUser,
+    smtpPasswordEncrypted: row.smtpPasswordEncrypted,
     timeZone: isValidTimeZone(row.timeZone) ? row.timeZone : "UTC",
     dailyMin: row.dailyMin,
     dailyMax: row.dailyMax,
@@ -154,8 +156,14 @@ async function getConfig(project: ProjectRef): Promise<OutreachConfig> {
 }
 
 function settingsView(config: OutreachConfig): OutreachSettingsView {
+  const { smtpPasswordEncrypted, ...visible } = config;
   const problem = mailProblem(config);
-  return { ...config, mailReady: problem === null, mailProblem: problem };
+  return {
+    ...visible,
+    smtpPasswordSet: smtpPasswordEncrypted !== null,
+    mailReady: problem === null,
+    mailProblem: problem,
+  };
 }
 
 async function getSettings(project: ProjectRef) {
@@ -170,7 +178,7 @@ type OutreachSettingsInput = {
   signature: string;
   smtpHost: string;
   smtpPort: number;
-  mailEnvKey: string;
+  smtpUser: string;
   timeZone: string;
   dailyMin: number;
   dailyMax: number;
@@ -183,9 +191,12 @@ type OutreachSettingsInput = {
   scheduleWindowMinutes: number;
 };
 
+// `smtpPassword` replaces the saved password when given; it is stored
+// encrypted and never returned.
 async function updateSettings(
   project: ProjectRef,
   input: Partial<OutreachSettingsInput>,
+  smtpPassword?: string,
 ) {
   await getConfig(project);
   for (const zone of [input.timeZone, input.scheduleTimeZone]) {
@@ -216,16 +227,26 @@ async function updateSettings(
     ...(input.signature !== undefined
       ? { signature: signatureText({ signature: input.signature }) }
       : {}),
-    ...(input.mailEnvKey !== undefined
-      ? {
-          mailEnvKey: input.mailEnvKey
-            .toUpperCase()
-            .replace(/[^A-Z0-9]+/gu, "_"),
-        }
+    ...(smtpPassword
+      ? { smtpPasswordEncrypted: await encryptSmtpPassword(smtpPassword) }
       : {}),
   };
   await OutreachRepository.updateSettings(project.id, values);
   return getSettings(project);
+}
+
+async function encryptSmtpPassword(password: string) {
+  try {
+    return await encryptSecret(password);
+  } catch (error) {
+    if (error instanceof SecretKeyMissingError) {
+      throw new OutreachError(
+        "VALIDATION_ERROR",
+        "The server needs BETTER_AUTH_SECRET in .env to store the SMTP password encrypted.",
+      );
+    }
+    throw error;
+  }
 }
 
 // Log in to the SMTP server and out again; sends nothing.
@@ -245,7 +266,7 @@ async function testMail(project: ProjectRef) {
   if (isLogTransport()) {
     return "Log transport (OUTREACH_MAIL_TRANSPORT=log): no mail server is used and nothing is ever sent.";
   }
-  return `Logged in to ${config.smtpHost} as the outreach mailbox; nothing was sent.`;
+  return `Logged in to ${config.smtpHost} as ${config.smtpUser}; nothing was sent.`;
 }
 
 // ---- Reads ------------------------------------------------------------------

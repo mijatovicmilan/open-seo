@@ -269,8 +269,7 @@ export type OutreachAnalytics = {
 };
 
 // The project's outreach identity and pacing, as the app shows and edits it.
-// SMTP credentials are never part of it: `mailReady` only says whether the
-// server found them.
+// The SMTP password is never part of it, only whether one is saved.
 export type OutreachSettingsView = {
   siteUrl: string;
   linkDomains: string[];
@@ -279,7 +278,8 @@ export type OutreachSettingsView = {
   signature: string;
   smtpHost: string;
   smtpPort: number;
-  mailEnvKey: string;
+  smtpUser: string;
+  smtpPasswordSet: boolean;
   timeZone: string;
   dailyMin: number;
   dailyMax: number;

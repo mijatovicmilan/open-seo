@@ -14,12 +14,12 @@ import {
 } from "@/serverFunctions/outreach";
 import type { OutreachSettingsView } from "@/shared/outreach";
 
-// The project's outreach identity and pacing. SMTP credentials are never
-// entered here: the server reads them from its environment.
+// The project's outreach identity and pacing, and the mailbox login. The
+// saved SMTP password never comes back: a blank field keeps it.
 
 export type OutreachSettingsFormState = Omit<
   OutreachSettingsView,
-  "linkDomains" | "mailReady" | "mailProblem"
+  "linkDomains" | "mailReady" | "mailProblem" | "smtpPasswordSet"
 > & {
   linkDomains: string;
 };
@@ -37,11 +37,13 @@ export function OutreachSettingsForm({
     const {
       mailReady: _ready,
       mailProblem: _problem,
+      smtpPasswordSet: _passwordSet,
       linkDomains,
       ...rest
     } = settings;
     return { ...rest, linkDomains: linkDomains.join(" ") };
   });
+  const [smtpPassword, setSmtpPassword] = useState("");
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const testConnection = async () => {
@@ -58,18 +60,18 @@ export function OutreachSettingsForm({
   };
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((current) => ({ ...current, [key]: value }));
-  const envKey = form.mailEnvKey.toUpperCase().replace(/[^A-Z0-9]+/gu, "_");
 
   const save = async () => {
     setSaving(true);
     try {
       const result = await updateOutreachSettings({
-        data: { projectId, settings: form },
+        data: { projectId, settings: form, smtpPassword },
       });
       if (!result.ok) {
         toast.error(result.message);
         return;
       }
+      setSmtpPassword("");
       toast.success("Outreach settings saved");
       await Promise.all([
         queryClient.invalidateQueries({
@@ -193,14 +195,30 @@ export function OutreachSettingsForm({
           {text("smtpHost", "SMTP host (SSL)", undefined, "smtp.zoho.com")}
           {number("smtpPort", "Port")}
         </div>
-        {text(
-          "mailEnvKey",
-          "Mail env key",
-          envKey
-            ? `The server reads OUTREACH_${envKey}_SMTP_USER and OUTREACH_${envKey}_SMTP_PASSWORD from its environment (use an app password).`
-            : "A short name, for example the project name. Credentials stay in the server environment, never here.",
-          "EXAMPLE",
-        )}
+        <div className="grid gap-3 sm:grid-cols-2">
+          {text(
+            "smtpUser",
+            "SMTP user",
+            "Usually the mailbox address.",
+            "outreach@example.com",
+          )}
+          <label className="flex w-full flex-col">
+            <span className="mb-1 text-sm font-medium">SMTP password</span>
+            <Input
+              type="password"
+              autoComplete="new-password"
+              className="h-9"
+              value={smtpPassword}
+              placeholder={
+                settings.smtpPasswordSet ? "Saved (leave blank to keep)" : ""
+              }
+              onChange={(event) => setSmtpPassword(event.target.value)}
+            />
+            <span className="mt-1 text-xs text-muted-foreground">
+              Use an app password. Stored encrypted and never shown again.
+            </span>
+          </label>
+        </div>
       </section>
 
       <section className="space-y-3 rounded-xl border border-border bg-card p-4">

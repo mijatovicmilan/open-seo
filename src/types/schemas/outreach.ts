@@ -42,7 +42,7 @@ export const outreachSettingsInputSchema = z.object({
   signature: z.string().max(500),
   smtpHost: z.string().trim().max(200),
   smtpPort: z.number().int().min(1).max(65_535),
-  mailEnvKey: z.string().trim().max(40),
+  smtpUser: z.string().trim().max(200),
   timeZone: z.string().trim().min(1).max(60),
   dailyMin: z.number().int().min(0).max(100),
   dailyMax: z.number().int().min(0).max(100),

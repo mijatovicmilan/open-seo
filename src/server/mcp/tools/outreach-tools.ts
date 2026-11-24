@@ -897,7 +897,7 @@ export const updateOutreachSettingsTool = {
   config: {
     title: "Update outreach settings",
     description:
-      "Change the project's outreach identity and pacing: site URL, link domains (hosts that count as a link to us), sender name and email, signature, SMTP host/port, mail env key (the server reads OUTREACH_<KEY>_SMTP_USER and _SMTP_PASSWORD; never pass credentials here), time zone and daily/weekly limits. Only with the owner's go. Free.",
+      "Change the project's outreach identity and pacing: site URL, link domains (hosts that count as a link to us), sender name and email, signature, SMTP host/port and user (the password is set only by the owner in the app), time zone and daily/weekly limits. Only with the owner's go. Free.",
     inputSchema: settingsInput,
     outputSchema: z.looseObject({
       projectId: z.string(),

@@ -159,11 +159,22 @@ export const checkOutreachLink = createServerFn({ method: "POST" })
 
 export const updateOutreachSettings = createServerFn({ method: "POST" })
   .middleware(requireProjectContext)
-  .validator(projectOnly.extend({ settings: outreachSettingsInputSchema }))
+  .validator(
+    projectOnly.extend({
+      settings: outreachSettingsInputSchema,
+      // Blank keeps the saved password.
+      smtpPassword: z.string().max(500).optional(),
+    }),
+  )
   .handler(
     async ({ data, context }): Promise<Result<OutreachSettingsView>> =>
       asResult(
-        () => OutreachService.updateSettings(context.project, data.settings),
+        () =>
+          OutreachService.updateSettings(
+            context.project,
+            data.settings,
+            data.smtpPassword?.trim(),
+          ),
         context.project,
       ),
   );

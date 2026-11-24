@@ -128,6 +128,7 @@ beforeEach(async () => {
   for (const file of [
     "drizzle/sqlite/0048_fork_outreach_gsc.sql",
     "drizzle/sqlite/0050_fork_outreach_schedule.sql",
+    "drizzle/sqlite/0079_fork_outreach_smtp_login.sql",
   ]) {
     state.database.exec(
       readFileSync(file, "utf8").replaceAll("--> statement-breakpoint", ""),
@@ -138,7 +139,7 @@ beforeEach(async () => {
     senderEmail: "outreach@example.com",
     signature: "Alex\nExample",
     smtpHost: "smtp.example.com",
-    mailEnvKey: "EXAMPLE",
+    smtpUser: "outreach@example.com",
     timeZone: "Asia/Bangkok",
   });
   await OutreachScheduler.setPaused(project, false);

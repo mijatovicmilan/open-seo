@@ -554,6 +554,13 @@
       "when": 1795496009188,
       "tag": "0078_fork_dataforseo_usage",
       "breakpoints": true
+    },
+    {
+      "idx": 79,
+      "version": "6",
+      "when": 1795497496388,
+      "tag": "0079_fork_outreach_smtp_login",
+      "breakpoints": true
     }
   ]
 }

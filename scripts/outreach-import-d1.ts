@@ -18,9 +18,10 @@
  *     [--container open-seo-open-seo-1] [--dry-run]
  *
  * settings.json holds the project's outreach settings (siteUrl, linkDomains,
- * senderName, senderEmail, signature, smtpHost, smtpPort, mailEnvKey,
+ * senderName, senderEmail, signature, smtpHost, smtpPort, smtpUser,
  * timeZone, dailyMin, dailyMax, weeklyMin, weeklyMax, followUpDays). No
- * credentials: SMTP user and password stay in the server environment.
+ * password: the owner enters it in Outreach → Settings, where it is stored
+ * encrypted.
  */
 
 import { execFileSync } from "node:child_process";
@@ -157,7 +158,7 @@ const SETTINGS_COLUMNS: Record<string, string> = {
   signature: "signature",
   smtpHost: "smtp_host",
   smtpPort: "smtp_port",
-  mailEnvKey: "mail_env_key",
+  smtpUser: "smtp_user",
   timeZone: "time_zone",
   dailyMin: "daily_min",
   dailyMax: "daily_max",

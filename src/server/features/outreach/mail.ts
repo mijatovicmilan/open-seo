@@ -3,36 +3,21 @@
 // signature, sent over SMTP with implicit TLS (port 465) through Cloudflare's
 // socket API, which works on Workers and in the local workerd runtime.
 //
-// The SMTP user and password come only from the environment
-// (OUTREACH_<KEY>_SMTP_USER / OUTREACH_<KEY>_SMTP_PASSWORD, where KEY is the
-// project's mail env key). They are never stored, logged or returned, and
-// SMTP errors are reported without them.
+// The SMTP user and password are the project's outreach settings; the
+// password is stored encrypted and decrypted here only for the login. It is
+// never logged or returned, and SMTP errors are reported without it.
 
 import { env } from "cloudflare:workers";
 import type { OutreachConfig } from "@/server/features/outreach/outreachDomain";
+import { decryptSecret } from "@/server/lib/secretBox";
 
 const SMTP_TIMEOUT_MS = 20_000;
 const EMAIL = /^[^\s@<>()",;:]+@[^\s@<>()",;:]+\.[^\s@<>()",;:]+$/u;
 const ASCII = /^[\x20-\x7e]*$/u;
 
-type MailCredentials = { user: string; password: string };
-
 function envValue(name: string) {
   const value: unknown = Reflect.get(env, name);
   return typeof value === "string" && value.trim() ? value.trim() : null;
-}
-
-function mailEnvNames(key: string) {
-  const prefix = `OUTREACH_${key.toUpperCase().replace(/[^A-Z0-9]+/gu, "_")}`;
-  return { user: `${prefix}_SMTP_USER`, password: `${prefix}_SMTP_PASSWORD` };
-}
-
-function credentialsFor(key: string): MailCredentials | null {
-  if (!key) return null;
-  const names = mailEnvNames(key);
-  const user = envValue(names.user);
-  const password = envValue(names.password);
-  return user && password ? { user, password } : null;
 }
 
 /** OUTREACH_MAIL_TRANSPORT=log: nothing goes out; each send is only logged
@@ -49,10 +34,11 @@ export function mailProblem(config: OutreachConfig): string | null {
   if (!config.senderName) return "Set the sender name in outreach settings.";
   if (!config.signature) return "Set the signature in outreach settings.";
   if (!config.smtpHost) return "Set the SMTP host in outreach settings.";
-  if (!config.mailEnvKey) return "Set the mail env key in outreach settings.";
-  if (!isLogTransport() && !credentialsFor(config.mailEnvKey)) {
-    const names = mailEnvNames(config.mailEnvKey);
-    return `The server has no ${names.user} and ${names.password} values.`;
+  if (
+    !isLogTransport() &&
+    (!config.smtpUser || !config.smtpPasswordEncrypted)
+  ) {
+    return "Set the SMTP user and password in outreach settings.";
   }
   return null;
 }
@@ -142,8 +128,16 @@ async function withSmtpSession(
   config: OutreachConfig,
   steps: (session: SmtpSession) => Promise<void>,
 ) {
-  const credentials = credentialsFor(config.mailEnvKey);
-  if (!credentials) throw new Error("no SMTP credentials on the server");
+  if (!config.smtpUser || !config.smtpPasswordEncrypted) {
+    throw new Error("no SMTP user and password in outreach settings");
+  }
+  const password = await decryptSecret(config.smtpPasswordEncrypted).catch(
+    () => {
+      throw new Error(
+        "the saved SMTP password can no longer be decrypted (BETTER_AUTH_SECRET changed); enter it again in outreach settings",
+      );
+    },
+  );
   const { connect } = await import("cloudflare:sockets");
   const socket = connect(
     { hostname: config.smtpHost, port: config.smtpPort },
@@ -210,7 +204,7 @@ async function withSmtpSession(
     await command(`EHLO ${domain}`);
     await expect("EHLO", [250]);
     await command(
-      `AUTH PLAIN ${base64(`\u0000${credentials.user}\u0000${credentials.password}`)}`,
+      `AUTH PLAIN ${base64(`\u0000${config.smtpUser}\u0000${password}`)}`,
     );
     await expect("login", [235]);
     await steps({ command, write, expect, next });
@@ -247,7 +241,7 @@ export async function sendOutreachMail(input: {
 }
 
 // Logs in and out again without sending anything, so the owner can check
-// the settings and the server's credentials.
+// the settings and the saved login.
 export async function testMailConnection(config: OutreachConfig) {
   if (isLogTransport()) return;
   await withSmtpSession(config, async () => undefined);

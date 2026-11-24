@@ -34,12 +34,13 @@ export const outreachSettings = sqliteTable("outreach_settings", {
   senderEmail: text("sender_email").notNull().default(""),
   // Appended under every outgoing body ("\n" separated lines).
   signature: text("signature").notNull().default(""),
-  // SMTP server for sending from the app (SSL, usually port 465). The user
-  // and password never live in the database: they are read from the
-  // OUTREACH_<mailEnvKey>_SMTP_USER and _SMTP_PASSWORD environment values.
+  // SMTP server for sending from the app (SSL, usually port 465) and the
+  // mailbox login. The password is encrypted with BETTER_AUTH_SECRET
+  // (secretBox) and never leaves the server; null until it is set.
   smtpHost: text("smtp_host").notNull().default(""),
   smtpPort: integer("smtp_port").notNull().default(465),
-  mailEnvKey: text("mail_env_key").notNull().default(""),
+  smtpUser: text("smtp_user").notNull().default(""),
+  smtpPasswordEncrypted: text("smtp_password_encrypted"),
   // Days and weeks (from Monday) are counted in this IANA time zone.
   timeZone: text("time_zone").notNull().default("UTC"),
   dailyMin: integer("daily_min").notNull().default(2),

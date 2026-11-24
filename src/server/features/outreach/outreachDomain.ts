@@ -35,7 +35,9 @@ export type OutreachConfig = {
   signature: string;
   smtpHost: string;
   smtpPort: number;
-  mailEnvKey: string;
+  smtpUser: string;
+  // Ciphertext (secretBox); decrypted only for an SMTP login in mail.ts.
+  smtpPasswordEncrypted: string | null;
   timeZone: string;
   dailyMin: number;
   dailyMax: number;

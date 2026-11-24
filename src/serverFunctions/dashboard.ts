@@ -1,12 +1,14 @@
 import { DashboardSiteService } from "@/server/features/dashboard/services/DashboardSiteService";
 import { AppError } from "@/server/lib/errors";
 import { createServerFn } from "@tanstack/react-start";
+import { automaticDataforseoCallsOff } from "@/server/features/dataforseo-usage/automaticCalls";
 import { ActivationRepository } from "@/server/features/activation/repositories/ActivationRepository";
 import { DashboardService } from "@/server/features/dashboard/services/DashboardService";
 import { requireProjectContext } from "@/serverFunctions/middleware";
 import {
   dashboardProjectInputSchema,
   dashboardBacklinksInputSchema,
+  dashboardLinkActivityInputSchema,
   dashboardStepDismissalSchema,
 } from "@/types/schemas/dashboard";
 
@@ -87,9 +89,12 @@ export const getDashboardBacklinks = createServerFn({ method: "POST" })
         "VALIDATION_ERROR",
         "Add your website in project settings first.",
       );
+    // Fork addition (FORK-CHANGES.md): with automatic DataForSEO calls off,
+    // only a click (`load`) calls DataForSEO.
     return DashboardSiteService.getBacklinks(
       { domain: context.project.domain, kind: data.kind },
       context,
+      data.load || !automaticDataforseoCallsOff(),
     );
   });
 export const getDashboardEmergingQueries = createServerFn({ method: "POST" })
@@ -103,12 +108,13 @@ export const getDashboardEmergingQueries = createServerFn({ method: "POST" })
   );
 export const getDashboardLinkActivity = createServerFn({ method: "POST" })
   .middleware(requireProjectContext)
-  .validator(dashboardProjectInputSchema)
-  .handler(({ context }) => {
+  .validator(dashboardLinkActivityInputSchema)
+  .handler(({ context, data }) => {
     if (!context.project.domain)
       throw new AppError("VALIDATION_ERROR", "Add your website first.");
     return DashboardSiteService.getLinkActivity(
       context.project.domain,
       context,
+      data.load || !automaticDataforseoCallsOff(),
     );
   });

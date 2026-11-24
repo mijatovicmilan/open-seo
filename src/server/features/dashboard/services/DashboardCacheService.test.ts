@@ -67,7 +67,7 @@ function input(
   };
 }
 
-it("allows only one paid load for simultaneous cold visits and reuses the winner's result", async () => {
+it("allows only one paid load for simultaneous cold visits; the second waits for the winner's result", async () => {
   let finish!: (value: string[]) => void;
   let started!: () => void;
   const loading = new Promise<void>((resolve) => {
@@ -81,14 +81,10 @@ it("allows only one paid load for simultaneous cold visits and reuses the winner
   });
   const first = DashboardCacheService.readThrough(input(load));
   await loading;
-  await expect(DashboardCacheService.readThrough(input(load))).rejects.toThrow(
-    "already running",
-  );
+  const second = DashboardCacheService.readThrough(input(load));
   finish(["result"]);
-  await first;
-  expect((await DashboardCacheService.readThrough(input(load))).value).toEqual([
-    "result",
-  ]);
+  expect((await first).value).toEqual(["result"]);
+  expect((await second).value).toEqual(["result"]);
   expect(load).toHaveBeenCalledTimes(1);
 });
 

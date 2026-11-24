@@ -46,6 +46,11 @@ export function DataforseoUsagePage() {
               title="DataForSEO usage"
               hint={`What OpenSEO's DataForSEO calls cost in the last ${usage.windowDays} days, as DataForSEO reported each one. Calls that fail without a charge, such as on an empty balance, are not listed.`}
             />
+            <p className="text-sm text-muted-foreground">
+              {usage.automaticCallsOff
+                ? "Automatic calls are off (DATAFORSEO_AUTO_CALLS=off): the dashboard's backlink cards and a rank tracker's suggestions, first check and stats wait for a click. Searches and checks you start still run."
+                : "Automatic calls are on: the dashboard's backlink cards load once a day, and a rank tracker checks new keywords as soon as they are added. Set DATAFORSEO_AUTO_CALLS=off in .env to stop them."}
+            </p>
             <div className="grid gap-4 sm:grid-cols-3">
               <Stat
                 label="Balance"

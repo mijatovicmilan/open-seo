@@ -1,3 +1,4 @@
+import { automaticDataforseoCallsOff } from "@/server/features/dataforseo-usage/automaticCalls";
 import { z } from "zod";
 import {
   keywordLimitMessage,
@@ -113,7 +114,12 @@ export const addRankTrackingKeywordsTool = {
     );
     const requested = args.keywords.length;
     const metricsNote =
-      result.added > 0 ? await fetchKeywordMetrics(args, context.billing) : "";
+      result.added === 0
+        ? ""
+        : // Fork addition (FORK-CHANGES.md).
+          automaticDataforseoCallsOff()
+          ? " Search volume, difficulty and CPC were not fetched: automatic DataForSEO calls are off on this install (refresh them when needed)."
+          : await fetchKeywordMetrics(args, context.billing);
     return mcpResponse({
       text: `Added ${result.added} of ${requested} requested keyword${requested === 1 ? "" : "s"} to tracker ${args.trackerId}.${result.overLimit ? ` ${result.overLimit.notAdded} did not fit: ${keywordLimitMessage(result.overLimit.limit)}` : ""} No check was started.${metricsNote}${result.scheduledEstimate ? ` Future ${result.scheduledEstimate.scheduleInterval} checks cost at most ${result.scheduledEstimate.costCredits} credits each, including retries (up to ~${result.scheduledEstimate.monthlyCostCredits} credits/month).` : result.added > 0 ? " This tracker is manual, so positions appear only after a check with run_rank_tracker." : ""}`,
       meta: buildProjectMeta(

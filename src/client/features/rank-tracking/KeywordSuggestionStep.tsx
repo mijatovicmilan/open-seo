@@ -173,11 +173,20 @@ export function KeywordSuggestionStep({
   // any SERP language with any country, and the server resolves a Labs-served
   // language for this country (resolveLabsMarket in serverFunctions/domain.ts).
   const labsSupported = isLabsLocationCode(locationCode);
+  // Fork addition (FORK-CHANGES.md): a click while automatic DataForSEO calls
+  // are off; the server answers null until then.
+  const [load, setLoad] = useState(false);
   const suggestionsQuery = useQuery({
-    queryKey: ["domainKeywordSuggestions", projectId, domain, locationCode],
+    queryKey: [
+      "domainKeywordSuggestions",
+      projectId,
+      domain,
+      locationCode,
+      load,
+    ],
     queryFn: () =>
       getDomainKeywordSuggestions({
-        data: { projectId, domain, locationCode },
+        data: { projectId, domain, locationCode, load },
       }),
     enabled: labsSupported,
   });
@@ -264,6 +273,23 @@ export function KeywordSuggestionStep({
         <div className="flex flex-col items-center justify-center py-16">
           <Spinner label="This usually takes a few seconds" />
         </div>
+      </>
+    );
+  }
+
+  if (suggestionsQuery.data === null) {
+    return (
+      <>
+        <StepHeader
+          title="Find the keywords you already rank for?"
+          description={`Automatic DataForSEO calls are off. Looking up the keywords ${domain} ranks for uses DataForSEO credits (about $0.01). You can also skip and add keywords yourself.`}
+        />
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Skip
+          </Button>
+          <Button onClick={() => setLoad(true)}>Find keywords</Button>
+        </DialogFooter>
       </>
     );
   }

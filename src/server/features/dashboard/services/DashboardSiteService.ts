@@ -40,16 +40,26 @@ const queriesSchema = z.object({
   baselineStartDate: z.string(),
 });
 
+// `load` false (fork addition, FORK-CHANGES.md: automatic DataForSEO calls
+// off) reads only the saved result; null when there is none.
 async function getBacklinks(
   input: { domain: string; kind: "new" | "lost" | "all" },
   billingCustomer: BillingCustomerContext,
+  load = true,
 ) {
-  const result = await DashboardCacheService.readThrough({
+  const cache = {
     namespace: "dashboard:links:v2",
     organizationId: billingCustomer.organizationId,
     params: input,
     schema: z.array(backlinksItemSchema),
     maxAgeMs: 86400_000,
+  };
+  if (!load) {
+    const saved = await DashboardCacheService.peek(cache);
+    return saved && { ...saved, value: mapBacklinksRows(saved.value) };
+  }
+  const result = await DashboardCacheService.readThrough({
+    ...cache,
     load: async () => {
       const target = normalizeBacklinksTarget(input.domain, {
         scope: "subdomains",
@@ -291,32 +301,40 @@ async function getEmergingQueries(projectId: string, organizationId: string) {
 async function getLinkActivity(
   domain: string,
   billingCustomer: BillingCustomerContext,
+  load = true,
 ) {
   const target = normalizeBacklinksTarget(domain, {
     scope: "subdomains",
   }).apiTarget;
-  const domains = await DashboardCacheService.readThrough({
+  const cache = {
     namespace: "dashboard:new-domains:v2",
     organizationId: billingCustomer.organizationId,
     params: { target },
     schema: z.array(referringDomainItemSchema),
     maxAgeMs: 86400_000,
-    load: async () => {
-      const from = new Date(Date.now() - 7 * 86400_000)
-        .toISOString()
-        .slice(0, 10);
-      const response = await createDataforseoClient(
-        billingCustomer,
-      ).backlinks.referringDomains({
-        target,
-        includeSubdomains: true,
-        limit: 25,
-        orderBy: ["first_seen,desc"],
-        filters: [["first_seen", ">=", `${from} 00:00:00 +00:00`]],
-      });
-      return response.items;
-    },
-  });
+  };
+  // Fork addition (FORK-CHANGES.md): see getBacklinks.
+  const domains = load
+    ? await DashboardCacheService.readThrough({
+        ...cache,
+        load: async () => {
+          const from = new Date(Date.now() - 7 * 86400_000)
+            .toISOString()
+            .slice(0, 10);
+          const response = await createDataforseoClient(
+            billingCustomer,
+          ).backlinks.referringDomains({
+            target,
+            includeSubdomains: true,
+            limit: 25,
+            orderBy: ["first_seen,desc"],
+            filters: [["first_seen", ">=", `${from} 00:00:00 +00:00`]],
+          });
+          return response.items;
+        },
+      })
+    : await DashboardCacheService.peek(cache);
+  if (!domains) return null;
   // Stale domain results must not trigger a second charge or pretend the week is quiet.
   if (domains.value.length || domains.stale)
     return {
@@ -329,7 +347,12 @@ async function getLinkActivity(
       kind: "domains" as const,
       links: [],
     };
-  const links = await getBacklinks({ domain, kind: "new" }, billingCustomer);
+  const links = await getBacklinks(
+    { domain, kind: "new" },
+    billingCustomer,
+    load,
+  );
+  if (!links) return null;
   return { ...links, value: [], kind: "links" as const, links: links.value };
 }
 

@@ -8,6 +8,7 @@ import { useState, type ComponentProps } from "react";
 import { TabsTrigger } from "@/client/components/ui/tabs";
 import { getDashboardBacklinks } from "@/serverFunctions/dashboard";
 import { Freshness, ExternalPage } from "./siteTabParts";
+import { LoadDataforseoPrompt } from "@/client/features/dataforseo-usage/LoadDataforseoPrompt";
 const KINDS = ["new", "lost", "all"] as const;
 type Kind = (typeof KINDS)[number];
 
@@ -25,9 +26,13 @@ export function DashboardBacklinks({
   domain: string;
 }) {
   const [kind, setKind] = useState<Kind>("new");
+  // Fork addition (FORK-CHANGES.md): kinds loaded by a click while automatic
+  // DataForSEO calls are off.
+  const [loaded, setLoaded] = useState<Kind[]>([]);
+  const load = loaded.includes(kind);
   const query = useQuery({
-    queryKey: ["dashboardBacklinks", projectId, domain, kind],
-    queryFn: () => getDashboardBacklinks({ data: { projectId, kind } }),
+    queryKey: ["dashboardBacklinks", projectId, domain, kind, load],
+    queryFn: () => getDashboardBacklinks({ data: { projectId, kind, load } }),
     staleTime: 86400_000,
     retry: false,
   });
@@ -37,7 +42,13 @@ export function DashboardBacklinks({
       kind={kind}
       isLoading={query.isPending}
       error={
-        query.isError ? (
+        query.data === null ? (
+          <LoadDataforseoPrompt
+            cost="about $0.03"
+            onLoad={() => setLoaded([...loaded, kind])}
+            isLoading={query.isFetching}
+          />
+        ) : query.isError ? (
           <QueryError
             error={query.error}
             fallback="Could not load backlinks"
@@ -69,8 +80,8 @@ export function DashboardBacklinks({
   );
 }
 
-type Backlink = Awaited<
-  ReturnType<typeof getDashboardBacklinks>
+type Backlink = NonNullable<
+  Awaited<ReturnType<typeof getDashboardBacklinks>>
 >["value"][number];
 function DashboardBacklinkTable({
   rows,

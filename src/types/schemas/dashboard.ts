@@ -33,6 +33,13 @@ export const dashboardSiteTabSchema = z.enum([
 export const dashboardSearchSchema = z.object({
   tab: dashboardSiteTabSchema.optional().catch(undefined),
 });
+// Fork addition (FORK-CHANGES.md): `load` is a click on "Load" while
+// automatic DataForSEO calls are off (DATAFORSEO_AUTO_CALLS=off).
 export const dashboardBacklinksInputSchema = dashboardProjectInputSchema.extend(
-  { kind: z.enum(["new", "lost", "all"]).default("new") },
+  {
+    kind: z.enum(["new", "lost", "all"]).default("new"),
+    load: z.boolean().optional(),
+  },
 );
+export const dashboardLinkActivityInputSchema =
+  dashboardProjectInputSchema.extend({ load: z.boolean().optional() });

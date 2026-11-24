@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { automaticDataforseoCallsOff } from "@/server/features/dataforseo-usage/automaticCalls";
 import { waitUntil } from "cloudflare:workers";
 import { RankTrackingRepository } from "@/server/features/rank-tracking/repositories/RankTrackingRepository";
 import { RankTrackingService } from "@/server/features/rank-tracking/services/RankTrackingService";
@@ -102,11 +103,14 @@ export const createRankTrackingConfig = createServerFn({ method: "POST" })
 
     // Re-adding an archived domain keeps its keywords, and the keyword step
     // then adds nothing new — so this is the only place its check can start.
-    await runAutoCheck({
-      configId: result.id,
-      projectId: context.projectId,
-      billingCustomer: context,
-    });
+    // Fork addition (FORK-CHANGES.md): not while automatic DataForSEO calls
+    // are off.
+    if (!automaticDataforseoCallsOff())
+      await runAutoCheck({
+        configId: result.id,
+        projectId: context.projectId,
+        billingCustomer: context,
+      });
 
     await markOnboardingMilestone(context, "rankTrackingSetUp");
     waitUntil(
@@ -242,8 +246,11 @@ export const addTrackingKeywords = createServerFn({ method: "POST" })
       data.matchCase,
     );
 
+    // Fork addition (FORK-CHANGES.md): with automatic DataForSEO calls off,
+    // new keywords wait for a check and a stats refresh someone starts.
+    const automatic = !automaticDataforseoCallsOff();
     const autoCheck =
-      result.addedIds.length > 0
+      automatic && result.addedIds.length > 0
         ? await runAutoCheck({
             configId: data.configId,
             projectId: context.projectId,
@@ -253,7 +260,7 @@ export const addTrackingKeywords = createServerFn({ method: "POST" })
         : null;
 
     // Fetch keyword metrics (awaited so they're in the DB before client re-fetches)
-    if (result.added > 0) {
+    if (automatic && result.added > 0) {
       try {
         await RankTrackingService.refreshKeywordMetrics(
           data.configId,

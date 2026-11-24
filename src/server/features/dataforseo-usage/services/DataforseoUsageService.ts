@@ -1,6 +1,7 @@
 import { sortBy } from "remeda";
 import { fetchUserData } from "@/server/lib/dataforseo/appendix";
 import { DataforseoCallRepository } from "../repositories/DataforseoCallRepository";
+import { automaticDataforseoCallsOff } from "../automaticCalls";
 
 // The DataForSEO usage page (fork feature, see FORK-CHANGES.md): what the
 // last 30 days of calls cost, by feature and by endpoint, the latest calls,
@@ -36,6 +37,7 @@ async function getUsage(organizationId: string) {
 
   return {
     windowDays: WINDOW_DAYS,
+    automaticCallsOff: automaticDataforseoCallsOff(),
     balanceUsd,
     totalCostUsd: rows.reduce((sum, row) => sum + row.costUsd, 0),
     totalCalls: rows.reduce((sum, row) => sum + row.calls, 0),

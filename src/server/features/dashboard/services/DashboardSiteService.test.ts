@@ -24,6 +24,7 @@ vi.mock("./DashboardCacheService", () => ({
     readThrough: async (input: { load: () => Promise<unknown> }) => ({
       value: await input.load(),
     }),
+    peek: async () => null,
   },
 }));
 
@@ -145,6 +146,14 @@ it("falls back to new backlinks when there are no new referring domains", async 
     kind: "links",
     links: [{ urlFrom: "https://existing.example/new-page" }],
   });
+});
+// Fork addition (FORK-CHANGES.md): automatic DataForSEO calls off.
+it("without permission to load, reports nothing saved instead of calling DataForSEO", async () => {
+  expect(
+    await DashboardSiteService.getLinkActivity("example.com", customer, false),
+  ).toBeNull();
+  expect(providers.domains).not.toHaveBeenCalled();
+  expect(providers.links).not.toHaveBeenCalled();
 });
 
 it("finds new queries beyond Google's default first page", async () => {

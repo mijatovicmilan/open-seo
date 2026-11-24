@@ -64,6 +64,9 @@ export const domainKeywordSuggestionsSchema = z.object({
   scope: researchScopeSchema.optional(),
   locationCode: z.number().int().positive().optional(),
   languageCode: z.string().min(2).max(8).optional(),
+  // Fork addition (FORK-CHANGES.md): a click while automatic DataForSEO calls
+  // are off (DATAFORSEO_AUTO_CALLS=off).
+  load: z.boolean().optional(),
 });
 
 export const DOMAIN_KEYWORDS_PAGE_SIZES = [50, 100, 200] as const;

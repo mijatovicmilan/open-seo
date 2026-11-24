@@ -18,6 +18,9 @@ const BILLING_CODES = new Set<ErrorCode>([
   "INSUFFICIENT_CREDITS",
 ]);
 const failureSchema = z.object({ code: errorCodeSchema });
+// Provider loads take a few seconds; a claim held longer is a backoff.
+const WAIT_STEP_MS = 500;
+const MAX_WAIT_MS = 15_000;
 
 // Cached provider responses are disposable; keep them longer than their refresh
 // cadence so credit/provider failures can display the last successful result.
@@ -53,10 +56,24 @@ async function readThrough<T>(input: {
         stale: true,
         refreshError: "Update already running or temporarily paused.",
       };
-    // Fork addition (FORK-CHANGES.md): while a failed refresh backs off, a
-    // retry gets that failure's reason, not "too many requests".
-    const failure = failureSchema.safeParse(await getCached(`${key}:failure`));
-    if (failure.success) throw new AppError(failure.data.code);
+    // Fork addition (FORK-CHANGES.md): a visit that overlaps a running load
+    // (a reload, a second tab) waits for its result; while a failed refresh
+    // backs off, a retry gets that failure's reason. Neither is "too many
+    // requests".
+    for (let waited = 0; ; waited += WAIT_STEP_MS) {
+      const failure = failureSchema.safeParse(
+        await getCached(`${key}:failure`),
+      );
+      if (failure.success) throw new AppError(failure.data.code);
+      const done = schema.safeParse(await getCached(key));
+      if (
+        done.success &&
+        Date.now() - Date.parse(done.data.fetchedAt) < input.maxAgeMs
+      )
+        return { ...done.data, stale: false, refreshError: null };
+      if (waited >= MAX_WAIT_MS) break;
+      await new Promise((resolve) => setTimeout(resolve, WAIT_STEP_MS));
+    }
     throw new AppError(
       "RATE_LIMITED",
       "An update is already running or temporarily paused. Try again shortly.",
@@ -97,6 +114,29 @@ async function readThrough<T>(input: {
   }
 }
 
+// Fork addition (FORK-CHANGES.md): the saved result without loading, for when
+// automatic DataForSEO calls are off. Null when nothing was ever loaded.
+async function peek<T>(input: {
+  namespace: string;
+  organizationId: string;
+  params: Record<string, unknown>;
+  schema: z.ZodType<T>;
+  maxAgeMs: number;
+}) {
+  const key = await buildCacheKey(input.namespace, {
+    ...input.params,
+    organizationId: input.organizationId,
+  });
+  const schema = z.object({ value: input.schema, fetchedAt: z.string() });
+  const parsed = schema.safeParse(await getCached(key));
+  if (!parsed.success) return null;
+  return {
+    ...parsed.data,
+    stale: Date.now() - Date.parse(parsed.data.fetchedAt) >= input.maxAgeMs,
+    refreshError: null,
+  };
+}
+
 // Search Console rows are Google data the privacy policy lets users remove, so
 // every cached copy for a project sits under one prefix that disconnect,
 // project deletion, and account erasure can drop.
@@ -113,6 +153,7 @@ async function deleteGscCache(projectId: string) {
 
 export const DashboardCacheService = {
   readThrough,
+  peek,
   gscNamespace,
   deleteGscCache,
 };

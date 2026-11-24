@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { automaticDataforseoCallsOff } from "@/server/features/dataforseo-usage/automaticCalls";
 import { requireProjectContext } from "@/serverFunctions/middleware";
 import {
   domainOverviewSchema,
@@ -40,8 +41,10 @@ export const getDomainOverview = createServerFn({ method: "POST" })
 export const getDomainKeywordSuggestions = createServerFn({ method: "POST" })
   .middleware(requireProjectContext)
   .validator(domainKeywordSuggestionsSchema)
-  .handler(async ({ data, context }) =>
-    DomainService.getSuggestedKeywords(
+  .handler(async ({ data, context }) => {
+    // Fork addition (FORK-CHANGES.md): null asks for a click first.
+    if (automaticDataforseoCallsOff() && !data.load) return null;
+    return DomainService.getSuggestedKeywords(
       {
         ...data,
         ...resolveLabsMarket(data, context.project),
@@ -49,8 +52,8 @@ export const getDomainKeywordSuggestions = createServerFn({ method: "POST" })
         projectId: context.projectId,
       },
       context,
-    ),
-  );
+    );
+  });
 
 export const getDomainKeywordsPage = createServerFn({ method: "POST" })
   .middleware(requireProjectContext)

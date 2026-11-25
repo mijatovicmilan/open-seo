@@ -17,7 +17,7 @@ import {
 import { formatDay } from "@/client/features/gsc-history/annotationStyles";
 import type { InsightsTarget } from "@/client/features/gsc-history/InsightsDetailSheet";
 import type { Insights } from "@/client/features/gsc-history/types";
-import { pageSection, sectionLabel } from "@/shared/pageSection";
+import { TypeCell, TypePill } from "@/client/features/gsc-history/TypePill";
 
 /** Clicking a page or query in any table opens its details panel. */
 export const InsightsOpenContext = createContext<
@@ -55,15 +55,6 @@ export function PageCell({ url }: { url: string | null }) {
     >
       {label}
     </button>
-  );
-}
-
-/** Fork addition (FORK-CHANGES.md): the page's type, its first folder. */
-export function TypeCell({ url }: { url: string | null }) {
-  return (
-    <TableCell className="whitespace-nowrap text-muted-foreground">
-      {url ? sectionLabel(pageSection(url)) : "—"}
-    </TableCell>
   );
 }
 
@@ -231,6 +222,7 @@ export function NewQueriesTable({ rows }: { rows: Insights["newQueries"] }) {
         <TableRow>
           <TableHead>Query</TableHead>
           <TableHead>Best page</TableHead>
+          <TableHead>Type</TableHead>
           <TableHead>First seen</TableHead>
           <TableHead className="text-right">Impr.</TableHead>
           <TableHead className="text-right">Clicks</TableHead>
@@ -244,6 +236,7 @@ export function NewQueriesTable({ rows }: { rows: Insights["newQueries"] }) {
             <TableCell className={PAGE_HALF}>
               <PageCell url={row.page} />
             </TableCell>
+            <TypeCell url={row.page} />
             <TableCell className="whitespace-nowrap">
               {formatDay(row.firstDate)}
             </TableCell>
@@ -270,6 +263,7 @@ export function NearPageOneTable({ rows }: { rows: Insights["nearPageOne"] }) {
         <TableRow>
           <TableHead>Query</TableHead>
           <TableHead>Best page</TableHead>
+          <TableHead>Type</TableHead>
           <TableHead className="text-right">Pos.</TableHead>
           <TableHead className="text-right">Impr.</TableHead>
           <TableHead className="text-right">Clicks</TableHead>
@@ -283,6 +277,7 @@ export function NearPageOneTable({ rows }: { rows: Insights["nearPageOne"] }) {
             <TableCell className={PAGE_HALF}>
               <PageCell url={row.page} />
             </TableCell>
+            <TypeCell url={row.page} />
             <TableCell className="text-right tabular-nums">
               {formatPosition(row.position)}
             </TableCell>
@@ -309,6 +304,7 @@ export function CtrGapTable({ rows }: { rows: Insights["ctrGaps"] }) {
         <TableRow>
           <TableHead>Query</TableHead>
           <TableHead>Page</TableHead>
+          <TableHead>Type</TableHead>
           <TableHead className="text-right">Pos.</TableHead>
           <TableHead className="text-right">CTR</TableHead>
           <TableHead className="text-right">Expected</TableHead>
@@ -322,6 +318,7 @@ export function CtrGapTable({ rows }: { rows: Insights["ctrGaps"] }) {
             <TableCell className={PAGE_HALF}>
               <PageCell url={row.page} />
             </TableCell>
+            <TypeCell url={row.page} />
             <TableCell className="text-right tabular-nums">
               {formatPosition(row.position)}
             </TableCell>
@@ -370,6 +367,7 @@ export function CannibalizationTable({
                   className="flex min-w-0 items-center gap-2"
                 >
                   <PageCell url={page.page} />
+                  <TypePill url={page.page} />
                   <span className="shrink-0 text-xs text-muted-foreground">
                     {Math.round(page.share * 100)}%, #
                     {formatPosition(page.position)}

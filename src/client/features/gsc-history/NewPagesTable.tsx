@@ -7,10 +7,8 @@ import {
   TableRow,
 } from "@/client/components/ui/table";
 import { formatDay } from "@/client/features/gsc-history/annotationStyles";
-import {
-  PageCell,
-  TypeCell,
-} from "@/client/features/gsc-history/SearchInsightsSections";
+import { PageCell } from "@/client/features/gsc-history/SearchInsightsSections";
+import { TypeCell } from "@/client/features/gsc-history/TypePill";
 import type { Insights } from "@/client/features/gsc-history/types";
 import { formatCount } from "@/client/features/search-performance/SearchPerformanceColumns";
 

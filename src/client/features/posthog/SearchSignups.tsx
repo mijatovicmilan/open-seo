@@ -19,8 +19,8 @@ import {
 import {
   InsightSection,
   PageCell,
-  TypeCell,
 } from "@/client/features/gsc-history/SearchInsightsSections";
+import { TypeCell } from "@/client/features/gsc-history/TypePill";
 import { pageSection } from "@/shared/pageSection";
 import type { Insights } from "@/client/features/gsc-history/types";
 import { getSearchSignups } from "@/serverFunctions/analyticsSource";

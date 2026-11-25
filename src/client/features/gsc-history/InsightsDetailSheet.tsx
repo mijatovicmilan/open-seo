@@ -3,7 +3,6 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Filter } from "lucide-react";
 import { cn } from "cn";
 import { SafeExternalLink } from "@/client/components/SafeExternalLink";
-import { Badge } from "@/client/components/ui/badge";
 import { Button } from "@/client/components/ui/button";
 import {
   Sheet,
@@ -35,13 +34,13 @@ import {
   QueryCell,
   pathOf,
 } from "@/client/features/gsc-history/SearchInsightsSections";
+import { TypePill } from "@/client/features/gsc-history/TypePill";
 import { getStandardErrorMessage } from "@/client/lib/error-messages";
 import {
   formatCount,
   formatPosition,
 } from "@/client/features/search-performance/SearchPerformanceColumns";
 import { getSearchInsights } from "@/serverFunctions/gscHistory";
-import { pageSection, sectionLabel } from "@/shared/pageSection";
 
 // Fork feature (FORK-CHANGES.md): what Search Insights knows about one page
 // or one query, opened from any table.
@@ -94,9 +93,7 @@ export function InsightsDetailSheet({
                 {"page" in target ? (
                   <>
                     Page
-                    <Badge variant="outline" className="font-normal">
-                      {sectionLabel(pageSection(target.page))}
-                    </Badge>
+                    <TypePill url={target.page} />
                   </>
                 ) : (
                   "Query"

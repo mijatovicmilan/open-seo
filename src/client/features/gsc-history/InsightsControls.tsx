@@ -143,6 +143,55 @@ export function InsightsControls({
             onChange({ range: value, start: undefined, end: undefined });
           }}
         />
+        {showCustom ? (
+          <form
+            className="flex flex-wrap items-center gap-2"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (!draftStart || !draftEnd) return;
+              setEditing(false);
+              onChange({ range: "custom", start: draftStart, end: draftEnd });
+            }}
+          >
+            <CalendarRange className="size-4 text-muted-foreground" />
+            <Input
+              type="date"
+              className="h-9 w-40 text-sm"
+              value={draftStart}
+              min={bounds.oldest ?? undefined}
+              max={bounds.newest ?? undefined}
+              onChange={(event) => setDraftStart(event.target.value)}
+              aria-label="From"
+            />
+            <span className="text-xs text-muted-foreground">to</span>
+            <Input
+              type="date"
+              className="h-9 w-40 text-sm"
+              value={draftEnd}
+              min={bounds.oldest ?? undefined}
+              max={bounds.newest ?? undefined}
+              onChange={(event) => setDraftEnd(event.target.value)}
+              aria-label="To"
+            />
+            <Button type="submit" className="h-9">
+              Apply
+            </Button>
+            {range !== "custom" ? (
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-9"
+                onClick={() => setEditing(false)}
+              >
+                Cancel
+              </Button>
+            ) : null}
+          </form>
+        ) : null}
+      </div>
+      {/* Custom dates open beside the period buttons; the filters keep
+          their own row. */}
+      <div className="flex flex-wrap items-center gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <ChoiceMenu
             label="Compare with"
@@ -222,51 +271,6 @@ export function InsightsControls({
           </span>
         ) : null}
       </div>
-      {showCustom ? (
-        <form
-          className="flex flex-wrap items-center gap-2"
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (!draftStart || !draftEnd) return;
-            setEditing(false);
-            onChange({ range: "custom", start: draftStart, end: draftEnd });
-          }}
-        >
-          <CalendarRange className="size-4 text-muted-foreground" />
-          <Input
-            type="date"
-            className="h-9 w-40 text-sm"
-            value={draftStart}
-            min={bounds.oldest ?? undefined}
-            max={bounds.newest ?? undefined}
-            onChange={(event) => setDraftStart(event.target.value)}
-            aria-label="From"
-          />
-          <span className="text-xs text-muted-foreground">to</span>
-          <Input
-            type="date"
-            className="h-9 w-40 text-sm"
-            value={draftEnd}
-            min={bounds.oldest ?? undefined}
-            max={bounds.newest ?? undefined}
-            onChange={(event) => setDraftEnd(event.target.value)}
-            aria-label="To"
-          />
-          <Button type="submit" className="h-9">
-            Apply
-          </Button>
-          {range !== "custom" ? (
-            <Button
-              type="button"
-              variant="ghost"
-              className="h-9"
-              onClick={() => setEditing(false)}
-            >
-              Cancel
-            </Button>
-          ) : null}
-        </form>
-      ) : null}
     </div>
   );
 }

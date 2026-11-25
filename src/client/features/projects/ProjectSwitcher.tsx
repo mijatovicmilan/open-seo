@@ -18,7 +18,7 @@ import {
 import { Button } from "@/client/components/ui/button";
 import { Separator } from "@/client/components/ui/separator";
 import { Skeleton } from "@/client/components/ui/skeleton";
-import { DomainFavicon } from "@/client/features/ai-visibility/DomainFavicon";
+import { ProjectIcon } from "@/client/features/projects/ProjectIcon";
 import { LOCATIONS } from "@/shared/keyword-locations";
 import type { ProjectSummary } from "./types";
 
@@ -130,9 +130,9 @@ export function ProjectSwitcher({
           >
             <span className="flex min-w-0 items-center gap-2.5">
               {activeProject?.domain ? (
-                <DomainFavicon
+                <ProjectIcon
+                  projectId={activeProject.id}
                   domain={activeProject.domain}
-                  className="size-6 rounded-md"
                 />
               ) : null}
               <span className="flex min-w-0 flex-col">
@@ -189,10 +189,7 @@ export function ProjectSwitcher({
                 className="gap-2.5"
               >
                 {project.domain ? (
-                  <DomainFavicon
-                    domain={project.domain}
-                    className="size-6 rounded-md"
-                  />
+                  <ProjectIcon projectId={project.id} domain={project.domain} />
                 ) : (
                   // Keeps names in line with the projects that have an icon.
                   <span className="size-6 shrink-0" />

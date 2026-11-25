@@ -155,7 +155,21 @@ type HandlerState = {
   activeCoordinate?: { x: number; y: number };
 };
 
-const AXIS_WIDTH = 44;
+// The y-axis is as wide as its longest label (11px digits are ~6.5px wide),
+// so short labels leave no gap at the chart's sides.
+function tickLabel(series: ChartSeries, value: number) {
+  return series.metric.percent
+    ? series.metric.format(value)
+    : new Intl.NumberFormat("en-US", { notation: "compact" }).format(value);
+}
+
+function axisWidth(axis: ReturnType<typeof axisFor>, series: ChartSeries) {
+  const longest = Math.max(
+    1,
+    ...axis.ticks.map((tick) => tickLabel(series, tick).length),
+  );
+  return Math.ceil(longest * 6.5) + 10;
+}
 
 /** A note marker under the baseline; merged markers show their count. A
  *  click pins a tooltip with every mark it holds. */
@@ -333,13 +347,16 @@ export function TimeSeriesChart({
   const margin = {
     top: 8,
     right: axes.length > 1 ? 0 : 8,
-    bottom: 12,
+    // Note markers sit under the day labels.
+    bottom: hasNotes ? 12 : 0,
     left: 0,
   };
+  const widths = axes.map((axis) => axisWidth(axis, axis.series));
+  const leftWidth = widths[0] ?? 0;
+  const rightWidth = widths[1] ?? 0;
   // Where a day sits, for the keyboard (the pointer reports its own).
-  const plotLeft = margin.left + AXIS_WIDTH;
-  const plotWidth =
-    width - margin.right - (axes.length > 1 ? AXIS_WIDTH : 0) - plotLeft;
+  const plotLeft = margin.left + leftWidth;
+  const plotWidth = width - margin.right - rightWidth - plotLeft;
   const xAt = (index: number) => {
     const n = rows.length;
     if (kind === "bar") return plotLeft + ((index + 0.5) * plotWidth) / n;
@@ -381,6 +398,7 @@ export function TimeSeriesChart({
         }
         tick={{ fontSize: 11, fill: AXIS }}
         tickMargin={hasNotes ? 16 : 6}
+        height={hasNotes ? 36 : 24}
         tickLine={false}
         axisLine={false}
         minTickGap={28}
@@ -396,13 +414,7 @@ export function TimeSeriesChart({
           ticks={axis.ticks}
           reversed={Boolean(axis.series.metric.inverted)}
           allowDecimals={!axis.series.metric.integer}
-          tickFormatter={(value: number) =>
-            axis.series.metric.percent
-              ? axis.series.metric.format(value)
-              : new Intl.NumberFormat("en-US", {
-                  notation: "compact",
-                }).format(value)
-          }
+          tickFormatter={(value: number) => tickLabel(axis.series, value)}
           // With two scales the ticks take each line's colour, so it is
           // clear which axis belongs to which line.
           tick={{
@@ -415,7 +427,7 @@ export function TimeSeriesChart({
           }}
           tickLine={false}
           axisLine={false}
-          width={44}
+          width={widths[index] ?? 0}
         />
       ))}
       {/* Only for the hover dots; the card is drawn below, outside the SVG,

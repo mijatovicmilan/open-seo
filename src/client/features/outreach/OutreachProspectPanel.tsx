@@ -82,7 +82,7 @@ export function OutreachProspectPanel({
       <SheetContent
         side="right"
         showCloseButton={false}
-        className="gap-0 overflow-hidden bg-card p-0 data-[side=right]:w-full data-[side=right]:sm:max-w-2xl"
+        className="gap-0 overflow-hidden border-border bg-card p-0 data-[side=right]:w-full data-[side=right]:sm:max-w-2xl"
       >
         <header className="flex items-start gap-3 border-b border-border px-5 py-4">
           <div className="min-w-0 flex-1 space-y-1">

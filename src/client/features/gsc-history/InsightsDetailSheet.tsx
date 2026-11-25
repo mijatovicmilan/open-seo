@@ -80,7 +80,7 @@ export function InsightsDetailSheet({
     >
       <SheetContent
         initialFocus={headerRef}
-        className="gap-0 overflow-y-auto data-[side=right]:w-full data-[side=right]:sm:max-w-xl"
+        className="gap-0 overflow-y-auto border-border data-[side=right]:w-full data-[side=right]:sm:max-w-xl"
       >
         {target ? (
           <InsightsOpenContext.Provider value={onOpen}>

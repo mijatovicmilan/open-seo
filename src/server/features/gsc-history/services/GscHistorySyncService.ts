@@ -89,7 +89,11 @@ async function fetchDailyTotals(
   projectId: string,
   oldest: string,
   latest: string,
-): Promise<{ byDay: Map<string, DayMetrics>; settledThrough: string | null }> {
+): Promise<{
+  byDay: Map<string, DayMetrics>;
+  newest: string | null;
+  settledThrough: string | null;
+}> {
   // ~490 days in the window, under one call's 1,000-row limit.
   const result = await GscService.getPerformance({
     projectId,
@@ -112,13 +116,33 @@ async function fetchDailyTotals(
   }
   // Fork addition (FORK-CHANGES.md): the newest day Google calls final. With
   // no incomplete day in the window, every day it returned is final.
+  const newest = [...byDay.keys()].reduce<string | null>(
+    (found, day) => (found && found > day ? found : day),
+    null,
+  );
   const settledThrough = result.firstIncompleteDate
     ? addDays(result.firstIncompleteDate, -1)
-    : [...byDay.keys()].reduce<string | null>(
-        (newest, day) => (newest && newest > day ? newest : day),
-        null,
-      );
-  return { byDay, settledThrough };
+    : newest;
+  return { byDay, newest, settledThrough };
+}
+
+/** Fork addition (FORK-CHANGES.md): the newest hour Google has data for on
+ *  `day`, so the chart can say how far a partial day goes. */
+async function fetchNewestHour(projectId: string, day: string) {
+  const result = await GscService.getPerformance({
+    projectId,
+    startDate: day,
+    endDate: day,
+    dimensions: ["hour"],
+    type: "web",
+    dataState: "hourly_all",
+    rowLimit: 24,
+  });
+  // Keys are ISO times in Pacific time with one offset, so they sort as text.
+  return result.rows.reduce<string | null>((newest, row) => {
+    const hour = row.keys?.[0];
+    return hour && (!newest || hour > newest) ? hour : newest;
+  }, null);
 }
 
 async function fetchDay(projectId: string, day: string) {
@@ -237,11 +261,15 @@ async function syncProject(
       now,
       await GscHistoryRepository.listStoredDates(projectId, oldest),
     );
-    const { byDay: totals, settledThrough } = await fetchDailyTotals(
-      projectId,
-      plan.oldest,
-      plan.latest,
-    );
+    const {
+      byDay: totals,
+      newest,
+      settledThrough,
+    } = await fetchDailyTotals(projectId, plan.oldest, plan.latest);
+    const newestHour =
+      newest && settledThrough && newest > settledThrough
+        ? await fetchNewestHour(projectId, newest)
+        : null;
     const impressionsByDay = new Map(
       [...totals].map(([day, metrics]) => [day, metrics.impressions]),
     );
@@ -313,6 +341,7 @@ async function syncProject(
       backfillDone: remainingDays === 0,
       atIso: new Date().toISOString(),
       settledThrough,
+      newestHour,
     });
     return {
       status: "synced",

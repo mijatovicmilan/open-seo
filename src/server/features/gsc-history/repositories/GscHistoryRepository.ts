@@ -376,6 +376,7 @@ async function finishSync(
         backfillDone: boolean;
         atIso: string;
         settledThrough: string | null;
+        newestHour: string | null;
       }
     | { ok: false; error: string },
 ): Promise<void> {
@@ -384,6 +385,7 @@ async function finishSync(
         lastSuccessAt: result.atIso,
         lastError: null,
         settledThrough: result.settledThrough,
+        newestHour: result.newestHour,
         // Keep the first time the backfill completed.
         ...(result.backfillDone
           ? {

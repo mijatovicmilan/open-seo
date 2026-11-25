@@ -98,6 +98,8 @@ async function getStatus(projectId: string, now: Date = new Date()) {
     backfillDoneAt: state?.backfillDoneAt ?? null,
     // Fork addition (FORK-CHANGES.md): Google's newest final day.
     settledThrough: state?.settledThrough ?? null,
+    // Fork addition (FORK-CHANGES.md): how far the partial day after it goes.
+    newestHour: state?.newestHour ?? null,
     running,
     needsSync:
       connection !== null &&
@@ -547,6 +549,7 @@ async function getInsights(
         settledEnd,
         chartEnd,
         compareMissing,
+        newestHour: status.newestHour,
       },
       filter,
       totals,

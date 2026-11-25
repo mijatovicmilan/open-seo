@@ -421,6 +421,13 @@
       "when": 1795537556550,
       "tag": "0059_fork_gsc_settled_through",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1795589422303,
+      "tag": "0060_fork_gsc_newest_hour",
+      "breakpoints": true
     }
   ]
 }

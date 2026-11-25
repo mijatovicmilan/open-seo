@@ -1,0 +1,1 @@
+ALTER TABLE `gsc_sync_state` ADD `newest_hour` text;

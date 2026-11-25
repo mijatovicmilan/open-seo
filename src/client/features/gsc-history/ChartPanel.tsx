@@ -43,6 +43,16 @@ function fmt(day: string, options: Intl.DateTimeFormatOptions) {
 }
 
 /** "Nov 21–22" or "Nov 30 – Dec 1". */
+// Fork addition (FORK-CHANGES.md): how far Google's data for the last
+// partial day goes, from the newest hour it had ("…T15:00:00-08:00"). The
+// hour is Pacific time, like Google's days.
+function hourNote(newestHour: string | null, day: string) {
+  if (!newestHour?.startsWith(day)) return "";
+  const hour = Number(newestHour.slice(11, 13));
+  const label = `${hour % 12 || 12} ${hour < 12 ? "AM" : "PM"}`;
+  return ` (last data ${label} PT)`;
+}
+
 function shortRange(start: string, end: string) {
   if (start === end) return fmt(start, { month: "short", day: "numeric" });
   if (start.slice(0, 7) === end.slice(0, 7)) {
@@ -131,6 +141,7 @@ export function ChartPanel({
       ? { start: addDay(completeEnd, 1), end: period.chartEnd }
       : null;
   const noData = !insights.firstDataDay;
+  const lastHour = fresh ? hourNote(period.newestHour, fresh.end) : "";
   // Fork addition (FORK-CHANGES.md): "Include partial days" draws them solid.
   const includesPartial = period.current.end > period.settledEnd;
   return (
@@ -155,7 +166,7 @@ export function ChartPanel({
           ) : null}
           {includesPartial && fresh && !noData ? (
             <span title="Search Console is still adding data for these days (fresh data), so they are lower than they will end up.">
-              {shortRange(fresh.start, fresh.end)} still partial
+              {shortRange(fresh.start, fresh.end)} still partial{lastHour}
             </span>
           ) : null}
           {hasPartial && !includesPartial && !noData ? (
@@ -165,7 +176,7 @@ export function ChartPanel({
             >
               <span className="w-4 border-t-2 border-dotted border-foreground/30" />
               {fresh
-                ? `Partial data, ${shortRange(fresh.start, fresh.end)}`
+                ? `Partial data, ${shortRange(fresh.start, fresh.end)}${lastHour}`
                 : "Partial data"}
             </span>
           ) : null}

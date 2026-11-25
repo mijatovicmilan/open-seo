@@ -159,6 +159,10 @@ export const gscSyncState = sqliteTable("gsc_sync_state", {
   // Fork addition (FORK-CHANGES.md): the newest day Google called final in
   // the last successful sync (the day before its first incomplete day).
   settledThrough: text("settled_through"),
+  // Fork addition (FORK-CHANGES.md): the newest hour Google had data for on
+  // the partial day after it, in Pacific time with its offset
+  // ("2026-11-24T15:00:00-08:00"); null when every day was final.
+  newestHour: text("newest_hour"),
 });
 
 // Notes on the chart that the data cannot know: a deploy, a page published,

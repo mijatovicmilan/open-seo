@@ -55,7 +55,9 @@ export type GscPerformanceFilter = {
 
 export type GscPerformanceInput = {
   projectId: string;
-  dimensions?: GscDimension[];
+  // Fork addition (FORK-CHANGES.md): "hour" with "hourly_all" for Search
+  // Insights' partial day; the MCP tool's schema still lists GSC_DIMENSIONS.
+  dimensions?: (GscDimension | "hour")[];
   dateRange?: GscDateRange;
   startDate?: string;
   endDate?: string;
@@ -63,7 +65,7 @@ export type GscPerformanceInput = {
   rowLimit?: number;
   startRow?: number;
   type?: GscSearchType;
-  dataState?: "all" | "final";
+  dataState?: "all" | "final" | "hourly_all";
 };
 
 function clamp(value: number, min: number, max: number): number {

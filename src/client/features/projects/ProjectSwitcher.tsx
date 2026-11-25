@@ -18,6 +18,7 @@ import {
 import { Button } from "@/client/components/ui/button";
 import { Separator } from "@/client/components/ui/separator";
 import { Skeleton } from "@/client/components/ui/skeleton";
+import { DomainFavicon } from "@/client/features/ai-visibility/DomainFavicon";
 import { LOCATIONS } from "@/shared/keyword-locations";
 import type { ProjectSummary } from "./types";
 
@@ -127,15 +128,23 @@ export function ProjectSwitcher({
             aria-label="Switch project"
             className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded-l-lg px-3 py-1.5 text-left hover:bg-accent"
           >
-            <span className="flex min-w-0 flex-col">
-              <span className="truncate text-sm font-medium">
-                {activeProject?.name ?? "Select project"}
-              </span>
+            <span className="flex min-w-0 items-center gap-2.5">
               {activeProject?.domain ? (
-                <span className="truncate text-xs text-muted-foreground">
-                  {activeProject.domain}
-                </span>
+                <DomainFavicon
+                  domain={activeProject.domain}
+                  className="size-6 rounded-md"
+                />
               ) : null}
+              <span className="flex min-w-0 flex-col">
+                <span className="truncate text-sm font-medium">
+                  {activeProject?.name ?? "Select project"}
+                </span>
+                {activeProject?.domain ? (
+                  <span className="truncate text-xs text-muted-foreground">
+                    {activeProject.domain}
+                  </span>
+                ) : null}
+              </span>
             </span>
           </ComboboxTrigger>
           {activeProject ? (
@@ -174,7 +183,20 @@ export function ProjectSwitcher({
           ) : null}
           <ComboboxList className="max-h-[min(60vh,21rem)]">
             {(project: ProjectSummary) => (
-              <ComboboxItem key={project.id} value={project}>
+              <ComboboxItem
+                key={project.id}
+                value={project}
+                className="gap-2.5"
+              >
+                {project.domain ? (
+                  <DomainFavicon
+                    domain={project.domain}
+                    className="size-6 rounded-md"
+                  />
+                ) : (
+                  // Keeps names in line with the projects that have an icon.
+                  <span className="size-6 shrink-0" />
+                )}
                 <span className="flex min-w-0 flex-col">
                   <span className="truncate">{project.name}</span>
                   {project.domain ? (

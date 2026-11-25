@@ -12,7 +12,11 @@ const mocks = vi.hoisted(() => {
   const getUserInfoEmail =
     vi.fn<(opts: GscClientOptions) => Promise<string | null>>();
   const querySearchAnalytics =
-    vi.fn<(opts: GscClientOptions) => Promise<never[]>>();
+    vi.fn<
+      (
+        opts: GscClientOptions,
+      ) => Promise<{ rows: never[]; firstIncompleteDate: null }>
+    >();
   const inspectUrl = vi.fn<(url: string) => Promise<object>>();
   const dbSelect = vi.fn(() => ({
     from: vi.fn(() => ({
@@ -270,7 +274,10 @@ describe("GscService.listSitesForUserWithGrantStatus", () => {
 
 describe("GscService.getPerformance", () => {
   beforeEach(() => {
-    mocks.querySearchAnalytics.mockResolvedValue([]);
+    mocks.querySearchAnalytics.mockResolvedValue({
+      rows: [],
+      firstIncompleteDate: null,
+    });
     mocks.getByProjectId.mockResolvedValue({
       connectedByUserId: "u1",
       connectedAccountEmail: null,

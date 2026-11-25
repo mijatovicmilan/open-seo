@@ -94,6 +94,8 @@ async function getStatus(projectId: string, now: Date = new Date()) {
     lastSuccessAt: state?.lastSuccessAt ?? null,
     lastError: state?.lastError ?? null,
     backfillDoneAt: state?.backfillDoneAt ?? null,
+    // Fork addition (FORK-CHANGES.md): Google's newest final day.
+    settledThrough: state?.settledThrough ?? null,
     running,
     needsSync:
       connection !== null &&
@@ -318,6 +320,8 @@ type InsightsOptions = {
   start?: string;
   end?: string;
   compare: "previous" | "year" | "none";
+  /** Fork addition (FORK-CHANGES.md): count the partial days too. */
+  fresh?: boolean;
   page?: string;
   query?: string;
   country?: string;
@@ -369,7 +373,11 @@ async function getInsights(
   }
   const oldest = status.oldestDay;
   const newest = status.newestDay;
-  const resolved = resolveInsightRange(options, { oldest, newest }, now);
+  const resolved = resolveInsightRange(
+    options,
+    { oldest, newest, settled: status.settledThrough },
+    now,
+  );
   const { current, chartEnd, settledEnd, days } = resolved;
   // A comparison that starts before the stored history would read as zeros
   // ("everything grew"); it is left out and the page says why.

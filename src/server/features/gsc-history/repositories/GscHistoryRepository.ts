@@ -367,13 +367,19 @@ async function claimSync(
 async function finishSync(
   projectId: string,
   result:
-    | { ok: true; backfillDone: boolean; atIso: string }
+    | {
+        ok: true;
+        backfillDone: boolean;
+        atIso: string;
+        settledThrough: string | null;
+      }
     | { ok: false; error: string },
 ): Promise<void> {
   const set = result.ok
     ? {
         lastSuccessAt: result.atIso,
         lastError: null,
+        settledThrough: result.settledThrough,
         // Keep the first time the backfill completed.
         ...(result.backfillDone
           ? {

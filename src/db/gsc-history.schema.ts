@@ -156,6 +156,9 @@ export const gscSyncState = sqliteTable("gsc_sync_state", {
   lastError: text("last_error"),
   // Set once the backfill reached the oldest day GSC keeps.
   backfillDoneAt: text("backfill_done_at"),
+  // Fork addition (FORK-CHANGES.md): the newest day Google called final in
+  // the last successful sync (the day before its first incomplete day).
+  settledThrough: text("settled_through"),
 });
 
 // Notes on the chart that the data cannot know: a deploy, a page published,

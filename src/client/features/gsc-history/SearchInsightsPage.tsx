@@ -54,6 +54,7 @@ export type SearchInsightsState = {
   start?: string;
   end?: string;
   compare: SearchInsightsCompare;
+  fresh: boolean;
   gran: Granularity;
   metrics: MetricKey[];
   page?: string;
@@ -81,6 +82,7 @@ export function SearchInsightsPage({
     start: state.range === "custom" ? state.start : undefined,
     end: state.range === "custom" ? state.end : undefined,
     compare: state.compare,
+    fresh: state.fresh || undefined,
     page: state.page || undefined,
     query: state.query || undefined,
     country: state.country || undefined,
@@ -152,6 +154,7 @@ export function SearchInsightsPage({
                   start={state.start}
                   end={state.end}
                   compare={state.compare}
+                  fresh={state.fresh}
                   granularity={state.gran}
                   resolvedGranularity={resolvedGranularity}
                   bounds={{
@@ -251,6 +254,9 @@ function InsightsBody({
 
       <p className="text-xs text-muted-foreground">
         Totals and the tables below cover {periodText(period.current)}
+        {period.current.end > period.settledEnd
+          ? ", partial days included"
+          : ""}
         {period.previous && (insights.prevTotals?.impressions ?? 0) > 0
           ? `, compared with ${periodText(period.previous)}`
           : ""}

@@ -26,6 +26,14 @@ export type GscSearchAnalyticsRow = {
   position: number;
 };
 
+// Fork addition (FORK-CHANGES.md): Google's first day still being collected.
+// Sent only for `dataState: "all"` grouped by date, when the range holds such
+// a day (YYYY-MM-DD, Pacific time).
+type GscSearchAnalyticsResult = {
+  rows: GscSearchAnalyticsRow[];
+  firstIncompleteDate: string | null;
+};
+
 export type GscDimensionFilter = {
   dimension: string;
   operator: string;
@@ -189,12 +197,18 @@ export function createGscClient(opts: {
     async querySearchAnalytics(
       siteUrl: string,
       body: GscSearchAnalyticsRequest,
-    ): Promise<GscSearchAnalyticsRow[]> {
-      const data = await request<{ rows?: GscSearchAnalyticsRow[] }>(
+    ): Promise<GscSearchAnalyticsResult> {
+      const data = await request<{
+        rows?: GscSearchAnalyticsRow[];
+        metadata?: { firstIncompleteDate?: string };
+      }>(
         `${GSC_API_BASE}/sites/${encodeURIComponent(siteUrl)}/searchAnalytics/query`,
         { method: "POST", body },
       );
-      return data.rows ?? [];
+      return {
+        rows: data.rows ?? [],
+        firstIncompleteDate: data.metadata?.firstIncompleteDate ?? null,
+      };
     },
 
     /** URL Inspection API `urlInspection.index.inspect`. This lives on a

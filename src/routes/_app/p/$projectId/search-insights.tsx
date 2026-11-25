@@ -34,6 +34,7 @@ function SearchInsightsRoute() {
           ...next,
           range: next.range === "28d" ? undefined : next.range,
           compare: next.compare === "previous" ? undefined : next.compare,
+          fresh: next.fresh || undefined,
           gran: next.gran === "auto" ? undefined : next.gran,
           metrics:
             next.metrics === "clicks,impressions" ? undefined : next.metrics,
@@ -55,6 +56,7 @@ function SearchInsightsRoute() {
         start: search.start,
         end: search.end,
         compare: search.compare ?? "previous",
+        fresh: search.fresh ?? false,
         gran: search.gran ?? "auto",
         metrics: parseMetrics(search.metrics),
         page: search.page,

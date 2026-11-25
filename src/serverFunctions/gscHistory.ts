@@ -34,6 +34,7 @@ export const getSearchInsights = createServerFn({ method: "POST" })
       start: data.start,
       end: data.end,
       compare: data.compare,
+      fresh: data.fresh,
       page: data.page,
       query: data.query,
       country: data.country,

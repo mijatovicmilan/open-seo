@@ -568,6 +568,13 @@
       "when": 1795499985316,
       "tag": "0080_fork_dataforseo_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 81,
+      "version": "6",
+      "when": 1795537555677,
+      "tag": "0081_fork_gsc_settled_through",
+      "breakpoints": true
     }
   ]
 }

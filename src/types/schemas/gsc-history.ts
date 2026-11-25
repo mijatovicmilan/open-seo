@@ -51,6 +51,8 @@ export const searchInsightsInputSchema = z.object({
   start: isoDay.optional(),
   end: isoDay.optional(),
   compare: z.enum(SEARCH_INSIGHTS_COMPARE).default("previous"),
+  // Count the partial (not yet final) days in totals and tables too.
+  fresh: z.boolean().optional(),
   page: z.string().trim().min(1).max(2000).optional(),
   query: z.string().trim().min(1).max(500).optional(),
   country: gscCountrySchema.optional(),
@@ -64,6 +66,7 @@ export const searchInsightsSearchSchema = z.object({
   start: isoDay.optional(),
   end: isoDay.optional(),
   compare: z.enum(SEARCH_INSIGHTS_COMPARE).optional(),
+  fresh: z.boolean().optional(),
   gran: z.enum(["auto", "day", "week", "month"]).optional(),
   // Comma-separated chart metrics, e.g. "clicks,impressions".
   metrics: z.string().max(60).optional(),

@@ -40,6 +40,8 @@ type GscPerformanceResult = {
   connectedBy: string | null;
   request: GscSearchAnalyticsRequest;
   rows: GscSearchAnalyticsRow[];
+  /** Fork addition (FORK-CHANGES.md): Google's first day still being collected. */
+  firstIncompleteDate?: string | null;
 };
 
 type GscSiteListResult = {
@@ -244,12 +246,16 @@ async function getPerformance(
     userId: connection.connectedByUserId,
     gscAccountId: connection.gscAccountId ?? undefined,
   });
-  const rows = await client.querySearchAnalytics(connection.siteUrl, request);
+  const { rows, firstIncompleteDate } = await client.querySearchAnalytics(
+    connection.siteUrl,
+    request,
+  );
   return {
     siteUrl: connection.siteUrl,
     connectedBy: connection.connectedAccountEmail,
     request,
     rows,
+    firstIncompleteDate,
   };
 }
 

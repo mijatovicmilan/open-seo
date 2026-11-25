@@ -13,6 +13,7 @@ import {
   type SegmentDayRow,
 } from "@/server/features/gsc-history/repositories/GscHistoryRepository";
 import {
+  addDays,
   historyWindow,
   planSync,
   selectDays,
@@ -88,7 +89,7 @@ async function fetchDailyTotals(
   projectId: string,
   oldest: string,
   latest: string,
-): Promise<Map<string, DayMetrics>> {
+): Promise<{ byDay: Map<string, DayMetrics>; settledThrough: string | null }> {
   // ~490 days in the window, under one call's 1,000-row limit.
   const result = await GscService.getPerformance({
     projectId,
@@ -109,7 +110,15 @@ async function fetchDailyTotals(
       position: row.position,
     });
   }
-  return byDay;
+  // Fork addition (FORK-CHANGES.md): the newest day Google calls final. With
+  // no incomplete day in the window, every day it returned is final.
+  const settledThrough = result.firstIncompleteDate
+    ? addDays(result.firstIncompleteDate, -1)
+    : [...byDay.keys()].reduce<string | null>(
+        (newest, day) => (newest && newest > day ? newest : day),
+        null,
+      );
+  return { byDay, settledThrough };
 }
 
 async function fetchDay(projectId: string, day: string) {
@@ -228,7 +237,11 @@ async function syncProject(
       now,
       await GscHistoryRepository.listStoredDates(projectId, oldest),
     );
-    const totals = await fetchDailyTotals(projectId, plan.oldest, plan.latest);
+    const { byDay: totals, settledThrough } = await fetchDailyTotals(
+      projectId,
+      plan.oldest,
+      plan.latest,
+    );
     const impressionsByDay = new Map(
       [...totals].map(([day, metrics]) => [day, metrics.impressions]),
     );
@@ -299,6 +312,7 @@ async function syncProject(
       ok: true,
       backfillDone: remainingDays === 0,
       atIso: new Date().toISOString(),
+      settledThrough,
     });
     return {
       status: "synced",

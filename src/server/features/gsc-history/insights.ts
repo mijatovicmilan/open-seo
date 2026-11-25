@@ -42,11 +42,15 @@ export function insightPeriods(
 type Range = { start: string; end: string };
 
 /** The ranges the Search Insights page reads for a preset or custom range.
- *  `current` ends at the settled end (past GSC's ~3-day lag) for presets, so
- *  totals and sections never count half-reported days; the chart runs on to
- *  `chartEnd`, the newest stored day, and marks the days after `settledEnd`
- *  as partial. The comparison is the same length before, or the same dates
- *  52 weeks earlier (same weekdays), or none. */
+ *  `current` ends at the settled end for presets, so totals and sections
+ *  never count half-reported days; the chart runs on to `chartEnd`, the
+ *  newest stored day, and marks the days after `settledEnd` as partial. The
+ *  comparison is the same length before, or the same dates 52 weeks earlier
+ *  (same weekdays), or none.
+ *
+ *  Fork addition (FORK-CHANGES.md): the settled end is the newest day Google
+ *  called final in the last sync (`bounds.settled`), falling back to three
+ *  days ago; with `fresh`, totals and sections run on to the newest day. */
 export function resolveInsightRange(
   input: {
     range: string;
@@ -54,8 +58,9 @@ export function resolveInsightRange(
     start?: string;
     end?: string;
     compare: "previous" | "year" | "none";
+    fresh?: boolean;
   },
-  bounds: { oldest: string; newest: string },
+  bounds: { oldest: string; newest: string; settled?: string | null },
   today: Date,
 ): {
   current: Range;
@@ -64,8 +69,10 @@ export function resolveInsightRange(
   settledEnd: string;
   days: number;
 } {
-  const settledCut = addDays(today.toISOString().slice(0, 10), -3);
+  const settledCut =
+    bounds.settled ?? addDays(today.toISOString().slice(0, 10), -3);
   const settledEnd = bounds.newest < settledCut ? bounds.newest : settledCut;
+  const totalsEnd = input.fresh ? bounds.newest : settledEnd;
   let start: string;
   let end: string;
   let chartEnd: string;
@@ -78,11 +85,11 @@ export function resolveInsightRange(
     start = from < bounds.oldest ? bounds.oldest : from;
     if (start > end) start = end;
     chartEnd = end;
-    end = end > settledEnd ? settledEnd : end;
+    end = end > totalsEnd ? totalsEnd : end;
     if (start > end) end = start;
   } else {
     const length = input.presetDays ?? 28;
-    end = settledEnd;
+    end = totalsEnd;
     const wanted = addDays(end, -(length - 1));
     start = wanted < bounds.oldest ? bounds.oldest : wanted;
     chartEnd = bounds.newest;

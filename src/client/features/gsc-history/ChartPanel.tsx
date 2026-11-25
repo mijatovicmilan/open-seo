@@ -120,9 +120,15 @@ export function ChartPanel({
   const shownStart =
     first && first > period.current.start ? first : period.current.start;
   const shift = daysBetween(period.current.start, shownStart);
+  // Fork addition (FORK-CHANGES.md): with partial days counted, the period
+  // runs past the last complete day.
+  const completeEnd =
+    period.settledEnd < period.current.end
+      ? period.settledEnd
+      : period.current.end;
   const fresh =
-    period.chartEnd > period.current.end
-      ? { start: addDay(period.current.end, 1), end: period.chartEnd }
+    period.chartEnd > completeEnd
+      ? { start: addDay(completeEnd, 1), end: period.chartEnd }
       : null;
   const noData = !insights.firstDataDay;
   return (
@@ -131,7 +137,7 @@ export function ChartPanel({
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 text-xs leading-6 text-muted-foreground [&>span]:whitespace-nowrap">
           <span className="inline-flex items-center gap-1.5">
             <span className="h-0.5 w-4 rounded bg-foreground/70" />
-            {periodText({ start: shownStart, end: period.current.end })}
+            {periodText({ start: shownStart, end: completeEnd })}
           </span>
           {comparable && period.previous && !noData ? (
             <span className="inline-flex items-center gap-1.5">

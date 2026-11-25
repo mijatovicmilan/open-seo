@@ -5,6 +5,7 @@ import { CalendarRange, X } from "lucide-react";
 import { Badge } from "@/client/components/ui/badge";
 import { Button } from "@/client/components/ui/button";
 import { Input } from "@/client/components/ui/input";
+import { Switch } from "@/client/components/ui/switch";
 import type { Granularity } from "@/client/features/gsc-history/searchSeries";
 import type {
   SearchInsightsCompare,
@@ -53,6 +54,7 @@ export function InsightsControls({
   start,
   end,
   compare,
+  fresh,
   granularity,
   resolvedGranularity,
   bounds,
@@ -66,6 +68,7 @@ export function InsightsControls({
   start?: string;
   end?: string;
   compare: SearchInsightsCompare;
+  fresh: boolean;
   granularity: Granularity;
   resolvedGranularity: "day" | "week" | "month";
   bounds: { oldest: string | null; newest: string | null };
@@ -78,6 +81,7 @@ export function InsightsControls({
     start?: string;
     end?: string;
     compare?: SearchInsightsCompare;
+    fresh?: boolean;
     gran?: Granularity;
     country?: string;
     device?: Device;
@@ -173,6 +177,14 @@ export function InsightsControls({
             }
             menuWidth="w-44"
           />
+          {/* Fork addition (FORK-CHANGES.md): count the partial days too. */}
+          <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-border px-3 text-sm whitespace-nowrap">
+            <Switch
+              checked={fresh}
+              onCheckedChange={(next) => onChange({ fresh: next })}
+            />
+            Include partial days
+          </label>
         </div>
         {segmentsPending ? (
           <span className="text-xs text-muted-foreground">

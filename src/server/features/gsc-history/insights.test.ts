@@ -201,6 +201,21 @@ describe("resolveInsightRange", () => {
     expect(range.previous).toEqual({ start: "2026-09-26", end: "2026-10-23" });
   });
 
+  it("ends at Google's newest final day, or at the newest day with fresh", () => {
+    const settled = { ...bounds, settled: "2026-11-21" };
+    const preset = { range: "7d", presetDays: 7, compare: "none" } as const;
+    const final = resolveInsightRange(preset, settled, today);
+    expect(final.settledEnd).toBe("2026-11-21");
+    expect(final.current.end).toBe("2026-11-21");
+    const fresh = resolveInsightRange(
+      { ...preset, fresh: true },
+      settled,
+      today,
+    );
+    expect(fresh.settledEnd).toBe("2026-11-21");
+    expect(fresh.current).toEqual({ start: "2026-11-16", end: "2026-11-22" });
+  });
+
   it("compares a year earlier on the same weekdays and clamps a custom range to stored days", () => {
     const year = resolveInsightRange(
       { range: "7d", presetDays: 7, compare: "year" },

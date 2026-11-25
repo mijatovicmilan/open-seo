@@ -95,7 +95,7 @@ export function InsightsDetailSheet({
             <SheetHeader
               ref={headerRef}
               tabIndex={-1}
-              className="p-6 pb-4 outline-none"
+              className="px-6 pt-6 pb-5 outline-none"
             >
               <SheetDescription className="flex items-center gap-2">
                 {"page" in target ? (
@@ -127,7 +127,7 @@ export function InsightsDetailSheet({
               metrics={metrics}
               granularity={granularity}
             />
-            <SheetFooter className="border-t border-border px-6">
+            <SheetFooter className="border-t border-border px-6 py-4">
               <Button variant="outline" onClick={() => onFilter(target)}>
                 <Filter data-icon="inline-start" />
                 Show only this {"page" in target ? "page" : "query"} on Search
@@ -187,49 +187,51 @@ function DetailBody({
   const { totals, prevTotals, period } = insights;
   const isPage = "page" in target;
   return (
-    <div className="space-y-5 px-6 pb-6">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs text-muted-foreground">
-          {periodText(period.current)}
-          {prevTotals && period.previous
-            ? `, compared with ${periodText(period.previous)}`
-            : ""}
-        </p>
-        <label className="inline-flex cursor-pointer items-center gap-2 text-xs">
+    <div className="space-y-6 px-6 pb-6">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0 text-xs leading-5 text-muted-foreground">
+          <div>{periodText(period.current)}</div>
+          {prevTotals && period.previous ? (
+            <div>vs {periodText(period.previous)}</div>
+          ) : null}
+        </div>
+        <label className="inline-flex shrink-0 cursor-pointer items-center gap-2 text-xs">
           <Switch checked={fresh} onCheckedChange={setFresh} />
           Include partial days
         </label>
       </div>
-      <div className="grid grid-cols-4 gap-2">
-        {STATS.map((key) => {
-          const value = totals[key];
-          const previous = prevTotals?.[key];
-          const empty =
-            (key === "ctr" || key === "position") && totals.impressions === 0;
-          return (
-            <div
-              key={key}
-              className="min-w-0 rounded-lg border border-border px-3 py-2"
-            >
-              <div className="truncate text-[11px] uppercase tracking-wide text-muted-foreground">
-                {METRICS[key].name}
+      <div className="space-y-3">
+        <div className="grid grid-cols-4 gap-2">
+          {STATS.map((key) => {
+            const value = totals[key];
+            const previous = prevTotals?.[key];
+            const empty =
+              (key === "ctr" || key === "position") && totals.impressions === 0;
+            return (
+              <div
+                key={key}
+                className="min-w-0 rounded-lg border border-border px-3 py-2"
+              >
+                <div className="truncate text-[11px] uppercase tracking-wide text-muted-foreground">
+                  {METRICS[key].name}
+                </div>
+                <div className="text-lg font-semibold tabular-nums">
+                  {empty ? "—" : METRICS[key].format(value)}
+                </div>
+                {previous !== undefined && !empty ? (
+                  <Change metric={key} current={value} previous={previous} />
+                ) : null}
               </div>
-              <div className="text-lg font-semibold tabular-nums">
-                {empty ? "—" : METRICS[key].format(value)}
-              </div>
-              {previous !== undefined && !empty ? (
-                <Change metric={key} current={value} previous={previous} />
-              ) : null}
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
+        <DetailChart
+          insights={insights}
+          metrics={metrics}
+          granularity={granularity}
+        />
       </div>
-      <DetailChart
-        insights={insights}
-        metrics={metrics}
-        granularity={granularity}
-      />
-      <section className="space-y-2">
+      <section className="space-y-1">
         <h3 className="text-sm font-medium">
           {isPage ? "Queries for this page" : "Pages for this query"}
           <span className="ml-2 font-normal text-muted-foreground">
@@ -243,7 +245,7 @@ function DetailBody({
               : "No page is stored for this query in the period."}
           </p>
         ) : (
-          <Table>
+          <Table className="[&_td:first-child]:pl-0 [&_td:last-child]:pr-0 [&_th:first-child]:pl-0 [&_th:last-child]:pr-0">
             <TableHeader>
               <TableRow>
                 <TableHead className="w-full">

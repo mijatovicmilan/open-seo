@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react";
-import { Plus } from "lucide-react";
 import { Button } from "@/client/components/ui/button";
 import { TimeSeriesChart } from "@/client/features/charts/TimeSeriesChart";
 import {
@@ -7,8 +6,8 @@ import {
   type NoteDraft,
   isManual,
   NoteEditor,
-  NotesList,
 } from "@/client/features/gsc-history/AnnotationsPanel";
+import { NotesMenu } from "@/client/features/gsc-history/NotesMenu";
 import { formatDay } from "@/client/features/gsc-history/annotationStyles";
 import {
   buildChartPoints,
@@ -19,8 +18,8 @@ import {
 } from "@/client/features/gsc-history/searchSeries";
 import type { Insights } from "@/client/features/gsc-history/types";
 
-// The Search Insights chart card: legend, notes (add from the chart or
-// "+ Note", list behind "Notes (N)") and the chart itself.
+// The Search Insights chart card: legend, notes (add from the chart or the
+// Notes menu, which also lists them) and the chart itself.
 
 function addDay(day: string, days: number) {
   const date = new Date(`${day}T00:00:00Z`);
@@ -42,7 +41,6 @@ function fmt(day: string, options: Intl.DateTimeFormatOptions) {
   });
 }
 
-/** "Nov 21–22" or "Nov 30 – Dec 1". */
 // Fork addition (FORK-CHANGES.md): how far Google's data for the last
 // partial day goes, from the newest hour it had ("…T15:00:00-08:00"). The
 // hour is Pacific time, like Google's days.
@@ -50,15 +48,24 @@ function hourNote(newestHour: string | null, day: string) {
   if (!newestHour?.startsWith(day)) return "";
   const hour = Number(newestHour.slice(11, 13));
   const label = `${hour % 12 || 12} ${hour < 12 ? "AM" : "PM"}`;
-  return ` (last data ${label} PT)`;
+  return `to ${label} PT`;
 }
 
+/** "Nov 21–22" or "Nov 30 – Dec 1". */
 function shortRange(start: string, end: string) {
   if (start === end) return fmt(start, { month: "short", day: "numeric" });
   if (start.slice(0, 7) === end.slice(0, 7)) {
     return `${fmt(start, { month: "short", day: "numeric" })}–${fmt(end, { day: "numeric" })}`;
   }
   return `${fmt(start, { month: "short", day: "numeric" })} – ${fmt(end, { month: "short", day: "numeric" })}`;
+}
+
+// Fork addition (FORK-CHANGES.md): short in the legend, with the years only
+// when the range crosses one.
+function legendRange(start: string, end: string) {
+  return start.slice(0, 4) === end.slice(0, 4)
+    ? shortRange(start, end)
+    : periodText({ start, end });
 }
 
 export function periodText(range: { start: string; end: string }) {
@@ -116,7 +123,6 @@ export function ChartPanel({
     draft: NoteDraft;
     anchor: NoteAnchor;
   } | null>(null);
-  const [showNotes, setShowNotes] = useState(false);
   const openEditor = (draft: NoteDraft, anchor: NoteAnchor) =>
     setEditor({ draft, anchor });
   const noteCount = insights.annotations.filter(
@@ -144,83 +150,59 @@ export function ChartPanel({
   const lastHour = fresh ? hourNote(period.newestHour, fresh.end) : "";
   // Fork addition (FORK-CHANGES.md): "Include partial days" draws them solid.
   const includesPartial = period.current.end > period.settledEnd;
+  const shownEnd = includesPartial ? period.current.end : completeEnd;
+  const previousStart = period.previous
+    ? addDay(period.previous.start, shift)
+    : null;
+  const rangeTitle = [
+    periodText({ start: shownStart, end: shownEnd }),
+    comparable && period.previous && previousStart
+      ? `compared with ${periodText({ start: previousStart, end: period.previous.end })}`
+      : null,
+    trimmed && first ? `first data ${formatDay(first)}` : null,
+    !noData && (period.compareMissing || (period.previous && !comparable))
+      ? "no data in the comparison period"
+      : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
   return (
     <section className="rounded-xl border border-border bg-card p-4">
-      <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-2">
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 text-xs leading-6 text-muted-foreground [&>span]:whitespace-nowrap">
-          <span className="inline-flex items-center gap-1.5">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        {/* Fork change (FORK-CHANGES.md): one short legend row; the full
+            dates and what is missing are in its tooltip. */}
+        <div className="flex min-w-0 items-center gap-4 overflow-hidden text-xs whitespace-nowrap text-muted-foreground">
+          <span className="inline-flex items-center gap-1.5" title={rangeTitle}>
             <span className="h-0.5 w-4 rounded bg-foreground/70" />
-            {periodText({
-              start: shownStart,
-              end: includesPartial ? period.current.end : completeEnd,
-            })}
+            {legendRange(shownStart, shownEnd)}
           </span>
-          {comparable && period.previous && !noData ? (
+          {comparable && period.previous && previousStart && !noData ? (
             <span className="inline-flex items-center gap-1.5">
               <span className="h-0.5 w-4 rounded bg-foreground/25" />
-              {periodText({
-                start: addDay(period.previous.start, shift),
-                end: period.previous.end,
-              })}
+              vs {legendRange(previousStart, period.previous.end)}
             </span>
           ) : null}
-          {includesPartial && fresh && !noData ? (
-            <span title="Search Console is still adding data for these days (fresh data), so they are lower than they will end up.">
-              {shortRange(fresh.start, fresh.end)} still partial{lastHour}
-            </span>
-          ) : null}
-          {hasPartial && !includesPartial && !noData ? (
+          {fresh && !noData && (includesPartial || hasPartial) ? (
             <span
-              className="inline-flex items-center gap-1.5"
+              className="inline-flex min-w-0 items-center gap-1.5"
               title="Search Console is still adding data for these days (fresh data), so they are lower than they will end up."
             >
-              <span className="w-4 border-t-2 border-dotted border-foreground/30" />
-              {fresh
-                ? `Partial data, ${shortRange(fresh.start, fresh.end)}${lastHour}`
-                : "Partial data"}
+              {includesPartial ? null : (
+                <span className="w-4 border-t-2 border-dotted border-foreground/30" />
+              )}
+              {shortRange(fresh.start, fresh.end)} partial
+              {lastHour ? (
+                <span className="text-foreground/80">· {lastHour}</span>
+              ) : null}
             </span>
           ) : null}
-          {!noData &&
-          (period.compareMissing || (period.previous && !comparable)) ? (
-            <span>No data in the comparison period</span>
-          ) : null}
-          {trimmed && insights.firstDataDay ? (
-            <span>First data: {formatDay(insights.firstDataDay)}</span>
-          ) : null}
         </div>
-        <div className="-ml-2 flex shrink-0 items-center gap-1 sm:ml-0">
-          {noteCount > 0 ? (
-            <Button
-              variant="ghost"
-              size="xs"
-              className="text-muted-foreground"
-              aria-expanded={showNotes}
-              onClick={() => setShowNotes((current) => !current)}
-            >
-              Notes ({noteCount})
-            </Button>
-          ) : null}
-          <Button
-            variant="ghost"
-            size="xs"
-            className="text-muted-foreground"
-            title="Add a note"
-            onClick={(event) => {
-              const rect = event.currentTarget.getBoundingClientRect();
-              openEditor(
-                {
-                  date: insights.period.settledEnd,
-                  kind: "deploy",
-                  label: "",
-                  url: "",
-                },
-                { x: rect.left, y: rect.bottom },
-              );
-            }}
-          >
-            <Plus data-icon="inline-start" /> Note
-          </Button>
-        </div>
+        <NotesMenu
+          projectId={projectId}
+          insights={insights}
+          count={noteCount}
+          onEdit={openEditor}
+        />
       </div>
       {noData ? (
         <div className="flex h-60 items-center justify-center text-sm text-muted-foreground">
@@ -272,15 +254,6 @@ export function ChartPanel({
           }}
         />
       )}
-      {showNotes ? (
-        <div className="mt-3 border-t border-border pt-2">
-          <NotesList
-            projectId={projectId}
-            annotations={insights.annotations}
-            onEdit={openEditor}
-          />
-        </div>
-      ) : null}
       {editor ? (
         <NoteEditor
           key={`${editor.draft.id ?? "new"}-${editor.draft.date}`}

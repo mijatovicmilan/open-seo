@@ -63,7 +63,7 @@ export function MetricCards({
   const keys = totals.visits === undefined ? KEYS : [...KEYS, ...JOINED_KEYS];
   return (
     <div
-      className={`grid grid-cols-2 gap-2 sm:gap-3 ${keys.length > 4 ? "sm:grid-cols-3 xl:grid-cols-6" : "lg:grid-cols-4"}`}
+      className={`grid gap-2 ${keys.length > 4 ? "grid-cols-3 lg:grid-cols-6" : "grid-cols-2 sm:grid-cols-4"}`}
       role="group"
       aria-label="Chart metrics"
     >
@@ -100,14 +100,14 @@ export function MetricCards({
                 : undefined
             }
             className={cn(
-              "min-w-0 rounded-xl border bg-card p-3 text-left transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 sm:p-4",
+              "min-w-0 rounded-lg border bg-card px-3 py-2 text-left transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
               active ? "" : "border-border hover:bg-foreground/[0.03]",
             )}
           >
-            <div className="flex items-center gap-1.5 text-xs uppercase tracking-wide text-muted-foreground">
+            <div className="flex items-center gap-1.5 truncate text-[11px] uppercase tracking-wide text-muted-foreground">
               <span
                 className={cn(
-                  "flex size-3 items-center justify-center rounded-sm border",
+                  "flex size-3 shrink-0 items-center justify-center rounded-sm border",
                   active ? "" : "border-foreground/30",
                 )}
                 style={
@@ -135,8 +135,8 @@ export function MetricCards({
               </span>
               {metric.name}
             </div>
-            <div className="mt-1 flex flex-wrap items-baseline gap-x-2">
-              <span className="text-xl font-semibold tabular-nums text-foreground sm:text-2xl">
+            <div className="flex flex-wrap items-baseline gap-x-2">
+              <span className="text-lg font-semibold tabular-nums text-foreground">
                 {empty ? "—" : metric.format(value)}
               </span>
               {delta ? (

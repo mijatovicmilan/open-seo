@@ -55,6 +55,8 @@ export const searchInsightsInputSchema = z.object({
   fresh: z.boolean().optional(),
   page: z.string().trim().min(1).max(2000).optional(),
   query: z.string().trim().min(1).max(500).optional(),
+  // A page type (see src/shared/pageSection.ts): a first path folder or "/".
+  section: z.string().trim().min(1).max(100).optional(),
   country: gscCountrySchema.optional(),
   device: z.enum(GSC_DEVICES).optional(),
 });
@@ -72,6 +74,7 @@ export const searchInsightsSearchSchema = z.object({
   metrics: z.string().max(60).optional(),
   page: z.string().max(2000).optional(),
   query: z.string().max(500).optional(),
+  section: z.string().max(100).optional(),
   country: z.string().max(3).optional(),
   device: z.enum(GSC_DEVICES).optional(),
 });

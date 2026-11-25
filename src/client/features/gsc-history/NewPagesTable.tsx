@@ -7,7 +7,10 @@ import {
   TableRow,
 } from "@/client/components/ui/table";
 import { formatDay } from "@/client/features/gsc-history/annotationStyles";
-import { PageCell } from "@/client/features/gsc-history/SearchInsightsSections";
+import {
+  PageCell,
+  TypeCell,
+} from "@/client/features/gsc-history/SearchInsightsSections";
 import type { Insights } from "@/client/features/gsc-history/types";
 import { formatCount } from "@/client/features/search-performance/SearchPerformanceColumns";
 
@@ -43,7 +46,8 @@ export function NewPagesTable({ rows }: { rows: Insights["newPages"] }) {
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Page</TableHead>
+          <TableHead className="w-full">Page</TableHead>
+          <TableHead>Type</TableHead>
           <TableHead>First impressions</TableHead>
           <TableHead className="text-right">Impr.</TableHead>
           <TableHead className="text-right">Clicks</TableHead>
@@ -53,9 +57,10 @@ export function NewPagesTable({ rows }: { rows: Insights["newPages"] }) {
       <TableBody>
         {rows.map((row) => (
           <TableRow key={row.page}>
-            <TableCell>
+            <TableCell className="w-full max-w-0">
               <PageCell url={row.page} />
             </TableCell>
+            <TypeCell url={row.page} />
             <TableCell className="whitespace-nowrap">
               {formatDay(row.firstDate)}
             </TableCell>

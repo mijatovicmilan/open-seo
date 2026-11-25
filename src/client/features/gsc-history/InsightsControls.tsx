@@ -7,6 +7,7 @@ import { Button } from "@/client/components/ui/button";
 import { Input } from "@/client/components/ui/input";
 import { Switch } from "@/client/components/ui/switch";
 import type { Granularity } from "@/client/features/gsc-history/searchSeries";
+import { sectionLabel } from "@/shared/pageSection";
 import type {
   SearchInsightsCompare,
   SearchInsightsRange,
@@ -61,6 +62,8 @@ export function InsightsControls({
   country,
   device,
   countries,
+  section,
+  sections,
   segmentsPending,
   onChange,
 }: {
@@ -75,6 +78,8 @@ export function InsightsControls({
   country?: string;
   device?: Device;
   countries: Array<{ country: string; impressions: number }>;
+  section?: string;
+  sections: Array<{ section: string; impressions: number }>;
   segmentsPending: boolean;
   onChange: (patch: {
     range?: SearchInsightsRange;
@@ -85,6 +90,7 @@ export function InsightsControls({
     gran?: Granularity;
     country?: string;
     device?: Device;
+    section?: string;
   }) => void;
 }) {
   const [draftStart, setDraftStart] = useState(start ?? "");
@@ -102,6 +108,19 @@ export function InsightsControls({
     ...countries.map((row) => ({
       value: row.country,
       label: countryName(row.country),
+      hint: row.impressions.toLocaleString("en-US"),
+    })),
+  ];
+
+  // Fork addition (FORK-CHANGES.md): page types, see src/shared/pageSection.ts.
+  const sectionOptions = [
+    { value: ALL, label: "All page types" },
+    ...(section && !sections.some((row) => row.section === section)
+      ? [{ value: section, label: sectionLabel(section) }]
+      : []),
+    ...sections.map((row) => ({
+      value: row.section,
+      label: sectionLabel(row.section),
       hint: row.impressions.toLocaleString("en-US"),
     })),
   ];
@@ -177,6 +196,17 @@ export function InsightsControls({
             }
             menuWidth="w-44"
           />
+          <ChoiceMenu
+            label="Page type"
+            value={section ?? ALL}
+            options={sectionOptions}
+            narrowed={Boolean(section)}
+            display={section ? sectionLabel(section) : "All page types"}
+            onChange={(value) =>
+              onChange({ section: value === ALL ? undefined : value })
+            }
+            menuWidth="w-56"
+          />
           {/* Fork addition (FORK-CHANGES.md): count the partial days too. */}
           <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-border px-3 text-sm whitespace-nowrap">
             <Switch
@@ -241,22 +271,24 @@ export function InsightsControls({
   );
 }
 
-type FilterKey = "page" | "query" | "country" | "device";
+type FilterKey = "page" | "query" | "section" | "country" | "device";
 
 export function FilterChips({
   page,
   query,
+  section,
   country,
   device,
   onClear,
 }: {
   page?: string;
   query?: string;
+  section?: string;
   country?: string;
   device?: Device;
   onClear: (key: FilterKey) => void;
 }) {
-  if (!page && !query && !country && !device) return null;
+  if (!page && !query && !section && !country && !device) return null;
   const chip = (key: FilterKey, label: string, value: string) => (
     <Badge
       variant="outline"
@@ -288,6 +320,7 @@ export function FilterChips({
       <span className="text-xs text-muted-foreground">Filtered to</span>
       {page ? chip("page", "Page", path) : null}
       {query ? chip("query", "Query", query) : null}
+      {section ? chip("section", "Type", sectionLabel(section)) : null}
       {country ? chip("country", "Country", countryName(country)) : null}
       {device
         ? chip(

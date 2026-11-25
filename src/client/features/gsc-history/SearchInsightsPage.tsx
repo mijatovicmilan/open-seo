@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { AlertCircle, Info } from "lucide-react";
 import { PageHeader } from "@/client/components/PageHeader";
@@ -17,6 +18,10 @@ import {
   FilterChips,
   InsightsControls,
 } from "@/client/features/gsc-history/InsightsControls";
+import {
+  InsightsDetailSheet,
+  type InsightsTarget,
+} from "@/client/features/gsc-history/InsightsDetailSheet";
 import { MetricCards } from "@/client/features/gsc-history/MetricCards";
 import {
   type Granularity,
@@ -28,12 +33,15 @@ import {
   ChangesTable,
   CtrGapTable,
   InsightSection,
-  InsightsFilterContext,
+  InsightsOpenContext,
   NearPageOneTable,
   NewQueriesTable,
 } from "@/client/features/gsc-history/SearchInsightsSections";
 import { NewPagesTable } from "@/client/features/gsc-history/NewPagesTable";
-import { SyncStatusLine } from "@/client/features/gsc-history/SyncStatusLine";
+import {
+  SyncControl,
+  SyncNotices,
+} from "@/client/features/gsc-history/SyncStatusLine";
 import type { Insights } from "@/client/features/gsc-history/types";
 import { useSearchHistorySync } from "@/client/features/gsc-history/useSearchHistorySync";
 import { getStandardErrorMessage } from "@/client/lib/error-messages";
@@ -59,6 +67,7 @@ export type SearchInsightsState = {
   metrics: MetricKey[];
   page?: string;
   query?: string;
+  section?: string;
   country?: string;
   device?: "desktop" | "mobile" | "tablet";
 };
@@ -85,9 +94,11 @@ export function SearchInsightsPage({
     fresh: state.fresh || undefined,
     page: state.page || undefined,
     query: state.query || undefined,
+    section: state.section || undefined,
     country: state.country || undefined,
     device: state.device,
   };
+  const [detail, setDetail] = useState<InsightsTarget | null>(null);
   const insightsQuery = useQuery({
     queryKey: ["searchInsights", projectId, request],
     queryFn: () => getSearchInsights({ data: request }),
@@ -120,6 +131,11 @@ export function SearchInsightsPage({
             </span>
           }
           description="What changed in Google Search and what to do about it, from your stored Search Console history."
+          actions={
+            status?.connected ? (
+              <SyncControl status={status} sync={sync} />
+            ) : null
+          }
         />
 
         {insightsQuery.isPending ? (
@@ -136,11 +152,7 @@ export function SearchInsightsPage({
         ) : !status ? null : (
           <>
             {status.connected ? (
-              <SyncStatusLine
-                projectId={projectId}
-                status={status}
-                sync={sync}
-              />
+              <SyncNotices projectId={projectId} status={status} sync={sync} />
             ) : (
               <div className="max-w-2xl">
                 <GoogleConnectionCard provider="gsc" projectId={projectId} />
@@ -164,31 +176,45 @@ export function SearchInsightsPage({
                   country={state.country}
                   device={state.device}
                   countries={insights.countries}
+                  section={state.section}
+                  sections={insights.sections}
                   segmentsPending={status.segmentDaysMissing > 0}
                   onChange={onChange}
                 />
                 <FilterChips
                   page={state.page}
                   query={state.query}
+                  section={state.section}
                   country={state.country}
                   device={state.device}
                   onClear={(key) => onChange({ [key]: undefined })}
                 />
-                <InsightsFilterContext.Provider
-                  value={(filter) =>
-                    onChange({ page: filter.page, query: filter.query })
-                  }
-                >
+                <InsightsDetailSheet
+                  target={detail}
+                  request={request}
+                  onOpen={setDetail}
+                  onFilter={(target) => {
+                    setDetail(null);
+                    onChange(
+                      "page" in target
+                        ? { page: target.page, query: undefined }
+                        : { query: target.query, page: undefined },
+                    );
+                  }}
+                  onClose={() => setDetail(null)}
+                />
+                <InsightsOpenContext.Provider value={setDetail}>
                   <InsightsBody
                     projectId={projectId}
                     insights={insights}
                     signups={signups}
+                    section={state.section}
                     metrics={state.metrics}
                     granularity={resolvedGranularity}
                     onMetrics={(metrics) => onChange({ metrics })}
                     onShowDays={() => onChange({ gran: "day" })}
                   />
-                </InsightsFilterContext.Provider>
+                </InsightsOpenContext.Provider>
               </>
             ) : status.connected ? (
               <div className="rounded-xl border border-border bg-card p-6 text-sm text-muted-foreground">
@@ -207,6 +233,7 @@ function InsightsBody({
   projectId,
   insights,
   signups,
+  section,
   metrics,
   granularity,
   onMetrics,
@@ -215,14 +242,18 @@ function InsightsBody({
   projectId: string;
   insights: Insights;
   signups: ReturnType<typeof useSearchSignups>;
+  section?: string;
   metrics: MetricKey[];
   granularity: "day" | "week" | "month";
   onMetrics: (metrics: MetricKey[]) => void;
   onShowDays: () => void;
 }) {
   const { period, changes } = insights;
+  // PostHog can't split by page type: its totals and chart lines stay off.
   const joined =
-    signups.data && !signups.data.unsupportedFilter ? signups.data : null;
+    signups.data && !signups.data.unsupportedFilter && !section
+      ? signups.data
+      : null;
   const curveNote =
     insights.ctrCurve.source === "site"
       ? "your site's own median CTR per position"
@@ -246,7 +277,7 @@ function InsightsBody({
 
       <ChartPanel
         projectId={projectId}
-        insights={withSignupSeries(insights, signups.data)}
+        insights={withSignupSeries(insights, joined)}
         metrics={metrics}
         granularity={granularity}
         onShowDays={onShowDays}
@@ -263,7 +294,11 @@ function InsightsBody({
         . Table rows need {insights.minImpressions}+ impressions.
       </p>
 
-      <SearchSignupsSection data={signups.data} error={signups.error} />
+      <SearchSignupsSection
+        data={signups.data}
+        error={signups.error}
+        section={section}
+      />
 
       <div className="grid gap-4 xl:grid-cols-2">
         <InsightSection

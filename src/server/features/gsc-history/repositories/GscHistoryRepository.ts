@@ -1,5 +1,6 @@
 /* eslint-disable max-lines -- one store for the history tables, reads and writes side by side */
 import {
+  type AnyColumn,
   and,
   asc,
   count,
@@ -10,13 +11,16 @@ import {
   inArray,
   isNotNull,
   isNull,
+  like,
   lte,
   max,
   min,
+  notLike,
   or,
   sql,
 } from "drizzle-orm";
 import { db } from "@/db";
+import { TOP_LEVEL_SECTION } from "@/shared/pageSection";
 import { runBatch } from "@/db/runBatch";
 import {
   gscAnnotations,
@@ -446,22 +450,36 @@ function toAggregate(row: {
 
 type Range = { start: string; end: string };
 
+/** Fork addition (FORK-CHANGES.md): pages of one type (see pageSection), in
+ *  SQL. The `%` after `://` spans the host; the second pattern drops URLs
+ *  where the folder sits deeper in the path. */
+function inSection(column: AnyColumn, section: string) {
+  if (section === TOP_LEVEL_SECTION) return notLike(column, "%://%/%/%");
+  return and(
+    like(column, `%://%/${section}/%`),
+    notLike(column, `%://%/%/${section}/%`),
+  );
+}
+
 /** Daily sums for one page and/or one query over a date range: from the
  *  page table for a page alone (it keeps anonymized-query clicks), from the
  *  query x page table when a query is involved. */
 async function listFilteredDays(
   projectId: string,
-  filter: { page?: string; query?: string } & SegmentFilter,
+  filter: { page?: string; query?: string; section?: string } & SegmentFilter,
   range: Range,
 ): Promise<Array<AggregateRow & { date: string }>> {
   const segment = Boolean(filter.country || filter.device);
+  const section = filter.section
+    ? (column: AnyColumn) => inSection(column, filter.section ?? "")
+    : () => undefined;
   let rows: Array<{
     date: string;
     clicks: unknown;
     impressions: unknown;
     weighted: unknown;
   }>;
-  if (segment && !filter.page && !filter.query) {
+  if (segment && !filter.page && !filter.query && !filter.section) {
     // Site totals for a country and/or device.
     const t = gscDailySegments;
     rows = await db
@@ -500,6 +518,7 @@ async function listFilteredDays(
           filter.device ? eq(t.device, filter.device) : undefined,
           filter.query ? eq(t.query, filter.query) : undefined,
           filter.page ? eq(t.page, filter.page) : undefined,
+          section(t.page),
           gte(t.date, range.start),
           lte(t.date, range.end),
         ),
@@ -521,6 +540,7 @@ async function listFilteredDays(
           eq(t.projectId, projectId),
           eq(t.query, filter.query),
           filter.page ? eq(t.page, filter.page) : undefined,
+          section(t.page),
           gte(t.date, range.start),
           lte(t.date, range.end),
         ),
@@ -540,7 +560,8 @@ async function listFilteredDays(
       .where(
         and(
           eq(t.projectId, projectId),
-          eq(t.page, filter.page ?? ""),
+          filter.page ? eq(t.page, filter.page) : undefined,
+          section(t.page),
           gte(t.date, range.start),
           lte(t.date, range.end),
         ),

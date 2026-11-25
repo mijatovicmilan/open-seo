@@ -15,16 +15,16 @@ import {
   formatPosition,
 } from "@/client/features/search-performance/SearchPerformanceColumns";
 import { formatDay } from "@/client/features/gsc-history/annotationStyles";
+import type { InsightsTarget } from "@/client/features/gsc-history/InsightsDetailSheet";
 import type { Insights } from "@/client/features/gsc-history/types";
+import { pageSection, sectionLabel } from "@/shared/pageSection";
 
-type InsightsFilter = { page?: string; query?: string };
-
-/** Clicking a page or query in any table filters the whole page to it. */
-export const InsightsFilterContext = createContext<
-  ((filter: InsightsFilter) => void) | null
+/** Clicking a page or query in any table opens its details panel. */
+export const InsightsOpenContext = createContext<
+  ((target: InsightsTarget) => void) | null
 >(null);
 
-function pathOf(url: string) {
+export function pathOf(url: string) {
   try {
     const parsed = new URL(url);
     return `${parsed.pathname}${parsed.search}` || "/";
@@ -33,17 +33,15 @@ function pathOf(url: string) {
   }
 }
 
-/** A URL shown as its path; click filters to the page, full URL on hover. */
+/** A URL shown as its path, cut to the cell's width; the full URL on hover.
+ *  The cell around it sets the width (`w-full max-w-0` takes what is left). */
 export function PageCell({ url }: { url: string | null }) {
-  const onFilter = useContext(InsightsFilterContext);
+  const onOpen = useContext(InsightsOpenContext);
   if (!url) return <span className="text-muted-foreground">—</span>;
   const label = pathOf(url);
-  if (!onFilter) {
+  if (!onOpen) {
     return (
-      <span
-        title={url}
-        className="block max-w-[12rem] truncate 2xl:max-w-[22rem]"
-      >
+      <span title={url} className="block truncate">
         {label}
       </span>
     );
@@ -51,34 +49,53 @@ export function PageCell({ url }: { url: string | null }) {
   return (
     <button
       type="button"
-      title={`Filter to ${url}`}
-      onClick={() => onFilter({ page: url })}
-      className="block max-w-[12rem] truncate rounded-sm text-left underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50 2xl:max-w-[22rem]"
+      title={url}
+      onClick={() => onOpen({ page: url })}
+      className="block max-w-full truncate rounded-sm text-left underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
     >
       {label}
     </button>
   );
 }
 
-function QueryCell({ query }: { query: string }) {
-  const onFilter = useContext(InsightsFilterContext);
+/** Fork addition (FORK-CHANGES.md): the page's type, its first folder. */
+export function TypeCell({ url }: { url: string | null }) {
   return (
-    <TableCell className="max-w-[10rem] truncate 2xl:max-w-[18rem]">
-      {onFilter ? (
+    <TableCell className="whitespace-nowrap text-muted-foreground">
+      {url ? sectionLabel(pageSection(url)) : "—"}
+    </TableCell>
+  );
+}
+
+export function QueryCell({
+  query,
+  className = "w-full max-w-0",
+}: {
+  query: string;
+  className?: string;
+}) {
+  const onOpen = useContext(InsightsOpenContext);
+  return (
+    <TableCell className={className}>
+      {onOpen ? (
         <button
           type="button"
-          title={`Filter to "${query}"`}
-          onClick={() => onFilter({ query })}
-          className="max-w-full truncate rounded-sm text-left underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+          title={query}
+          onClick={() => onOpen({ query })}
+          className="block max-w-full truncate rounded-sm text-left underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
         >
           {query}
         </button>
       ) : (
-        query
+        <span className="block truncate">{query}</span>
       )}
     </TableCell>
   );
 }
+
+// Query and page side by side share the free width.
+const QUERY_HALF = "w-1/2 max-w-0";
+const PAGE_HALF = "w-1/2 max-w-0";
 
 function Delta({ current, previous }: { current: number; previous: number }) {
   const diff = current - previous;
@@ -136,7 +153,8 @@ export function ChangesTable({
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Page</TableHead>
+          <TableHead className="w-full">Page</TableHead>
+          <TableHead>Type</TableHead>
           <TableHead className="text-right">Clicks</TableHead>
           <TableHead className="text-right">Change</TableHead>
           <TableHead className="text-right">Impr. change</TableHead>
@@ -146,8 +164,8 @@ export function ChangesTable({
       <TableBody>
         {rows.map((row) => (
           <TableRow key={row.page}>
-            <TableCell>
-              <div className="flex items-center gap-1.5">
+            <TableCell className="w-full max-w-0">
+              <div className="flex min-w-0 items-center gap-1.5">
                 <Icon
                   className={cn(
                     "size-3.5 shrink-0",
@@ -157,6 +175,7 @@ export function ChangesTable({
                 <PageCell url={row.page} />
               </div>
             </TableCell>
+            <TypeCell url={row.page} />
             <TableCell className="text-right tabular-nums">
               {formatCount(row.clicks)}
             </TableCell>
@@ -221,8 +240,8 @@ export function NewQueriesTable({ rows }: { rows: Insights["newQueries"] }) {
       <TableBody>
         {rows.map((row) => (
           <TableRow key={row.query}>
-            <QueryCell query={row.query} />
-            <TableCell>
+            <QueryCell query={row.query} className={QUERY_HALF} />
+            <TableCell className={PAGE_HALF}>
               <PageCell url={row.page} />
             </TableCell>
             <TableCell className="whitespace-nowrap">
@@ -260,8 +279,8 @@ export function NearPageOneTable({ rows }: { rows: Insights["nearPageOne"] }) {
       <TableBody>
         {rows.map((row) => (
           <TableRow key={row.query}>
-            <QueryCell query={row.query} />
-            <TableCell>
+            <QueryCell query={row.query} className={QUERY_HALF} />
+            <TableCell className={PAGE_HALF}>
               <PageCell url={row.page} />
             </TableCell>
             <TableCell className="text-right tabular-nums">
@@ -299,8 +318,8 @@ export function CtrGapTable({ rows }: { rows: Insights["ctrGaps"] }) {
       <TableBody>
         {rows.map((row) => (
           <TableRow key={`${row.query}::${row.page}`}>
-            <QueryCell query={row.query} />
-            <TableCell>
+            <QueryCell query={row.query} className={QUERY_HALF} />
+            <TableCell className={PAGE_HALF}>
               <PageCell url={row.page} />
             </TableCell>
             <TableCell className="text-right tabular-nums">
@@ -340,13 +359,16 @@ export function CannibalizationTable({
       <TableBody>
         {rows.map((row) => (
           <TableRow key={row.query}>
-            <QueryCell query={row.query} />
+            <QueryCell query={row.query} className="w-1/3 max-w-0" />
             <TableCell className="text-right tabular-nums">
               {formatCount(row.impressions)}
             </TableCell>
-            <TableCell>
+            <TableCell className="w-2/3 max-w-0">
               {row.pages.map((page) => (
-                <div key={page.page} className="flex items-center gap-2">
+                <div
+                  key={page.page}
+                  className="flex min-w-0 items-center gap-2"
+                >
                   <PageCell url={page.page} />
                   <span className="shrink-0 text-xs text-muted-foreground">
                     {Math.round(page.share * 100)}%, #

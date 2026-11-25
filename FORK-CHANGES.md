@@ -28,7 +28,11 @@ upstream's version and re-apply the marked lines (each carries a
   newest day Google calls final (its `metadata.firstIncompleteDate`, stored per sync
   in `gsc_sync_state.settled_through`; three days ago before the first sync)
   are drawn as partial, and the "Include partial days" switch counts them in
-  the totals and tables too.
+  the totals and tables too. Pages have a type, the first folder of their
+  path (`src/shared/pageSection.ts`; "/tools/x" is "tools", top-level pages
+  share one), shown in the page tables and used as a filter. Clicking a page
+  or query opens a details panel (totals, trend, its queries or pages) with a
+  button that filters the whole page to it.
 
 - **GSC positions for keywords** (Saved Keywords and Rank Tracking): a
   "GSC position" column with the Search Console average position over the
@@ -77,7 +81,7 @@ Our own files:
   Postgres mirrors in `src/db/pg/`
 - `src/server/features/outreach/`, `src/server/features/gsc-history/`
 - `src/serverFunctions/outreach.ts`, `src/serverFunctions/gscHistory.ts`
-- `src/shared/outreach.ts`, `src/shared/outreachSchedule.ts`,
+- `src/shared/outreach.ts`, `src/shared/outreachSchedule.ts`, `src/shared/pageSection.ts`,
   `src/types/schemas/outreach.ts`,
   `src/types/schemas/gsc-history.ts`
 - `src/client/features/outreach/`, `src/client/features/gsc-history/`,
@@ -129,6 +133,7 @@ Our own files:
 | `src/routes/_app/p/$projectId/search-performance.tsx`                                                                                                                                                        | `beforeLoad` redirect to Search Insights (the page code stays)                                                                                                                                                                       | Old links and MCP URLs land on Search Insights                                                                                                       |
 | `src/routes/_app/p/$projectId/local-seo.tsx`                                                                                                                                                                 | `beforeLoad` redirect to Rank Tracking on the layout, so tracker pages redirect too (the page code stays)                                                                                                                            | Local SEO is not used here (owner, 2026-11-24)                                                                                                       |
 | `src/client/features/dashboard/DashboardCards.tsx`                                                                                                                                                           | The GSC card's link goes to Search Insights with the matching range                                                                                                                                                                  | No link to the hidden page                                                                                                                           |
+| `src/client/features/dashboard/DashboardPage.tsx`                                                                                                                                                            | `DashboardOnboarding` ("Get started" checklist) no longer rendered; the component and its test stay                                                                                                                                  | Owner's choice: the checklist is for new users                                                                                                       |
 | `src/client/components/Sidebar.tsx`                                                                                                                                                                          | Help & Community only in hosted mode (upstream hides SAM itself)                                                                                                                                                                     | Support is not used here                                                                                                                             |
 | `src/server/features/dashboard/services/DashboardService.test.ts`                                                                                                                                            | `vi.mock` of `posthogSource` returning null                                                                                                                                                                                          | Keeps the DB out of the test                                                                                                                         |
 | `src/routeTree.gen.ts`                                                                                                                                                                                       | Regenerated with our routes                                                                                                                                                                                                          | Generated by the router plugin                                                                                                                       |

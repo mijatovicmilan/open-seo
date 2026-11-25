@@ -19,7 +19,9 @@ import {
 import {
   InsightSection,
   PageCell,
+  TypeCell,
 } from "@/client/features/gsc-history/SearchInsightsSections";
+import { pageSection } from "@/shared/pageSection";
 import type { Insights } from "@/client/features/gsc-history/types";
 import { getSearchSignups } from "@/serverFunctions/analyticsSource";
 
@@ -137,9 +139,12 @@ function sortValue(row: Row, key: SortKey): number | null {
 export function SearchSignupsSection({
   data,
   error,
+  section,
 }: {
   data: SignupsData | null;
   error: string | null;
+  /** One page type: PostHog can't filter by it, so the rows are cut here. */
+  section?: string;
 }) {
   const [order, setOrder] = React.useState<{ key: SortKey; desc: boolean }>({
     key: "clicks",
@@ -159,7 +164,10 @@ export function SearchSignupsSection({
       </p>
     );
   }
-  const rows = sort(data.pages, (a, b) => {
+  const pages = section
+    ? data.pages.filter((row) => pageSection(row.page) === section)
+    : data.pages;
+  const rows = sort(pages, (a, b) => {
     const left = sortValue(a, order.key);
     const right = sortValue(b, order.key);
     if (left === null && right === null) return 0;
@@ -181,7 +189,8 @@ export function SearchSignupsSection({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Page</TableHead>
+            <TableHead className="w-full">Page</TableHead>
+            <TableHead>Type</TableHead>
             {COLUMNS.map((column) => (
               <TableHead
                 key={column.key}
@@ -221,9 +230,10 @@ export function SearchSignupsSection({
         <TableBody>
           {rows.map((row) => (
             <TableRow key={row.page}>
-              <TableCell>
+              <TableCell className="w-full max-w-0">
                 <PageCell url={row.page} />
               </TableCell>
+              <TypeCell url={row.page} />
               <TableCell className="text-right tabular-nums">
                 {formatCount(row.clicks)}
               </TableCell>

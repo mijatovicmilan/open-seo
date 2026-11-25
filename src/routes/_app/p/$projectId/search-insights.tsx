@@ -42,6 +42,7 @@ function SearchInsightsRoute() {
           end: next.range === "custom" ? next.end : undefined,
           page: next.page || undefined,
           query: next.query || undefined,
+          section: next.section || undefined,
           country: next.country || undefined,
           device: next.device,
         };
@@ -61,6 +62,7 @@ function SearchInsightsRoute() {
         metrics: parseMetrics(search.metrics),
         page: search.page,
         query: search.query,
+        section: search.section,
         country: search.country,
         device: search.device,
       }}

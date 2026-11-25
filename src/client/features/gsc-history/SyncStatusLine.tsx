@@ -18,9 +18,51 @@ function formatWhen(iso: string | null): string {
   });
 }
 
-/** Days stored, oldest day, last sync, any error, and the Sync now button.
- *  While a catch-up runs it shows how much history is filled. */
-export function SyncStatusLine({
+/** The header's sync control: days stored, last sync, and a small Sync
+ *  button. The site and the oldest day are in the tooltip. */
+export function SyncControl({
+  status: loaded,
+  sync,
+}: {
+  status: HistoryStatus;
+  sync: SearchHistorySync;
+}) {
+  const status = sync.progress ?? loaded;
+  const busy = sync.isSyncing || status.running;
+  const details = [
+    status.siteUrl,
+    status.oldestDay ? `Stored since ${formatDay(status.oldestDay)}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  return (
+    <div className="flex items-center gap-2">
+      <span
+        className="text-xs text-muted-foreground"
+        title={details || undefined}
+      >
+        {status.daysStored > 0
+          ? `${formatCount(status.daysStored)} days · synced ${formatWhen(status.lastSuccessAt)}`
+          : "No days stored yet"}
+      </span>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={sync.syncNow}
+        disabled={busy}
+      >
+        <RefreshCw
+          data-icon="inline-start"
+          className={cn(busy && "animate-spin")}
+        />
+        Sync
+      </Button>
+    </div>
+  );
+}
+
+/** What the sync is doing or what went wrong; nothing when all is well. */
+export function SyncNotices({
   projectId,
   status: loaded,
   sync,
@@ -32,79 +74,46 @@ export function SyncStatusLine({
   const status = sync.progress ?? loaded;
   const busy = sync.isSyncing || status.running;
   const total = status.daysStored + status.missingDays;
-
+  const notice =
+    busy && status.missingDays === 0 && status.segmentDaysMissing > 0 ? (
+      <span className="flex items-center gap-2">
+        <Spinner className="size-3.5" />
+        Adding country and device data: {formatCount(
+          status.segmentDaysMissing,
+        )}{" "}
+        days left.
+      </span>
+    ) : busy ? (
+      <span className="flex items-center gap-2">
+        <Spinner className="size-3.5" />
+        Filling history: {formatCount(status.daysStored)} of{" "}
+        {formatCount(total)} days. You can keep using the page.
+      </span>
+    ) : status.segmentDaysMissing > 0 ? (
+      `Country and device data still to add for ${formatCount(status.segmentDaysMissing)} days.`
+    ) : status.missingDays > 0 ? (
+      `${formatCount(status.missingDays)} older days still to fetch.`
+    ) : null;
+  const error = status.lastError && !busy;
+  if (!notice && !error) return null;
   return (
-    <div className="flex flex-col gap-2 rounded-xl border border-border bg-card px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
-      <div className="min-w-0 space-y-0.5">
-        <div className="text-muted-foreground">
-          {status.daysStored > 0 ? (
-            <>
-              <span className="font-medium text-foreground">
-                {formatCount(status.daysStored)} days stored
-              </span>
-              {status.oldestDay ? ` since ${formatDay(status.oldestDay)}` : ""}
-              {" · "}last sync {formatWhen(status.lastSuccessAt)}
-            </>
-          ) : (
-            "No days stored yet"
-          )}
+    <div className="space-y-1 text-sm text-muted-foreground">
+      {notice ? <div>{notice}</div> : null}
+      {error ? (
+        <div className="flex items-start gap-1.5 text-destructive">
+          <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+          <span>
+            Last sync failed: {status.lastError}{" "}
+            <Link
+              to="/p/$projectId/settings/integrations"
+              params={{ projectId }}
+              className="underline underline-offset-4"
+            >
+              Integrations
+            </Link>
+          </span>
         </div>
-        {status.siteUrl ? (
-          <div className="truncate text-xs text-muted-foreground">
-            {status.siteUrl}
-          </div>
-        ) : null}
-        {busy && status.missingDays === 0 && status.segmentDaysMissing > 0 ? (
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Spinner className="size-3.5" />
-            Adding country and device data:{" "}
-            {formatCount(status.segmentDaysMissing)} days left.
-          </div>
-        ) : busy ? (
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Spinner className="size-3.5" />
-            Filling history: {formatCount(status.daysStored)} of{" "}
-            {formatCount(total)} days. You can keep using the page.
-          </div>
-        ) : status.segmentDaysMissing > 0 ? (
-          <div className="text-muted-foreground">
-            Country and device data still to add for{" "}
-            {formatCount(status.segmentDaysMissing)} days.
-          </div>
-        ) : status.missingDays > 0 ? (
-          <div className="text-muted-foreground">
-            {formatCount(status.missingDays)} older days still to fetch.
-          </div>
-        ) : null}
-        {status.lastError && !busy ? (
-          <div className="flex items-start gap-1.5 text-destructive">
-            <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
-            <span>
-              Last sync failed: {status.lastError}{" "}
-              <Link
-                to="/p/$projectId/settings/integrations"
-                params={{ projectId }}
-                className="underline underline-offset-4"
-              >
-                Integrations
-              </Link>
-            </span>
-          </div>
-        ) : null}
-      </div>
-      <Button
-        variant="ghost"
-        size="sm"
-        className="self-start sm:self-center"
-        onClick={sync.syncNow}
-        disabled={busy}
-      >
-        <RefreshCw
-          data-icon="inline-start"
-          className={cn(busy && "animate-spin")}
-        />
-        Sync now
-      </Button>
+      ) : null}
     </div>
   );
 }

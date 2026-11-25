@@ -24,6 +24,8 @@ import {
   planSync,
 } from "@/server/features/gsc-history/syncPlan";
 import type { GscAnnotationKind } from "@/types/schemas/gsc-history";
+import { sort } from "remeda";
+import { pageSection } from "@/shared/pageSection";
 
 // Read side of Search Console history: sync status, the insight sections,
 // the chart and its annotations. Callers authorize the project.
@@ -323,6 +325,8 @@ type InsightsOptions = {
   /** Fork addition (FORK-CHANGES.md): count the partial days too. */
   fresh?: boolean;
   page?: string;
+  /** Fork addition (FORK-CHANGES.md): one page type, see pageSection. */
+  section?: string;
   query?: string;
   country?: string;
   device?: string;
@@ -353,13 +357,34 @@ function inRange<T extends { date: string }>(rows: T[], range: Range) {
 
 async function loadDays(
   projectId: string,
-  filter: { page?: string; query?: string } & SegmentFilter,
+  filter: { page?: string; query?: string; section?: string } & SegmentFilter,
   range: Range,
 ): Promise<DayPoint[]> {
-  if (filter.page || filter.query || filter.country || filter.device) {
+  if (
+    filter.page ||
+    filter.query ||
+    filter.section ||
+    filter.country ||
+    filter.device
+  ) {
     return GscHistoryRepository.listFilteredDays(projectId, filter, range);
   }
   return inRange(await GscHistoryRepository.listDailyTotals(projectId), range);
+}
+
+const DETAIL_ROWS = 50;
+
+/** Fork addition (FORK-CHANGES.md): page types by impressions. */
+function listSections(rows: Array<{ page: string; impressions: number }>) {
+  const bySection = new Map<string, number>();
+  for (const row of rows) {
+    const section = pageSection(row.page);
+    bySection.set(section, (bySection.get(section) ?? 0) + row.impressions);
+  }
+  return sort(
+    [...bySection].map(([section, impressions]) => ({ section, impressions })),
+    (a, b) => b.impressions - a.impressions,
+  );
 }
 
 async function getInsights(
@@ -388,6 +413,7 @@ async function getInsights(
   const filter = {
     ...(options.page ? { page: options.page } : {}),
     ...(options.query ? { query: options.query } : {}),
+    ...(options.section ? { section: options.section } : {}),
     ...(options.country ? { country: options.country } : {}),
     ...(options.device ? { device: options.device } : {}),
   };
@@ -395,7 +421,9 @@ async function getInsights(
     filter.country || filter.device
       ? { country: filter.country, device: filter.device }
       : null;
-  const filtered = Boolean(filter.page || filter.query || segment);
+  const filtered = Boolean(
+    filter.page || filter.query || filter.section || segment,
+  );
 
   const loadStart =
     previous && previous.start < current.start ? previous.start : current.start;
@@ -438,7 +466,9 @@ async function getInsights(
 
   const matches = (row: { page?: string | null; query?: string }) =>
     (!filter.page || row.page === filter.page) &&
-    (!filter.query || row.query === filter.query);
+    (!filter.query || row.query === filter.query) &&
+    (!filter.section ||
+      (row.page != null && pageSection(row.page) === filter.section));
   const [siteQueryPages, segmentQueryPages, countries] = await Promise.all([
     GscHistoryRepository.aggregateQueryPages(
       projectId,
@@ -502,6 +532,7 @@ async function getInsights(
     drivers: Array<{ query: string }>;
   }) =>
     (!filter.page || row.page === filter.page) &&
+    (!filter.section || pageSection(row.page) === filter.section) &&
     (!filter.query || row.drivers.some((d) => d.query === filter.query));
 
   return {
@@ -537,9 +568,21 @@ async function getInsights(
         : newPages.filter(
             (row) =>
               (!filter.page || row.page === filter.page) &&
+              (!filter.section || pageSection(row.page) === filter.section) &&
               (!segmentPages || segmentPages.has(row.page)),
           ),
       countries,
+      // Fork additions (FORK-CHANGES.md): the site's page types by
+      // impressions, and the query x page rows behind a page or query filter
+      // (the page details panel).
+      sections: listSections(siteQueryPages),
+      detailRows:
+        filter.page || filter.query
+          ? sort(
+              queryPages,
+              (a, b) => b.clicks - a.clicks || b.impressions - a.impressions,
+            ).slice(0, DETAIL_ROWS)
+          : [],
       series,
       firstDataDay,
       annotations: await loadAnnotations(projectId, newPages),

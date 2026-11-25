@@ -15,7 +15,6 @@ import { DashboardLinkActivity } from "./DashboardLinkActivity";
 import { dashboardSiteTabSchema } from "@/types/schemas/dashboard";
 import type { z } from "zod";
 import { useQuery } from "@tanstack/react-query";
-import { DashboardOnboarding } from "./DashboardOnboarding";
 import { isAgentConnected } from "./dashboardSteps";
 import {
   DashboardAgentCard,
@@ -149,11 +148,7 @@ export function DashboardPage({
           />
         ) : null}
 
-        <DashboardOnboarding
-          key={projectId}
-          projectId={projectId}
-          activation={activation}
-        />
+        {/* Fork change (FORK-CHANGES.md): no "Get started" checklist. */}
 
         <Tabs
           value={tab}

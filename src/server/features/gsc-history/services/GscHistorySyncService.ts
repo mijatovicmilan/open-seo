@@ -126,17 +126,17 @@ async function fetchDailyTotals(
   return { byDay, newest, settledThrough };
 }
 
-/** Fork addition (FORK-CHANGES.md): the newest hour Google has data for on
- *  `day`, so the chart can say how far a partial day goes. */
-async function fetchNewestHour(projectId: string, day: string) {
+/** Fork addition (FORK-CHANGES.md): the newest hour Google has data for
+ *  from `start` to `end`, so the chart can say how far a partial day goes. */
+async function fetchNewestHour(projectId: string, start: string, end: string) {
   const result = await GscService.getPerformance({
     projectId,
-    startDate: day,
-    endDate: day,
+    startDate: start,
+    endDate: end,
     dimensions: ["hour"],
     type: "web",
     dataState: "hourly_all",
-    rowLimit: 24,
+    rowLimit: GSC_MAX_ROW_LIMIT,
   });
   // Keys are ISO times in Pacific time with one offset, so they sort as text.
   return result.rows.reduce<string | null>((newest, row) => {
@@ -240,7 +240,13 @@ function describeSyncError(error: unknown): string {
  *  Search Console failures; they are recorded on the sync state. */
 async function syncProject(
   projectId: string,
-  options: { maxDetailDays?: number; now?: Date } = {},
+  options: {
+    maxDetailDays?: number;
+    now?: Date;
+    /** Fork addition (FORK-CHANGES.md): only the days after the newest final
+     *  one, for the 15-minute refresh. */
+    partialOnly?: boolean;
+  } = {},
 ): Promise<SyncRunResult> {
   const now = options.now ?? new Date();
   const connection = await GscService.getConnection(projectId);
@@ -268,13 +274,17 @@ async function syncProject(
     } = await fetchDailyTotals(projectId, plan.oldest, plan.latest);
     const newestHour =
       newest && settledThrough && newest > settledThrough
-        ? await fetchNewestHour(projectId, newest)
+        ? await fetchNewestHour(projectId, newest, newest)
         : null;
     const impressionsByDay = new Map(
       [...totals].map(([day, metrics]) => [day, metrics.impressions]),
     );
     const selection = selectDays(
-      plan.candidates,
+      options.partialOnly
+        ? plan.candidates.filter(
+            (day) => settledThrough !== null && day > settledThrough,
+          )
+        : plan.candidates,
       impressionsByDay,
       options.maxDetailDays ?? MAX_DETAIL_DAYS_PER_RUN,
     );
@@ -307,8 +317,9 @@ async function syncProject(
 
     // Days stored before the country and device tables existed get those
     // rows from the same budget, newest first.
-    const budget =
-      (options.maxDetailDays ?? MAX_DETAIL_DAYS_PER_RUN) - detailDays;
+    const budget = options.partialOnly
+      ? 0
+      : (options.maxDetailDays ?? MAX_DETAIL_DAYS_PER_RUN) - detailDays;
     let segmentDays = 0;
     if (budget > 0 && rowsWritten < MAX_ROWS_PER_RUN) {
       const missing = await GscHistoryRepository.listDaysMissingSegments(
@@ -384,7 +395,44 @@ async function syncAllConnectedProjects(): Promise<void> {
   }
 }
 
+// Google keeps hourly data for 10 days.
+const HOURLY_DAYS = 10;
+
+/** Fork addition (FORK-CHANGES.md): run every 15 minutes. A project whose
+ *  fresh data moved on since its last sync (Google has a newer hour) gets
+ *  its partial days fetched again; otherwise it costs one GSC call. */
+async function refreshPartialDays(now = new Date()): Promise<void> {
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Los_Angeles",
+  }).format(now);
+  for (const projectId of await GscHistoryRepository.listConnectedProjectIds()) {
+    try {
+      const state = await GscHistoryRepository.getSyncState(projectId);
+      // Before the backfill, or after a failed sync, the daily job and the
+      // page do the work.
+      if (!state?.settledThrough || !state.backfillDoneAt || state.lastError)
+        continue;
+      const from = addDays(state.settledThrough, 1);
+      const floor = addDays(today, -(HOURLY_DAYS - 1));
+      const latest = await fetchNewestHour(
+        projectId,
+        from > floor ? from : floor,
+        today,
+      );
+      if (!latest || latest === state.newestHour) continue;
+      await syncProject(projectId, { now, partialOnly: true });
+    } catch (error) {
+      console.error(
+        "[gsc-history] partial refresh failed for",
+        projectId,
+        error,
+      );
+    }
+  }
+}
+
 export const GscHistorySyncService = {
   syncProject,
   syncAllConnectedProjects,
+  refreshPartialDays,
 };

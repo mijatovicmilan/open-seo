@@ -16,10 +16,13 @@ const DAY_MS = 86400_000;
 
 // The switcher draws the icon at 24px (48px on a retina screen): a vector
 // icon first, then the 180px Apple touch icon, then the small favicons.
+function iconRank(url: string) {
+  if (/\.svg($|\?)/iu.test(url)) return 0;
+  return /apple-touch/iu.test(url) ? 1 : 2;
+}
+
 function sharpness(a: string, b: string) {
-  const rank = (url: string) =>
-    /\.svg($|\?)/iu.test(url) ? 0 : /apple-touch/iu.test(url) ? 1 : 2;
-  return rank(a) - rank(b);
+  return iconRank(a) - iconRank(b);
 }
 
 /** The icon as a data URI, or null when the site has none we can read. */

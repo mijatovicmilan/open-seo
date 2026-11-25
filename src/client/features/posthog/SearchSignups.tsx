@@ -260,8 +260,8 @@ export function SearchSignupsSection({
       </Table>
       <p className="border-t border-border px-4 py-2 text-xs text-muted-foreground">
         Visits are PostHog sessions from Google organic search, by landing page,
-        in days of {data.source.timeZone} (Search Console uses Pacific time). On
-        cookieless sites visits are estimates.
+        on Pacific-time days like Search Console&apos;s. On cookieless sites
+        visits are estimates.
       </p>
     </InsightSection>
   );

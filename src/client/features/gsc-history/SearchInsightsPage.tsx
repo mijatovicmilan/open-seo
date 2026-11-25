@@ -293,7 +293,8 @@ function InsightsBody({
         {period.previous && (insights.prevTotals?.impressions ?? 0) > 0
           ? `, compared with ${periodText(period.previous)}`
           : ""}
-        . Table rows need {insights.minImpressions}+ impressions.
+        . Table rows need {insights.minImpressions}+ impressions. Days and times
+        are in Pacific time, as Google counts them.
       </p>
 
       <SearchSignupsSection

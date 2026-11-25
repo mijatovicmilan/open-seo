@@ -8,14 +8,17 @@ import type { HistoryStatus } from "@/client/features/gsc-history/types";
 import type { SearchHistorySync } from "@/client/features/gsc-history/useSearchHistorySync";
 import { formatCount } from "@/client/features/search-performance/SearchPerformanceColumns";
 
+// In Pacific time, like Google's days and the chart's hours, so every time
+// on the page is in one zone.
 function formatWhen(iso: string | null): string {
   if (!iso) return "never";
-  return new Date(iso).toLocaleString("en-US", {
+  return `${new Date(iso).toLocaleString("en-US", {
     month: "short",
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
-  });
+    timeZone: "America/Los_Angeles",
+  })} PT`;
 }
 
 /** The header's sync control: days stored, last sync, and a small Sync

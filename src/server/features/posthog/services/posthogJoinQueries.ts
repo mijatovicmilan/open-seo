@@ -1,6 +1,7 @@
 import {
   domainExpr,
   keyEventValues,
+  PACIFIC_SESSIONS_SUBQUERY,
   SESSIONS_SUBQUERY,
 } from "./posthogQueries";
 
@@ -12,6 +13,9 @@ import {
 // outreach links → visits from the linking site → signups. A signup is a
 // session with at least one key event.
 // ---------------------------------------------------------------------------
+
+// Google visits and signups are counted on Search Console's days (Pacific
+// time), so they line up with its clicks day by day.
 
 /** Google organic sessions; Search Console's own "open page" links
  *  (search.google.com) are not search traffic. */
@@ -39,7 +43,7 @@ export function buildGoogleDailyQuery(
 ) {
   return {
     query: `SELECT toString(day) AS date, ${JOIN_METRICS}
-FROM (${SESSIONS_SUBQUERY})
+FROM (${PACIFIC_SESSIONS_SUBQUERY})
 WHERE ${GOOGLE_SESSION}${input.page ? `\n  AND ${domainExpr("host")} = {page_host} AND ${pathExpr("landing_page")} = {page_path}` : ""}${input.device ? "\n  AND lower(device) = {device}" : ""}
 GROUP BY date
 ORDER BY date ASC
@@ -64,7 +68,7 @@ export function buildGooglePagesQuery(
     query: `SELECT ${domainExpr("coalesce(host, '')")} AS host,
   ${pathExpr("coalesce(landing_page, '/')")} AS path,
   ${JOIN_METRICS}
-FROM (${SESSIONS_SUBQUERY})
+FROM (${PACIFIC_SESSIONS_SUBQUERY})
 WHERE ${GOOGLE_SESSION}${input.device ? "\n  AND lower(device) = {device}" : ""}
 GROUP BY host, path
 ORDER BY visits DESC, host ASC, path ASC

@@ -390,6 +390,15 @@ async function runScheduled(cron: string, env: Env) {
   } catch (err) {
     console.error("[cron] Outreach scheduler failed:", err);
   }
+  // Fork addition (FORK-CHANGES.md): Search Console's fresh data, every 15
+  // minutes (one of the three 5-minute runs in each quarter hour).
+  if (new Date().getUTCMinutes() % 15 < 5) {
+    try {
+      await withPgClient(() => GscHistorySyncService.refreshPartialDays());
+    } catch (err) {
+      console.error("[cron] Search Console partial refresh failed:", err);
+    }
+  }
   const checks = await Promise.allSettled([
     withPgClient(() => runScheduledRankChecks(env)),
     withPgClient(async () => {

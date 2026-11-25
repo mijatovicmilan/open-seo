@@ -91,9 +91,8 @@ const EVENT_WINDOW = `{filters}
 const ORGANIC_SESSION = "channel = 'Organic Search'";
 const ORGANIC_EVENT = "session.$channel_type = 'Organic Search'";
 
-/** One row per session that started in the range (days in the PostHog
- *  project's time zone). */
-export const SESSIONS_SUBQUERY = `SELECT
+/** One row per session that started in the range, on the day `day` gives. */
+const sessionsSubquery = (day: string) => `SELECT
     $session_id AS session_id,
     any(distinct_id) AS visitor,
     any(session.$entry_hostname) AS host,
@@ -107,7 +106,7 @@ export const SESSIONS_SUBQUERY = `SELECT
     argMin(properties.$device_type, timestamp) AS device,
     argMin(coalesce(nullIf(properties.$geoip_country_name, ''), properties.$geoip_country_code), timestamp) AS country,
     argMinIf(properties.$referrer, timestamp, event = '$pageview') AS referrer,
-    toDate(min(timestamp)) AS day,
+    ${day} AS day,
     countIf(event IN {key_events}) AS key_events
   FROM events
   WHERE ${EVENT_WINDOW}
@@ -115,6 +114,15 @@ export const SESSIONS_SUBQUERY = `SELECT
     AND (event = '$pageview' OR event IN {key_events})
   GROUP BY session_id
   HAVING day >= toDate({start}) AND day <= toDate({end})`;
+
+/** Days in the PostHog project's time zone. */
+export const SESSIONS_SUBQUERY = sessionsSubquery("toDate(min(timestamp))");
+
+/** Fork addition (FORK-CHANGES.md): days in Pacific time, as Search Console
+ *  counts them, for the joins with Search Console. */
+export const PACIFIC_SESSIONS_SUBQUERY = sessionsSubquery(
+  "toDate(toTimeZone(min(timestamp), 'America/Los_Angeles'))",
+);
 
 const SESSION_METRICS = `count() AS sessions,
   uniqExact(visitor) AS activeUsers,

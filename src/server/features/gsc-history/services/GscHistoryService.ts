@@ -450,7 +450,9 @@ async function getInsights(
       impressions: row.impressions,
       ctr: row.impressions > 0 ? row.clicks / row.impressions : null,
       position: row.impressions > 0 ? row.position : null,
-      partial: row.date > settledEnd,
+      // Fork change (FORK-CHANGES.md): with partial days counted they are
+      // drawn like the rest; the legend still names them.
+      partial: !options.fresh && row.date > settledEnd,
       compare: prior
         ? {
             date: prior.date,

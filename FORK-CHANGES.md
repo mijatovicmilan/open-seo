@@ -27,12 +27,12 @@ upstream's version and re-apply the marked lines (each carries a
   tools: `src/server/mcp/tools/search-history-tools.ts`. Days after the
   newest day Google calls final (its `metadata.firstIncompleteDate`, stored per sync
   in `gsc_sync_state.settled_through`; three days ago before the first sync)
-  are drawn as partial, and the "Include partial days" switch counts them in
-  the totals and tables too. Pages have a type, the first folder of their
+  are drawn as partial, and the "Include partial days" switch counts them in the totals and tables and draws them solid Pages have a type, the first folder of their
   path (`src/shared/pageSection.ts`; "/tools/x" is "tools", top-level pages
   share one), shown in the page tables and used as a filter. Clicking a page
   or query opens a details panel (totals, trend, its queries or pages) with a
-  button that filters the whole page to it.
+  button that filters the whole page to it; its chart follows the page's
+  metrics, and it has its own partial-days switch that is not saved.
 
 - **GSC positions for keywords** (Saved Keywords and Rank Tracking): a
   "GSC position" column with the Search Console average position over the

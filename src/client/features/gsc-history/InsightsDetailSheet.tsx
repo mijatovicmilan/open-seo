@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useMemo, useRef, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Filter } from "lucide-react";
 import { cn } from "cn";
@@ -21,10 +21,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/client/components/ui/table";
-import type { ChartConfig } from "@/client/components/ui/chart";
-import { TrendChart } from "@/client/features/dashboard/DashboardMetrics";
 import { periodText } from "@/client/features/gsc-history/ChartPanel";
+import { Switch } from "@/client/components/ui/switch";
+import { TimeSeriesChart } from "@/client/features/charts/TimeSeriesChart";
 import {
+  buildChartPoints,
+  chartStart,
+  METRIC_KEYS,
   METRICS,
   type MetricKey,
 } from "@/client/features/gsc-history/searchSeries";
@@ -40,6 +43,7 @@ import {
   formatCount,
   formatPosition,
 } from "@/client/features/search-performance/SearchPerformanceColumns";
+import type { Insights } from "@/client/features/gsc-history/types";
 import { getSearchInsights } from "@/serverFunctions/gscHistory";
 
 // Fork feature (FORK-CHANGES.md): what Search Insights knows about one page
@@ -49,16 +53,17 @@ export type InsightsTarget = { page: string } | { query: string };
 
 type InsightsRequest = Parameters<typeof getSearchInsights>[0]["data"];
 
-const chartConfig = {
-  clicks: { label: "Clicks", color: METRICS.clicks.color },
-  impressions: { label: "Impressions", color: METRICS.impressions.color },
-} satisfies ChartConfig;
+// The panel has Search Console data only; PostHog visits and signups stay
+// on the page.
+const PANEL_METRICS: MetricKey[] = ["clicks", "impressions", "ctr", "position"];
 
 const STATS = ["clicks", "impressions", "ctr", "position"] as const;
 
 export function InsightsDetailSheet({
   target,
   request,
+  metrics,
+  granularity,
   onOpen,
   onFilter,
   onClose,
@@ -66,6 +71,9 @@ export function InsightsDetailSheet({
   target: InsightsTarget | null;
   /** The page's own request; the target replaces its page, query and type. */
   request: InsightsRequest;
+  /** The page's chart metrics and granularity, so both charts match. */
+  metrics: MetricKey[];
+  granularity: "day" | "week" | "month";
   onOpen: (target: InsightsTarget) => void;
   onFilter: (target: InsightsTarget) => void;
   onClose: () => void;
@@ -111,7 +119,14 @@ export function InsightsDetailSheet({
                 )}
               </SheetTitle>
             </SheetHeader>
-            <DetailBody target={target} request={request} />
+            <DetailBody
+              // Its own partial-days switch starts from the page's each time.
+              key={"page" in target ? `p:${target.page}` : `q:${target.query}`}
+              target={target}
+              request={request}
+              metrics={metrics}
+              granularity={granularity}
+            />
             <SheetFooter className="border-t border-border px-6">
               <Button variant="outline" onClick={() => onFilter(target)}>
                 <Filter data-icon="inline-start" />
@@ -129,12 +144,19 @@ export function InsightsDetailSheet({
 function DetailBody({
   target,
   request,
+  metrics,
+  granularity,
 }: {
   target: InsightsTarget;
   request: InsightsRequest;
+  metrics: MetricKey[];
+  granularity: "day" | "week" | "month";
 }) {
+  // Only for this panel while it is open; nothing is saved.
+  const [fresh, setFresh] = useState(Boolean(request.fresh));
   const detailRequest = {
     ...request,
+    fresh: fresh || undefined,
     page: "page" in target ? target.page : undefined,
     query: "query" in target ? target.query : undefined,
     section: undefined,
@@ -166,15 +188,18 @@ function DetailBody({
   const isPage = "page" in target;
   return (
     <div className="space-y-5 px-6 pb-6">
-      <p className="text-xs text-muted-foreground">
-        {periodText(period.current)}
-        {period.current.end > period.settledEnd
-          ? ", partial days included"
-          : ""}
-        {prevTotals && period.previous
-          ? `, compared with ${periodText(period.previous)}`
-          : ""}
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs text-muted-foreground">
+          {periodText(period.current)}
+          {prevTotals && period.previous
+            ? `, compared with ${periodText(period.previous)}`
+            : ""}
+        </p>
+        <label className="inline-flex cursor-pointer items-center gap-2 text-xs">
+          <Switch checked={fresh} onCheckedChange={setFresh} />
+          Include partial days
+        </label>
+      </div>
       <div className="grid grid-cols-4 gap-2">
         {STATS.map((key) => {
           const value = totals[key];
@@ -199,16 +224,11 @@ function DetailBody({
           );
         })}
       </div>
-      <div className="flex h-36 flex-col">
-        <TrendChart
-          config={chartConfig}
-          data={insights.series.map((day) => ({
-            date: day.date,
-            clicks: day.clicks,
-            impressions: day.impressions,
-          }))}
-        />
-      </div>
+      <DetailChart
+        insights={insights}
+        metrics={metrics}
+        granularity={granularity}
+      />
       <section className="space-y-2">
         <h3 className="text-sm font-medium">
           {isPage ? "Queries for this page" : "Pages for this query"}
@@ -261,6 +281,45 @@ function DetailBody({
       </section>
     </div>
   );
+}
+
+function DetailChart({
+  insights,
+  metrics,
+  granularity,
+}: {
+  insights: Insights;
+  metrics: MetricKey[];
+  granularity: "day" | "week" | "month";
+}) {
+  const shown = PANEL_METRICS.filter((key) => metrics.includes(key));
+  const keys = shown.length > 0 ? shown : (["clicks", "impressions"] as const);
+  const { period } = insights;
+  const comparable =
+    Boolean(period.previous) && (insights.prevTotals?.impressions ?? 0) > 0;
+  const points = useMemo(
+    () =>
+      buildChartPoints({
+        series: insights.series,
+        annotations: [],
+        granularity,
+        from: chartStart(insights.series, insights.firstDataDay, granularity),
+        hasCompare: comparable,
+        firstDataDay: insights.firstDataDay,
+      }),
+    [insights, granularity, comparable],
+  );
+  const series = METRIC_KEYS.filter((key) =>
+    (keys as readonly MetricKey[]).includes(key),
+  ).map((key) => ({ key, metric: METRICS[key], color: METRICS[key].color }));
+  if (!insights.firstDataDay) {
+    return (
+      <p className="py-6 text-center text-sm text-muted-foreground">
+        No impressions in this period.
+      </p>
+    );
+  }
+  return <TimeSeriesChart points={points} series={series} height={180} />;
 }
 
 function Change({

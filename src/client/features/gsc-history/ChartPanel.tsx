@@ -131,13 +131,18 @@ export function ChartPanel({
       ? { start: addDay(completeEnd, 1), end: period.chartEnd }
       : null;
   const noData = !insights.firstDataDay;
+  // Fork addition (FORK-CHANGES.md): "Include partial days" draws them solid.
+  const includesPartial = period.current.end > period.settledEnd;
   return (
     <section className="rounded-xl border border-border bg-card p-4">
       <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-2">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 text-xs leading-6 text-muted-foreground [&>span]:whitespace-nowrap">
           <span className="inline-flex items-center gap-1.5">
             <span className="h-0.5 w-4 rounded bg-foreground/70" />
-            {periodText({ start: shownStart, end: completeEnd })}
+            {periodText({
+              start: shownStart,
+              end: includesPartial ? period.current.end : completeEnd,
+            })}
           </span>
           {comparable && period.previous && !noData ? (
             <span className="inline-flex items-center gap-1.5">
@@ -148,7 +153,12 @@ export function ChartPanel({
               })}
             </span>
           ) : null}
-          {hasPartial && !noData ? (
+          {includesPartial && fresh && !noData ? (
+            <span title="Search Console is still adding data for these days (fresh data), so they are lower than they will end up.">
+              {shortRange(fresh.start, fresh.end)} still partial
+            </span>
+          ) : null}
+          {hasPartial && !includesPartial && !noData ? (
             <span
               className="inline-flex items-center gap-1.5"
               title="Search Console is still adding data for these days (fresh data), so they are lower than they will end up."

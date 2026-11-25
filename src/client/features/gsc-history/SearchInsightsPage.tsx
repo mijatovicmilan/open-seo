@@ -192,6 +192,8 @@ export function SearchInsightsPage({
                 <InsightsDetailSheet
                   target={detail}
                   request={request}
+                  metrics={state.metrics}
+                  granularity={resolvedGranularity}
                   onOpen={setDetail}
                   onFilter={(target) => {
                     setDetail(null);

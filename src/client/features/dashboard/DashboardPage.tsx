@@ -10,8 +10,8 @@ import {
 } from "@/client/components/ui/tabs";
 import { DashboardKeywords } from "./DashboardKeywords";
 import { DashboardBacklinks } from "./DashboardBacklinks";
-import { DashboardNewQueries } from "./DashboardNewQueries";
-import { DashboardLinkActivity } from "./DashboardLinkActivity";
+// Fork addition (FORK-CHANGES.md): our own Overview tab.
+import { DashboardOverview } from "@/client/features/dashboard/overview/DashboardOverview";
 import { dashboardSiteTabSchema } from "@/types/schemas/dashboard";
 import type { z } from "zod";
 import { useQuery } from "@tanstack/react-query";
@@ -20,11 +20,6 @@ import {
   DashboardAgentCard,
   DashboardAgentPromptCard,
 } from "./DashboardAgentCard";
-import {
-  AuditHealthCard,
-  GscCard,
-} from "@/client/features/dashboard/DashboardCards";
-import { Ga4Card } from "@/client/features/dashboard/Ga4Card";
 import { WorkspaceMergeBanner } from "@/client/features/dashboard/WorkspaceMergeBanner";
 import { QueryError } from "@/client/components/QueryState";
 import {
@@ -82,9 +77,7 @@ export function DashboardPage({
     return <DashboardSkeleton />;
   }
 
-  const showBacklinks = activation.domain !== null;
   const gscConnected = activation.gsc.connected;
-  const ga4Connected = activation.ga4.connected;
   const agentConnected = isAgentConnected(activation);
   // An agent is connected, but no one in the organization has used OpenSEO
   // from one yet.
@@ -173,40 +166,14 @@ export function DashboardPage({
           </TabsList>
 
           {/* Base UI unmounts inactive panels, so paid detail queries load only on opening their tab. */}
-          <TabsContent
-            value="overview"
-            className="grid gap-4 lg:grid-cols-2 lg:[&>*:last-child:nth-child(odd)]:col-span-2"
-            keepMounted={false}
-          >
-            {/* One fixed order for every project, so connecting or scanning
-                fills a card in place. Search Console always renders:
-                connected shows the report, otherwise the connect pitch. */}
-            <DashboardNewQueries
+          {/* Fork change (FORK-CHANGES.md): our own Overview (search chart,
+              trends, what needs attention) replaces upstream's cards. */}
+          <TabsContent value="overview" keepMounted={false}>
+            <DashboardOverview
               projectId={projectId}
-              connected={gscConnected}
-              siteUrl={activation.gsc.siteUrl}
+              domain={activation.domain}
+              audit={overview?.audit ?? null}
             />
-            <GscCard
-              projectId={projectId}
-              connected={gscConnected}
-              siteUrl={activation.gsc.siteUrl}
-            />
-            {ga4Connected || !activation.ga4.cardDismissedAt ? (
-              <Ga4Card projectId={projectId} connected={ga4Connected} />
-            ) : null}
-            {overview ? (
-              <AuditHealthCard
-                projectId={projectId}
-                audit={overview.audit}
-                domain={activation.domain}
-              />
-            ) : null}
-            {showBacklinks ? (
-              <DashboardLinkActivity
-                projectId={projectId}
-                domain={activation.domain!}
-              />
-            ) : null}
           </TabsContent>
 
           <TabsContent value="keywords" keepMounted={false}>

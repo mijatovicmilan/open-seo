@@ -22,24 +22,21 @@ import {
 } from "@/client/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/client/components/ui/tabs";
 import {
-  type ChartPoint,
-  type ChartSeries,
-  TimeSeriesChart,
-} from "@/client/features/charts/TimeSeriesChart";
-import { SegmentGroup } from "@/client/features/charts/ChoiceMenu";
-import {
   ScheduledTab,
   ScheduleStrip,
 } from "@/client/features/outreach/OutreachSchedule";
+import { OutreachAnalytics } from "@/client/features/outreach/OutreachAnalytics";
 import { OutreachProspectPanel } from "@/client/features/outreach/OutreachProspectPanel";
 import { OutreachSettingsForm } from "@/client/features/outreach/OutreachSettingsForm";
 import {
   ActionPill,
+  EmptyState,
   Favicon,
   formatDateTime,
   formatNumber,
   outreachFaviconsKey,
   outreachQueryKey,
+  Panel,
   ScorePill,
   StatusBadge,
 } from "@/client/features/outreach/outreachUi";
@@ -54,7 +51,6 @@ import {
   OUTREACH_FILTERS,
   OUTREACH_TABS,
   outreachAttention,
-  type OutreachBreakdownRow,
   type OutreachFilter,
   outreachFilterCounts,
   outreachLinks,
@@ -65,46 +61,6 @@ import {
   sortOutreachProspects,
   type OutreachTab,
 } from "@/shared/outreach";
-
-// Panels follow the Search Performance page: a bordered card with a header
-// row, tables inside their own horizontal scroll so the page never scrolls
-// sideways.
-function Panel({
-  title,
-  meta,
-  actions,
-  children,
-}: {
-  title?: ReactNode;
-  meta?: ReactNode;
-  actions?: ReactNode;
-  children: ReactNode;
-}) {
-  return (
-    <section className="min-w-0 overflow-hidden rounded-xl border border-border bg-card">
-      {title || actions ? (
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
-          <div className="min-w-0">
-            {title ? <h2 className="font-semibold">{title}</h2> : null}
-            {meta ? (
-              <p className="text-xs text-muted-foreground">{meta}</p>
-            ) : null}
-          </div>
-          {actions}
-        </div>
-      ) : null}
-      {children}
-    </section>
-  );
-}
-
-function EmptyState({ children }: { children: ReactNode }) {
-  return (
-    <p className="px-4 py-8 text-center text-sm text-muted-foreground">
-      {children}
-    </p>
-  );
-}
 
 export function OutreachPage({
   projectId,
@@ -337,12 +293,8 @@ function Overview({
 }) {
   const attention = outreachAttention(data.prospects);
   const yours = attention.filter((p) => p.action.who === "owner").length;
-  const { analytics, settings } = data;
+  const { settings } = data;
   const setupMissing = !settings.siteUrl || settings.linkDomains.length === 0;
-  const rate = (value: number) =>
-    analytics.contacted
-      ? `${Math.round((value / analytics.contacted) * 100)}% of contacted`
-      : undefined;
 
   return (
     <div className="space-y-4">
@@ -366,31 +318,6 @@ function Overview({
       ) : null}
 
       <ScheduleStrip projectId={projectId} onOpen={() => onTab("scheduled")} />
-
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-5">
-        <Stat label="Contacted" value={formatNumber(analytics.contacted)} />
-        <Stat
-          label="Replied"
-          value={formatNumber(analytics.replied)}
-          hint={rate(analytics.replied)}
-        />
-        <Stat
-          label="Median reply"
-          value={
-            analytics.medianReplyHours === null
-              ? "—"
-              : analytics.medianReplyHours < 48
-                ? `${Math.round(analytics.medianReplyHours)} h`
-                : `${Math.round(analytics.medianReplyHours / 24)} d`
-          }
-        />
-        <Stat
-          label="Links won"
-          value={formatNumber(analytics.linksWon)}
-          hint={rate(analytics.linksWon)}
-        />
-        <Stat label="Links lost" value={formatNumber(analytics.linksLost)} />
-      </div>
 
       <Panel
         title="Needs attention"
@@ -450,197 +377,8 @@ function Overview({
         )}
       </Panel>
 
-      <div className="grid gap-4 xl:grid-cols-[2fr_3fr]">
-        <SentChart
-          perDay={analytics.sentPerDay}
-          perWeek={analytics.sentPerWeek}
-          timeZone={analytics.timeZoneLabel}
-        />
-        <Results analytics={analytics} />
-      </div>
+      <OutreachAnalytics projectId={projectId} />
     </div>
-  );
-}
-
-function Stat({
-  label,
-  value,
-  hint,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-}) {
-  return (
-    <div className="min-w-0 rounded-lg border border-border bg-card p-3 sm:p-4">
-      <div className="truncate text-xs tracking-wide text-muted-foreground uppercase">
-        {label}
-      </div>
-      <div className="mt-1 text-xl font-semibold tabular-nums sm:text-2xl">
-        {value}
-      </div>
-      {hint ? (
-        <div className="truncate text-xs text-muted-foreground">{hint}</div>
-      ) : null}
-    </div>
-  );
-}
-
-const SENT_SERIES: ChartSeries[] = [
-  {
-    key: "sent",
-    color: "var(--chart-1)",
-    metric: {
-      name: "Sent",
-      integer: true,
-      minTop: 4,
-      format: (value) => `${value}`,
-    },
-  },
-];
-
-function sentTick(date: string) {
-  return new Date(`${date}T00:00:00Z`).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  });
-}
-
-function SentChart({
-  perDay,
-  perWeek,
-  timeZone,
-}: {
-  perDay: Array<{ date: string; value: number }>;
-  perWeek: Array<{ date: string; value: number }>;
-  timeZone: string;
-}) {
-  const [view, setView] = useState<"day" | "week">("day");
-  const data = view === "day" ? perDay : perWeek;
-  const total = data.reduce((sum, item) => sum + item.value, 0);
-  const points: ChartPoint[] = data.map((item) => ({
-    key: item.date,
-    tick: sentTick(item.date),
-    label:
-      view === "day"
-        ? new Date(`${item.date}T00:00:00Z`).toLocaleDateString("en-US", {
-            weekday: "short",
-            month: "short",
-            day: "numeric",
-            timeZone: "UTC",
-          })
-        : `Week of ${sentTick(item.date)}`,
-    values: { sent: item.value },
-  }));
-  return (
-    <Panel
-      title="Emails sent"
-      meta={`${total} ${view === "day" ? "in the last 14 days" : "in the last 8 weeks"} · first emails and follow-ups · ${timeZone}`}
-      actions={
-        <SegmentGroup
-          label="Granularity"
-          items={[
-            { value: "day", label: "Days" },
-            { value: "week", label: "Weeks" },
-          ]}
-          value={view}
-          onChange={setView}
-        />
-      }
-    >
-      <div className="px-2 pb-3 pt-4 sm:px-4">
-        <TimeSeriesChart
-          points={points}
-          series={SENT_SERIES}
-          kind="bar"
-          height={180}
-        />
-      </div>
-    </Panel>
-  );
-}
-
-const RESULT_VIEWS = [
-  { value: "angle", label: "Angle" },
-  { value: "band", label: "Score band" },
-  { value: "page", label: "Our page" },
-] as const;
-
-function Results({ analytics }: { analytics: OutreachSnapshot["analytics"] }) {
-  const [view, setView] =
-    useState<(typeof RESULT_VIEWS)[number]["value"]>("angle");
-  const rows: OutreachBreakdownRow[] =
-    view === "angle"
-      ? analytics.byAngle
-      : view === "band"
-        ? analytics.byBand
-        : analytics.byOurPage;
-  return (
-    <Panel
-      title="Results"
-      actions={
-        <Tabs
-          value={view}
-          onValueChange={(value) => {
-            const next = RESULT_VIEWS.find((item) => item.value === value);
-            if (next) setView(next.value);
-          }}
-        >
-          <TabsList variant="line" className="*:flex-none">
-            {RESULT_VIEWS.map((item) => (
-              <TabsTrigger key={item.value} value={item.value}>
-                {item.label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
-      }
-    >
-      {rows.length === 0 ? (
-        <EmptyState>No prospects yet.</EmptyState>
-      ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-full">
-                {RESULT_VIEWS.find((item) => item.value === view)?.label}
-              </TableHead>
-              <TableHead className="px-2 text-right" title="Prospects">
-                Total
-              </TableHead>
-              <TableHead className="px-2 text-right">Sent</TableHead>
-              <TableHead className="px-2 text-right">Replied</TableHead>
-              <TableHead className="px-2 text-right">Linked</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((row) => (
-              <TableRow key={row.label}>
-                <TableCell
-                  className="max-w-0 min-w-28 truncate"
-                  title={row.label}
-                >
-                  {row.label}
-                </TableCell>
-                <TableCell className="px-2 text-right tabular-nums">
-                  {row.prospects}
-                </TableCell>
-                <TableCell className="px-2 text-right tabular-nums">
-                  {row.sent}
-                </TableCell>
-                <TableCell className="px-2 text-right tabular-nums">
-                  {row.replied}
-                </TableCell>
-                <TableCell className="px-2 text-right tabular-nums">
-                  {row.linked}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      )}
-    </Panel>
   );
 }
 

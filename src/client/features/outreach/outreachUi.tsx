@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { cn } from "cn";
@@ -170,4 +171,44 @@ export function formatNumber(value: number | null | undefined) {
   return value === null || value === undefined
     ? "—"
     : value.toLocaleString("en-US");
+}
+
+// Panels follow the Search Performance page: a bordered card with a header
+// row, tables inside their own horizontal scroll so the page never scrolls
+// sideways.
+export function Panel({
+  title,
+  meta,
+  actions,
+  children,
+}: {
+  title?: ReactNode;
+  meta?: ReactNode;
+  actions?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <section className="min-w-0 overflow-hidden rounded-xl border border-border bg-card">
+      {title || actions ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
+          <div className="min-w-0">
+            {title ? <h2 className="font-semibold">{title}</h2> : null}
+            {meta ? (
+              <p className="text-xs text-muted-foreground">{meta}</p>
+            ) : null}
+          </div>
+          {actions}
+        </div>
+      ) : null}
+      {children}
+    </section>
+  );
+}
+
+export function EmptyState({ children }: { children: ReactNode }) {
+  return (
+    <p className="px-4 py-8 text-center text-sm text-muted-foreground">
+      {children}
+    </p>
+  );
 }

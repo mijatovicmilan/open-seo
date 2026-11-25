@@ -53,6 +53,7 @@ import {
   countOutreach,
   OUTREACH_ANGLE_COLORS,
   OUTREACH_ANGLE_OTHER,
+  type OutreachAnalytics,
   type OutreachAngle,
   type OutreachMessageKind,
   outreachSendBlocker,
@@ -311,24 +312,39 @@ async function getSnapshot(
     OutreachRepository.load(project.id),
     listAngles(project.id),
   ]);
-  const withIds = assemble(loaded, config, now);
-  const prospects = withIds.map(stripId);
+  const prospects = assemble(loaded, config, now).map(stripId);
   return {
     settings: settingsView(config),
     counts: countOutreach(prospects),
     limits: outreachSendingLimits(loaded.messages, config, now),
-    analytics: outreachAnalytics({
-      prospects: withIds,
-      messages: loaded.messages,
-      linkChecks: loaded.linkChecks,
-      angles,
-      timeZone: config.timeZone,
-      now,
-    }),
     angles,
     prospects,
     readAt: now,
   };
+}
+
+// Sends, replies and links over `days` days and the period before, with
+// the weekly activity, the funnel and results per angle.
+async function getAnalytics(
+  project: ProjectRef,
+  days: number,
+  now = nowIso(),
+): Promise<OutreachAnalytics> {
+  const config = await getConfig(project);
+  const [loaded, angles] = await Promise.all([
+    OutreachRepository.load(project.id),
+    listAngles(project.id),
+  ]);
+  return outreachAnalytics({
+    prospects: assemble(loaded, config, now),
+    messages: loaded.messages,
+    events: loaded.events,
+    linkChecks: loaded.linkChecks,
+    angles,
+    timeZone: config.timeZone,
+    now,
+    days,
+  });
 }
 
 async function loadOne(project: ProjectRef, number: number, now = nowIso()) {
@@ -1630,6 +1646,7 @@ export const OutreachService = {
   updateSettings,
   testMail,
   getSnapshot,
+  getAnalytics,
   getProspect,
   getFavicons,
   listAngles,

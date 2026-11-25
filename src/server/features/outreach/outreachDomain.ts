@@ -1177,38 +1177,105 @@ function breakdown(
 const BAND_ORDER = ["Send first", "Later", "Do not send", "Not scored"];
 const NO_ANGLE = "No angle";
 
+// The day a link was won: its first check that found it, else the day the
+// agent set the status to linked.
+function wonDates(
+  input: { linkChecks: LinkCheckRow[]; events: EventRow[] },
+  local: (iso: string) => string,
+) {
+  const won = new Map<string, string>();
+  const keepEarliest = (prospectId: string, iso: string) => {
+    const date = local(iso);
+    const known = won.get(prospectId);
+    if (!known || date < known) won.set(prospectId, date);
+  };
+  for (const check of input.linkChecks) {
+    if (check.found) keepEarliest(check.prospectId, check.checkedAt);
+  }
+  const found = new Set(won.keys());
+  for (const event of input.events) {
+    if (
+      !found.has(event.prospectId) &&
+      event.type === "status" &&
+      event.detail?.startsWith("linked")
+    ) {
+      keepEarliest(event.prospectId, event.at);
+    }
+  }
+  return won;
+}
+
 export function outreachAnalytics(input: {
   prospects: Array<OutreachProspect & { id: string }>;
   messages: MessageRow[];
+  events: EventRow[];
   linkChecks: LinkCheckRow[];
   angles: OutreachAngle[];
   timeZone: string;
   now: string;
+  /** Length of the period the totals cover, compared with the one before. */
+  days: number;
 }): OutreachAnalytics {
-  const { prospects, messages, linkChecks, angles, timeZone, now } = input;
+  const { prospects, messages, angles, timeZone, now, days } = input;
   const angleLabel = new Map(angles.map((angle) => [angle.key, angle.label]));
-  const today = outreachLocalDate(now, timeZone);
-  const paced = messages
-    .filter((message) => PACED_KINDS.has(message.kind) && message.sentAt)
-    .map((message) => outreachLocalDate(message.sentAt ?? now, timeZone));
-
-  const days = Array.from({ length: 14 }, (_, index) =>
-    shiftDate(today, index - 13),
-  );
-  const thisWeek = weekStart(today);
-  const weeks = Array.from({ length: 8 }, (_, index) =>
-    shiftDate(thisWeek, (index - 7) * 7),
-  );
-
-  const contacted = new Set(
-    messages
-      .filter((m) => m.kind === "first" && m.sentAt)
-      .map((m) => m.prospectId),
+  const local = (iso: string) => outreachLocalDate(iso, timeZone);
+  const today = local(now);
+  const sends = messages.flatMap((m) =>
+    PACED_KINDS.has(m.kind) && m.sentAt
+      ? [{ prospectId: m.prospectId, kind: m.kind, date: local(m.sentAt) }]
+      : [],
   );
   const replies = messages.filter((m) => m.kind === "reply-in");
-  const repliedProspects = new Set(
-    replies.map((m) => m.prospectId).filter((p) => contacted.has(p)),
+  const replyDays = replies.map((m) => ({
+    prospectId: m.prospectId,
+    date: local(m.receivedAt ?? m.sentAt ?? m.createdAt),
+  }));
+
+  // First emails, follow-ups and replies from `start` up to, not including,
+  // `end`; the bucket holding today is still filling.
+  const bucket = (start: string, end: string) => {
+    const within = (date: string) => date >= start && date < end;
+    return {
+      date: start,
+      first: sends.filter((s) => s.kind === "first" && within(s.date)).length,
+      followUps: sends.filter((s) => s.kind === "follow-up" && within(s.date))
+        .length,
+      replies: replyDays.filter((r) => within(r.date)).length,
+      partial: within(today),
+    };
+  };
+  const thisWeek = weekStart(today);
+
+  const contacted = new Set(
+    sends.filter((s) => s.kind === "first").map((s) => s.prospectId),
   );
+  const replied = new Set(replyDays.map((r) => r.prospectId));
+  const won = wonDates(input, local);
+
+  // Totals for the days from `start` through `end`. The reply rate follows
+  // the prospects first emailed in those days, whenever they answered.
+  const totals = (start: string, end: string) => {
+    const within = (date: string) => date >= start && date <= end;
+    const firsts = sends.filter((s) => s.kind === "first" && within(s.date));
+    const reached = new Set(firsts.map((s) => s.prospectId));
+    const answered = [...reached].filter((id) => replied.has(id)).length;
+    const followUps = sends.filter(
+      (s) => s.kind === "follow-up" && within(s.date),
+    ).length;
+    return {
+      start,
+      end,
+      firstEmails: firsts.length,
+      followUps,
+      sent: firsts.length + followUps,
+      replies: new Set(
+        replyDays.filter((r) => within(r.date)).map((r) => r.prospectId),
+      ).size,
+      contacted: reached.size,
+      replyRate: reached.size ? answered / reached.size : null,
+      linksWon: [...won.values()].filter(within).length,
+    };
+  };
 
   const replyHours = replies.flatMap((reply) => {
     const receivedAt = reply.receivedAt ?? reply.sentAt;
@@ -1229,26 +1296,41 @@ export function outreachAnalytics(input: {
   });
 
   const everFound = new Set(
-    linkChecks.filter((check) => check.found).map((check) => check.prospectId),
+    input.linkChecks
+      .filter((check) => check.found)
+      .map((check) => check.prospectId),
   );
-  const won = prospects.filter(
+  const linked = prospects.filter(
     (p) => p.status === "linked" || everFound.has(p.id),
   );
+  const withStatus = (status: OutreachStatus) =>
+    prospects.filter((p) => p.status === status).length;
 
   return {
     timeZoneLabel: outreachTimeZoneLabel(timeZone),
-    sentPerDay: days.map((date) => ({
-      date,
-      value: paced.filter((d) => d === date).length,
-    })),
-    sentPerWeek: weeks.map((date) => ({
-      date,
-      value: paced.filter((d) => d >= date && d < shiftDate(date, 7)).length,
-    })),
-    contacted: contacted.size,
-    replied: repliedProspects.size,
+    days,
+    current: totals(shiftDate(today, 1 - days), today),
+    previous: totals(shiftDate(today, 1 - 2 * days), shiftDate(today, -days)),
+    everSent: sends.length > 0,
+    perDay: Array.from({ length: 14 }, (_, index) => {
+      const date = shiftDate(today, index - 13);
+      return bucket(date, shiftDate(date, 1));
+    }),
+    perWeek: Array.from({ length: 12 }, (_, index) => {
+      const date = shiftDate(thisWeek, (index - 11) * 7);
+      return bucket(date, shiftDate(date, 7));
+    }),
+    funnel: {
+      prospects: prospects.length,
+      contacted: contacted.size,
+      replied: [...replied].filter((id) => contacted.has(id)).length,
+      linked: linked.length,
+      dropped: withStatus("dropped"),
+      declined: withStatus("declined"),
+      noReply: withStatus("no reply"),
+    },
     medianReplyHours: median(replyHours),
-    linksWon: won.length,
+    linksLive: linked.filter((p) => !p.linkLost).length,
     linksLost: prospects.filter((p) => p.linkLost).length,
     byOurPage: breakdown(prospects, messages, (p) => p.ourPage || "Unknown"),
     byBand: breakdown(

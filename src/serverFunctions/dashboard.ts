@@ -34,17 +34,6 @@ export const getDashboardOverview = createServerFn({ method: "POST" })
     }),
   );
 
-// Hides only the optional GA4 pitch on this project's dashboard. The
-// integration remains available in Project Settings and a later connection
-// makes the dashboard card visible again.
-export const dismissDashboardGa4Card = createServerFn({ method: "POST" })
-  .middleware(requireProjectContext)
-  .validator(dashboardProjectInputSchema)
-  .handler(async ({ context }) => {
-    await ActivationRepository.markGa4CardDismissed(context.projectId);
-    return { ok: true as const };
-  });
-
 // Hides only the agent card, for this person on every project in the
 // workspace. The checklist's agent step stays.
 export const dismissDashboardAgentCard = createServerFn({ method: "POST" })

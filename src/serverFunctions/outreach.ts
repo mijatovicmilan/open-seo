@@ -53,6 +53,17 @@ export const getOutreachSnapshot = createServerFn({ method: "POST" })
   .validator(projectOnly)
   .handler(async ({ context }) => OutreachService.getSnapshot(context.project));
 
+export const getOutreachAnalytics = createServerFn({ method: "POST" })
+  .middleware(requireProjectContext)
+  .validator(
+    projectOnly.extend({
+      days: z.union([z.literal(7), z.literal(28), z.literal(90)]).default(28),
+    }),
+  )
+  .handler(async ({ context, data }) =>
+    OutreachService.getAnalytics(context.project, data.days),
+  );
+
 export const getOutreachFavicons = createServerFn({ method: "POST" })
   .middleware(requireProjectContext)
   .validator(projectOnly)

@@ -252,15 +252,53 @@ export type OutreachBreakdownRow = {
   linked: number;
 };
 
+// First emails, follow-ups and replies in one local day or week; `partial`
+// marks the one still filling (it holds today).
+export type OutreachActivity = {
+  date: string;
+  first: number;
+  followUps: number;
+  replies: number;
+  partial: boolean;
+};
+
+// One period's outreach, local days `start` through `end`. `replyRate` is
+// the share of the prospects first emailed in the period that answered, at
+// any time since; null when no one was emailed.
+export type OutreachPeriodTotals = {
+  start: string;
+  end: string;
+  sent: number;
+  firstEmails: number;
+  followUps: number;
+  replies: number;
+  contacted: number;
+  replyRate: number | null;
+  linksWon: number;
+};
+
 export type OutreachAnalytics = {
   timeZoneLabel: string;
-  // First emails and follow-ups per local day (14 days) and week (8 weeks).
-  sentPerDay: Array<{ date: string; value: number }>;
-  sentPerWeek: Array<{ date: string; value: number }>;
-  contacted: number;
-  replied: number;
+  days: number;
+  current: OutreachPeriodTotals;
+  previous: OutreachPeriodTotals;
+  /** Any first email or follow-up was ever sent. */
+  everSent: boolean;
+  // The last 14 local days and the last 12 weeks (Monday first).
+  perDay: OutreachActivity[];
+  perWeek: OutreachActivity[];
+  // Every prospect of the project, whenever it moved.
+  funnel: {
+    prospects: number;
+    contacted: number;
+    replied: number;
+    linked: number;
+    dropped: number;
+    declined: number;
+    noReply: number;
+  };
   medianReplyHours: number | null;
-  linksWon: number;
+  linksLive: number;
   linksLost: number;
   byOurPage: OutreachBreakdownRow[];
   byBand: OutreachBreakdownRow[];
@@ -301,7 +339,6 @@ export type OutreachSnapshot = {
   settings: OutreachSettingsView;
   counts: OutreachCounts;
   limits: OutreachLimits;
-  analytics: OutreachAnalytics;
   angles: OutreachAngle[];
   prospects: OutreachProspect[];
   readAt: string;

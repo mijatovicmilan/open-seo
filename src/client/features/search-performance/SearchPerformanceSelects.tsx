@@ -170,7 +170,7 @@ export function SearchPerformanceSelects({
   );
 }
 
-export function DateRangeSelect({
+function DateRangeSelect({
   value,
   onChange,
   triggerClassName,

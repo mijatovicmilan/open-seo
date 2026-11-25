@@ -5,6 +5,7 @@ import {
   type EventRow,
   findLinkToUs,
   type MessageRow,
+  outreachAnalytics,
   type OutreachConfig,
   outreachHash,
   outreachSendingLimits,
@@ -241,5 +242,61 @@ describe("sending limits", () => {
     expect(limits.sentToday).toBe(0);
     expect(limits.sentWeek).toBe(0);
     expect(limits.allowedNow).toBe(3);
+  });
+});
+
+describe("outreach analytics", () => {
+  it("buckets by local day and week and rates replies by who was emailed in the period", () => {
+    const messages = [
+      // Sunday 18:00 UTC is Monday 01:00 in Bangkok: this week, this period.
+      message({ id: 1, sentAt: "2026-11-01T18:00:00.000Z" }),
+      message({
+        id: 2,
+        kind: "reply-in",
+        receivedAt: "2026-11-03T03:00:00.000Z",
+      }),
+      message({ id: 3, prospectId: "p2", sentAt: "2026-10-26T03:00:00.000Z" }),
+      message({
+        id: 4,
+        prospectId: "p2",
+        kind: "follow-up",
+        sentAt: "2026-11-03T03:00:00.000Z",
+      }),
+    ];
+    const prospect = (id: string) => ({
+      id,
+      ...build({
+        row: { id, status: "sent" },
+        messages: messages.filter((m) => m.prospectId === id),
+      }),
+    });
+    const analytics = outreachAnalytics({
+      prospects: [prospect("p1"), prospect("p2")],
+      messages,
+      events: [],
+      linkChecks: [],
+      angles: [],
+      timeZone: "Asia/Bangkok",
+      now: "2026-11-04T05:00:00.000Z",
+      days: 7,
+    });
+    expect(analytics.current).toMatchObject({
+      firstEmails: 1,
+      followUps: 1,
+      replies: 1,
+      replyRate: 1,
+    });
+    // p2 was emailed in the period before and has not answered.
+    expect(analytics.previous).toMatchObject({ firstEmails: 1, replyRate: 0 });
+    expect(analytics.perWeek.slice(-2)).toEqual([
+      {
+        date: "2026-10-26",
+        first: 1,
+        followUps: 0,
+        replies: 0,
+        partial: false,
+      },
+      { date: "2026-11-02", first: 1, followUps: 1, replies: 1, partial: true },
+    ]);
   });
 });

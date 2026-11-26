@@ -1,3 +1,4 @@
+import { GoogleUnreachableError } from "@/server/lib/gscErrors";
 import { symmetricDecrypt, symmetricEncrypt } from "better-auth/crypto";
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -188,6 +189,11 @@ async function fetchTokens(params: Record<string, string>) {
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams(params),
     signal: AbortSignal.timeout(TOKEN_TIMEOUT_MS),
+  }).catch((error: unknown) => {
+    // Fork addition (FORK-CHANGES.md): Google not answering at all (no
+    // internet, DNS) is an outage, not a refused grant.
+    if (error instanceof Error && error.name === "TimeoutError") throw error;
+    throw new GoogleUnreachableError(error);
   });
   if (!response.ok) return null;
   return googleTokenResponseSchema.parse(await response.json());

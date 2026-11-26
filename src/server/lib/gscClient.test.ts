@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createGscClient, GscApiError, GscTokenError } from "./gscClient";
+import { GoogleUnreachableError } from "./gscErrors";
 
 const mocks = vi.hoisted(() => ({
   getAccessToken: vi.fn(),
@@ -179,5 +180,19 @@ describe("gscClient", () => {
     await expect(
       createGscClient({ userId: "u1" }).listSites(),
     ).rejects.toMatchObject({ name: "GscApiError", status: 504 });
+  });
+
+  // Fork addition (FORK-CHANGES.md): offline, the sync must not ask the
+  // owner to reconnect Search Console.
+  it("reports Google not answering as an outage, for the token and the call", async () => {
+    mocks.getAccessToken.mockRejectedValueOnce(new GoogleUnreachableError());
+    await expect(
+      createGscClient({ userId: "u1" }).listSites(),
+    ).rejects.toMatchObject({ name: "GscApiError", status: 503 });
+
+    mocks.fetch.mockRejectedValueOnce(new Error("internal error"));
+    await expect(
+      createGscClient({ userId: "u1" }).listSites(),
+    ).rejects.toMatchObject({ name: "GscApiError", status: 503 });
   });
 });

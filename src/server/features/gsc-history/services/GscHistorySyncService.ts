@@ -1,3 +1,4 @@
+import { sort } from "remeda";
 import {
   GscNotConnectedError,
   GscService,
@@ -224,14 +225,15 @@ async function fetchSegments(projectId: string, day: string) {
   return { segments, querySegments };
 }
 
+const NOT_CONNECTED_MESSAGE =
+  "Search Console is not connected for this project.";
+const RECONNECT_MESSAGE =
+  "The Search Console connection expired or was revoked. Reconnect it in Settings > Integrations.";
+
 /** A short, secret-free message for the status line. */
 function describeSyncError(error: unknown): string {
-  if (error instanceof GscNotConnectedError) {
-    return "Search Console is not connected for this project.";
-  }
-  if (error instanceof GscTokenError) {
-    return "The Search Console connection expired or was revoked. Reconnect it in Settings > Integrations.";
-  }
+  if (error instanceof GscNotConnectedError) return NOT_CONNECTED_MESSAGE;
+  if (error instanceof GscTokenError) return RECONNECT_MESSAGE;
   if (error instanceof GscApiError) return error.message.slice(0, 300);
   return "Sync failed unexpectedly. Try again later.";
 }
@@ -263,9 +265,23 @@ async function syncProject(
 
   try {
     const { oldest } = historyWindow(now);
-    const plan = planSync(
-      now,
-      await GscHistoryRepository.listStoredDates(projectId, oldest),
+    const stored = await GscHistoryRepository.listStoredDates(
+      projectId,
+      oldest,
+    );
+    const plan = planSync(now, stored);
+    // Fork addition (FORK-CHANGES.md): every day stored before Google called
+    // it final is fetched again, however long the machine was off; normally
+    // these are the last few days anyway.
+    const previousSettled =
+      (await GscHistoryRepository.getSyncState(projectId))?.settledThrough ??
+      null;
+    const unsettled = previousSettled
+      ? stored.filter((day) => day > previousSettled)
+      : [];
+    const candidates = sort(
+      [...new Set([...plan.candidates, ...unsettled])],
+      (a, b) => b.localeCompare(a),
     );
     const {
       byDay: totals,
@@ -280,11 +296,12 @@ async function syncProject(
       [...totals].map(([day, metrics]) => [day, metrics.impressions]),
     );
     const selection = selectDays(
+      // The partial refresh: today's new day too, which is not stored yet.
       options.partialOnly
-        ? plan.candidates.filter(
-            (day) => settledThrough !== null && day > settledThrough,
+        ? candidates.filter(
+            (day) => previousSettled === null || day > previousSettled,
           )
-        : plan.candidates,
+        : candidates,
       impressionsByDay,
       options.maxDetailDays ?? MAX_DETAIL_DAYS_PER_RUN,
     );
@@ -408,10 +425,18 @@ async function refreshPartialDays(now = new Date()): Promise<void> {
   for (const projectId of await GscHistoryRepository.listConnectedProjectIds()) {
     try {
       const state = await GscHistoryRepository.getSyncState(projectId);
-      // Before the backfill, or after a failed sync, the daily job and the
-      // page do the work.
-      if (!state?.settledThrough || !state.backfillDoneAt || state.lastError)
+      // Before the backfill the daily job and the page do the work.
+      if (!state?.settledThrough || !state.backfillDoneAt) continue;
+      // After a failed sync (no internet, the machine was off) try again
+      // until it works; a dead grant waits for the owner to reconnect.
+      if (state.lastError) {
+        if (
+          state.lastError !== RECONNECT_MESSAGE &&
+          state.lastError !== NOT_CONNECTED_MESSAGE
+        )
+          await syncProject(projectId, { now });
         continue;
+      }
       const from = addDays(state.settledThrough, 1);
       const floor = addDays(today, -(HOURLY_DAYS - 1));
       const latest = await fetchNewestHour(

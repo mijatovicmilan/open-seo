@@ -28,6 +28,17 @@ export class GscTokenError extends Error {
   }
 }
 
+/** Fork addition (FORK-CHANGES.md): Google could not be reached at all (no
+ *  internet, DNS). An outage the next sync retries, not a revoked grant. */
+export class GoogleUnreachableError extends Error {
+  constructor(public readonly cause?: unknown) {
+    super(
+      "Couldn't reach Google (no internet connection?). The next sync retries.",
+    );
+    this.name = "GoogleUnreachableError";
+  }
+}
+
 export class GscNotConnectedError extends Error {
   constructor(public readonly projectId: string) {
     super("Search Console is not connected for this project");

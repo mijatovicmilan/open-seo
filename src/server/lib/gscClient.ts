@@ -2,7 +2,11 @@ import { getGoogleAccessToken } from "@/server/features/google/googleOAuth";
 import { getGoogleAccessMode } from "@/server/features/google/googleAccess";
 import { getGatewayGoogleFetch } from "@/server/features/google/gatewayGoogle";
 import { GSC_OAUTH_PROVIDER_ID } from "@/shared/gsc";
-import { GscApiError, GscTokenError } from "./gscErrors";
+import {
+  GoogleUnreachableError,
+  GscApiError,
+  GscTokenError,
+} from "./gscErrors";
 
 export { GscApiError, GscTokenError } from "./gscErrors";
 
@@ -89,6 +93,23 @@ function messageForStatus(status: number, body: string): string {
   return `Search Console API error (${status}): ${body.slice(0, 300)}`;
 }
 
+/** A slow or unreachable Google, as the error the caller reports; null
+ *  for anything else. */
+function outage(error: unknown): GscApiError | null {
+  if (error instanceof Error && error.name === "TimeoutError") {
+    return new GscApiError(
+      504,
+      "Search Console didn't respond in time. Retry shortly.",
+    );
+  }
+  // Fork addition (FORK-CHANGES.md): no answer from Google at all.
+  return error instanceof GoogleUnreachableError ? unreachable(error) : null;
+}
+
+function unreachable(cause: unknown) {
+  return new GscApiError(503, new GoogleUnreachableError(cause).message);
+}
+
 /** Free Google Search Console client. Unlike the DataForSEO client it does NOT
  *  meter credits — GSC is first-party data with no per-call cost. Access tokens
  *  come from (and are auto-refreshed against) the connector's stored
@@ -108,8 +129,14 @@ export function createGscClient(opts: {
     }).catch((error: unknown) => {
       tokenPromise = undefined;
       // A slow token endpoint is an outage, not a revoked grant: request()
-      // reports it as one rather than prompting a reconnect.
-      if (error instanceof Error && error.name === "TimeoutError") throw error;
+      // reports it as one rather than prompting a reconnect. So is Google
+      // not answering at all (fork addition, FORK-CHANGES.md).
+      if (
+        error instanceof Error &&
+        (error.name === "TimeoutError" ||
+          error instanceof GoogleUnreachableError)
+      )
+        throw error;
       throw new GscTokenError(
         "Could not mint a Search Console access token (grant revoked or expired).",
         error,
@@ -147,9 +174,18 @@ export function createGscClient(opts: {
     init?: { method?: string; body?: unknown },
   ): Promise<T> {
     const hasBody = init?.body !== undefined;
+    // Fork change (FORK-CHANGES.md): the token and the call fail apart, so
+    // a call Google never answered reads as an outage, not a dead grant.
+    let auth: Awaited<ReturnType<typeof authenticated>>;
+    try {
+      auth = await authenticated();
+    } catch (error) {
+      throw outage(error) ?? error;
+    }
+    // Called on its own: workerd's fetch refuses another object as `this`.
+    const { fetch: send, headers } = auth;
     let response: Response;
     try {
-      const { fetch: send, headers } = await authenticated();
       response = await send(url, {
         method: init?.method ?? "GET",
         headers: {
@@ -160,13 +196,7 @@ export function createGscClient(opts: {
         signal: AbortSignal.timeout(GSC_TIMEOUT_MS),
       });
     } catch (error) {
-      if (error instanceof Error && error.name === "TimeoutError") {
-        throw new GscApiError(
-          504,
-          "Search Console didn't respond in time. Retry shortly.",
-        );
-      }
-      throw error;
+      throw outage(error) ?? unreachable(error);
     }
     if (!response.ok) {
       const body = await response.text().catch(() => "");

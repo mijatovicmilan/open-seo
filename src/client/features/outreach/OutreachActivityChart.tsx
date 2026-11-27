@@ -79,10 +79,8 @@ export function ActivityChart({
             />
             <Tooltip
               cursor={{ fill: "var(--muted)", opacity: 0.5 }}
-              content={({ active, payload }) => {
-                const bucket = payload?.[0]?.payload as
-                  | OutreachActivity
-                  | undefined;
+              content={({ active, label }) => {
+                const bucket = buckets.find((b) => b.date === label);
                 if (!active || !bucket) return null;
                 return (
                   <div className="rounded-md border border-border bg-popover px-3 py-2 text-xs shadow-md">

@@ -30,7 +30,8 @@ import type {
 // Fork feature (FORK-CHANGES.md): what outreach brought in, on the Outreach
 // page and (compact) on the dashboard.
 
-type Days = 7 | 28 | 90;
+const DAYS = [7, 28, 90] as const;
+type Days = (typeof DAYS)[number];
 
 const PERIODS: Array<{ value: `${Days}`; label: string }> = [
   { value: "7", label: "7 days" },
@@ -105,7 +106,10 @@ export function OutreachAnalytics({
           label="Period"
           items={PERIODS}
           value={`${days}`}
-          onChange={(value) => setDays(Number(value) as Days)}
+          onChange={(value) => {
+            const next = DAYS.find((d) => `${d}` === value);
+            if (next) setDays(next);
+          }}
         />
       </div>
       <Numbers analytics={analytics} />

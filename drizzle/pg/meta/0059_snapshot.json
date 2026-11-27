@@ -1,6 +1,6 @@
 {
-  "id": "74aafc80-a8b2-402a-9260-1d1b6c331ca2",
-  "prevId": "292c5557-11b6-4383-a958-8611c2a8fcd7",
+  "id": "292c5557-11b6-4383-a958-8611c2a8fcd7",
+  "prevId": "44f4ad19-4a77-4736-b666-391b6a0945ca",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -6551,12 +6551,6 @@
         },
         "backfill_done_at": {
           "name": "backfill_done_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "settled_through": {
-          "name": "settled_through",
           "type": "text",
           "primaryKey": false,
           "notNull": false

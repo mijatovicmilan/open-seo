@@ -8,6 +8,8 @@ import { BackLink, PageHeader } from "@/client/components/PageHeader";
 import { pageHead } from "@/client/lib/pageHead";
 import leafletCss from "leaflet/dist/leaflet.css?url";
 import localRankMapCss from "@/client/features/local-seo/local-rank-map.css?url";
+import { distanceUnitQueryOptions } from "@/client/features/settings/distanceUnitQueries";
+import { queryClient } from "@/client/tanstack-db/queryClient";
 
 export const Route = createFileRoute("/_app/p/$projectId/local-seo")({
   head: () => ({
@@ -25,6 +27,8 @@ export const Route = createFileRoute("/_app/p/$projectId/local-seo")({
       params: { projectId: params.projectId },
     });
   },
+  // Distances show in the user's unit (see useDistanceUnit).
+  loader: () => queryClient.ensureQueryData(distanceUnitQueryOptions()),
   component: LocalSeoLayout,
 });
 function LocalSeoLayout() {

@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "1298974a-077a-4207-a1f5-42468c60aa3f",
-  "prevId": "38e4741b-62b8-44c1-b866-00d27ed376fa",
+  "id": "38e4741b-62b8-44c1-b866-00d27ed376fa",
+  "prevId": "8c133b3e-8839-422a-9423-e389cd49179e",
   "tables": {
     "account_deletion_requests": {
       "name": "account_deletion_requests",
@@ -5354,20 +5354,13 @@
           "autoincrement": false,
           "default": 465
         },
-        "smtp_user": {
-          "name": "smtp_user",
+        "mail_env_key": {
+          "name": "mail_env_key",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
           "default": "''"
-        },
-        "smtp_password_encrypted": {
-          "name": "smtp_password_encrypted",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
         },
         "time_zone": {
           "name": "time_zone",

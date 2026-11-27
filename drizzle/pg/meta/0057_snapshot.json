@@ -1,6 +1,6 @@
 {
-  "id": "44f4ad19-4a77-4736-b666-391b6a0945ca",
-  "prevId": "46c18ae1-076a-4ea6-9d55-7ff7e73ff042",
+  "id": "46c18ae1-076a-4ea6-9d55-7ff7e73ff042",
+  "prevId": "91911a7f-0b6c-4979-947b-ca890d7c619f",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -5833,18 +5833,12 @@
           "notNull": true,
           "default": 465
         },
-        "smtp_user": {
-          "name": "smtp_user",
+        "mail_env_key": {
+          "name": "mail_env_key",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
           "default": "''"
-        },
-        "smtp_password_encrypted": {
-          "name": "smtp_password_encrypted",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
         },
         "time_zone": {
           "name": "time_zone",

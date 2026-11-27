@@ -1,6 +1,6 @@
 {
-  "id": "292c5557-11b6-4383-a958-8611c2a8fcd7",
-  "prevId": "44f4ad19-4a77-4736-b666-391b6a0945ca",
+  "id": "44f4ad19-4a77-4736-b666-391b6a0945ca",
+  "prevId": "46c18ae1-076a-4ea6-9d55-7ff7e73ff042",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -8832,52 +8832,6 @@
             "id"
           ],
           "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.dataforseo_settings": {
-      "name": "dataforseo_settings",
-      "schema": "",
-      "columns": {
-        "organization_id": {
-          "name": "organization_id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "automatic_calls": {
-          "name": "automatic_calls",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "to_char(now() AT TIME ZONE 'utc', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"')"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "dataforseo_settings_organization_id_organization_id_fk": {
-          "name": "dataforseo_settings_organization_id_organization_id_fk",
-          "tableFrom": "dataforseo_settings",
-          "tableTo": "organization",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },

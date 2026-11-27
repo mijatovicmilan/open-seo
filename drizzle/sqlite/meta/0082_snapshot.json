@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "6b61e433-3cf8-45cc-8f3e-2532cecb8f92",
-  "prevId": "37fa36b4-c157-4542-a3a3-1d54b817caae",
+  "id": "37fa36b4-c157-4542-a3a3-1d54b817caae",
+  "prevId": "9c3c869c-1d6e-4395-bc1b-fddda3a5b28f",
   "tables": {
     "account_deletion_requests": {
       "name": "account_deletion_requests",
@@ -6073,13 +6073,6 @@
         },
         "settled_through": {
           "name": "settled_through",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "newest_hour": {
-          "name": "newest_hour",
           "type": "text",
           "primaryKey": false,
           "notNull": false,

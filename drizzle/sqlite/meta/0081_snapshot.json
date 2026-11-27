@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "37fa36b4-c157-4542-a3a3-1d54b817caae",
-  "prevId": "9c3c869c-1d6e-4395-bc1b-fddda3a5b28f",
+  "id": "9c3c869c-1d6e-4395-bc1b-fddda3a5b28f",
+  "prevId": "1298974a-077a-4207-a1f5-42468c60aa3f",
   "tables": {
     "account_deletion_requests": {
       "name": "account_deletion_requests",
@@ -6066,13 +6066,6 @@
         },
         "backfill_done_at": {
           "name": "backfill_done_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "settled_through": {
-          "name": "settled_through",
           "type": "text",
           "primaryKey": false,
           "notNull": false,

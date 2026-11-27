@@ -1,6 +1,6 @@
 {
-  "id": "3936fac1-db29-4df8-8759-228963f33e98",
-  "prevId": "74aafc80-a8b2-402a-9260-1d1b6c331ca2",
+  "id": "74aafc80-a8b2-402a-9260-1d1b6c331ca2",
+  "prevId": "292c5557-11b6-4383-a958-8611c2a8fcd7",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -6557,12 +6557,6 @@
         },
         "settled_through": {
           "name": "settled_through",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "newest_hour": {
-          "name": "newest_hour",
           "type": "text",
           "primaryKey": false,
           "notNull": false
